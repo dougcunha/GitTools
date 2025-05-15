@@ -19,7 +19,7 @@ GitTools is a command-line tool for searching and removing tags in multiple Git 
 - Allows interactive selection of repositories to remove tags from
 - Removes only the tags that actually exist in each repository
 - Supports multiple tags (comma-separated)
-- Modern, user-friendly terminal UI using Spectre.Console
+- Modern, user-friendly terminal UI using [Spectre.Console](https://spectreconsole.net/)
 
 ## Usage
 
@@ -62,7 +62,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to th
 This project uses the following open source libraries:
 
 - [Spectre.Console](https://spectreconsole.net/) — for beautiful, interactive console UIs in .NET
-- [FluentArgs](https://github.com/adambajguz/FluentArgs) — for modern, fluent command-line argument parsing
+- [FluentArgs](https://github.com/kutoga/FluentArgs) — for modern, fluent command-line argument parsing
 
 ## License
 
