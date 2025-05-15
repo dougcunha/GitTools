@@ -7,6 +7,7 @@
 - [Build](#build)
 - [Publish as Single File (Windows x64)](#publish-as-single-file-windows-x64)
 - [Contributing](#contributing)
+- [Third-party Libraries](#third-party-libraries)
 - [License](#license)
 
 GitTools is a command-line tool for searching and removing tags in multiple Git repositories and their submodules. It is designed to help you manage tags across large codebases with ease.
@@ -22,7 +23,7 @@ GitTools is a command-line tool for searching and removing tags in multiple Git 
 
 ## Usage
 
-```
+```sh
 GitTools --dir <root-directory> --tags <tag1,tag2,...>
 ```
 
@@ -34,7 +35,7 @@ GitTools --dir <root-directory> --tags <tag1,tag2,...>
 
 ### Example
 
-```
+```sh
 GitTools --dir C:\Projects --tags NET8,NET7
 ```
 
@@ -42,19 +43,26 @@ GitTools --dir C:\Projects --tags NET8,NET7
 
 This project requires [.NET 9 SDK](https://dotnet.microsoft.com/) to build and run.
 
-```
+```sh
 dotnet build
 ```
 
 ## Publish as Single File (Windows x64)
 
-```
+```sh
 dotnet publish -c Release -r win-x64 --self-contained true
 ```
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to this project.
+
+## Third-party Libraries
+
+This project uses the following open source libraries:
+
+- [Spectre.Console](https://spectreconsole.net/) — for beautiful, interactive console UIs in .NET
+- [FluentArgs](https://github.com/adambajguz/FluentArgs) — for modern, fluent command-line argument parsing
 
 ## License
 
