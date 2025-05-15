@@ -44,8 +44,7 @@ public sealed class Program
         var baseFolder = dir;
         var tagsToSearch = tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        AnsiConsole.MarkupLine($"[blue]Base folder: [bold]{baseFolder}[/][/]");
-        AnsiConsole.MarkupLine($"[blue]Tags to search: [bold]{string.Join(", ", tagsToSearch)}[/][/]");
+        ShowInitialInfo(baseFolder, tagsToSearch);
 
         var allGitFolders = await ScanGitRepositoriesAsync(baseFolder);
 
@@ -57,11 +56,45 @@ public sealed class Program
         }
 
         AnsiConsole.MarkupLine($"[blue]{allGitFolders.Count} repositories found.[/]");
+
+        var (reposWithTag, repoTagsMap, scanErrors) = await FindRepositoriesWithTagsAsync(allGitFolders, tagsToSearch);
+
+        if (reposWithTag.Count == 0)
+        {
+            AnsiConsole.MarkupLine($"[yellow]No repository with the specified tag(s) found.[/]");
+            ShowScanErrors(scanErrors, baseFolder);
+
+            return;
+        }
+
+        var selectedPaths = PromptRepositorySelection(repoTagsMap, reposWithTag, baseFolder, tagsToSearch);
+
+        if (selectedPaths.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[yellow]No repository selected.[/]");
+
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"[blue]Removing tag(s) {string.Join(", ", tagsToSearch)}...[/]");
+        await RemoveTagsFromRepositoriesAsync(selectedPaths, repoTagsMap, baseFolder);
+        ShowFinalStatus(scanErrors, baseFolder);
+    }
+
+    private static void ShowInitialInfo(string baseFolder, string[] tagsToSearch)
+    {
+        AnsiConsole.MarkupLine($"[blue]Base folder: [bold]{baseFolder}[/][/]");
+        AnsiConsole.MarkupLine($"[blue]Tags to search: [bold]{string.Join(", ", tagsToSearch)}[/][/]");
+    }
+
+    private static async Task<(List<string> reposWithTag, Dictionary<string, List<string>> repoTagsMap, Dictionary<string, Exception> scanErrors)> FindRepositoriesWithTagsAsync(List<string> allGitFolders, string[] tagsToSearch)
+    {
         var reposWithTag = new List<string>();
         var repoTagsMap = new Dictionary<string, List<string>>();
+        var scanErrors = new Dictionary<string, Exception>();
 
         await AnsiConsole.Status()
-            .StartAsync($"⏳ Checking tags '{string.Join(", ", tagsToSearch)}' in repositories...",
+            .StartAsync($"🔍 Checking tags '{string.Join(", ", tagsToSearch)}' in repositories...",
             async ctx =>
             {
                 foreach (var repo in allGitFolders)
@@ -69,29 +102,63 @@ public sealed class Program
                     ctx.Status($"Checking {Path.GetFileName(repo)}...");
                     ctx.Spinner(Spinner.Known.Line);
 
-                    var foundTags = new List<string>();
-                    foreach (var tag in tagsToSearch)
+                    try
                     {
-                        if (await HasTagAsync(repo, tag))
+                        var foundTags = new List<string>();
+
+                        foreach (var tag in tagsToSearch)
                         {
-                            foundTags.Add(tag);
+                            try
+                            {
+                                if (await HasTagAsync(repo, tag))
+                                {
+                                    foundTags.Add(tag);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                scanErrors[repo] = ex;
+
+                                break;
+                            }
+                        }
+                        if (foundTags.Count > 0)
+                        {
+                            reposWithTag.Add(repo);
+                            repoTagsMap[repo] = foundTags;
                         }
                     }
-                    if (foundTags.Count > 0)
+                    catch (Exception ex)
                     {
-                        reposWithTag.Add(repo);
-                        repoTagsMap[repo] = foundTags;
+                        scanErrors[repo] = ex;
                     }
                 }
             });
 
-        if (reposWithTag.Count == 0)
-        {
-            AnsiConsole.MarkupLine($"[yellow]No repository with the specified tag(s) found.[/]");
+        return (reposWithTag, repoTagsMap, scanErrors);
+    }
 
+    private static void ShowScanErrors(Dictionary<string, Exception> scanErrors, string baseFolder)
+    {
+        if (scanErrors.Count == 0)
             return;
-        }
 
+        if (!AnsiConsole.Confirm($"[red]{scanErrors.Count} scan errors detected.Do you want to see the details?[/]"))
+            return;
+
+        foreach (var err in scanErrors)
+        {
+            var rule = new Rule($"[red]{GetHierarchicalName(err.Key, baseFolder)}[/]")
+                .RuleStyle(new Style(Color.Red))                
+                .Centered();
+
+            AnsiConsole.Write(rule);                        
+            AnsiConsole.WriteException(err.Value, ExceptionFormats.ShortenEverything);
+        }
+    }
+
+    private static List<string> PromptRepositorySelection(Dictionary<string, List<string>> repoTagsMap, List<string> reposWithTag, string baseFolder, string[] tagsToSearch)
+    {
         var displayNameToPath = reposWithTag.ToDictionary
         (
             repo => $"{GetHierarchicalName(repo, baseFolder)} ({string.Join(", ", repoTagsMap[repo])})",
@@ -109,19 +176,11 @@ public sealed class Program
                 .AddChoices(displayNameToPath.Keys)
         );
 
-        if (selected.Count == 0)
-        {
-            AnsiConsole.MarkupLine("[yellow]No repository selected.[/]");
+        return [.. selected.Select(display => displayNameToPath[display])];
+    }
 
-            return;
-        }
-
-        var selectedPaths = selected
-            .Select(display => displayNameToPath[display])
-            .ToList();
-
-        AnsiConsole.MarkupLine($"[blue]Removing tag(s) {string.Join(", ", tagsToSearch)}...[/]");
-
+    private static async Task RemoveTagsFromRepositoriesAsync(List<string> selectedPaths, Dictionary<string, List<string>> repoTagsMap, string baseFolder)
+    {
         foreach (var repo in selectedPaths)
         {
             var hierarchicalName = GetHierarchicalName(repo, baseFolder);
@@ -144,8 +203,12 @@ public sealed class Program
             if (success)
                 AnsiConsole.MarkupLine($"[green]✅ {hierarchicalName}[/]");
         }
+    }
 
+    private static void ShowFinalStatus(Dictionary<string, Exception> scanErrors, string baseFolder)
+    {
         AnsiConsole.MarkupLine("[bold green]✅ Done![/]");
+        ShowScanErrors(scanErrors, baseFolder);
     }
 
     /// <summary>
@@ -166,6 +229,7 @@ public sealed class Program
             {
                 var relativePath = content[7..].Trim();
                 var fullPath = Path.GetFullPath(Path.Combine(repoPath, relativePath));
+
                 return fullPath;
             }
         }
@@ -196,7 +260,7 @@ public sealed class Program
                 });
             });
 
-        return gitRepos.Distinct().ToList();
+        return [.. gitRepos.Distinct()];
     }
 
     private static void SearchGitRepositories(string rootFolder, List<string> gitRepos, HashSet<string> processedPaths, StatusContext ctx)
@@ -291,9 +355,7 @@ public sealed class Program
     /// Removes the given tag from the repository.
     /// </summary>
     public static async Task DeleteTagAsync(string repoPath, string tag)
-    {
-        await RunGitCommandAsync(repoPath, $"tag -d {tag}");
-    }
+        => await RunGitCommandAsync(repoPath, $"tag -d {tag}");
 
     /// <summary>
     /// Runs a git command in the correct repository directory.
