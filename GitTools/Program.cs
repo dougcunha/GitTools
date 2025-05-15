@@ -33,21 +33,29 @@ public sealed class Program
             IsRequired = true
         };
 
+        var remoteOption = new Option<bool>
+        (
+            aliases: ["--remote", "-r"],
+            description: "Also remove the tag from the remote repository (if present)"
+        );
+
         var tagRemoveCommand = new Command("tag-remove", "Remove tags from git repositories")
         {
             dirOption,
-            tagsOption
+            tagsOption,
+            remoteOption
         };
 
         tagRemoveCommand.SetHandler
         (
-            async (dir, tags) =>
+            async (dir, tags, removeRemote) =>
             {
                 var command = new TagRemoveCommand();
-                await command.ExecuteAsync(dir, tags);
+                await command.ExecuteAsync(dir, tags, removeRemote);
             },
             dirOption,
-            tagsOption
+            tagsOption,
+            remoteOption
         );
 
         rootCommand.AddCommand(tagRemoveCommand);

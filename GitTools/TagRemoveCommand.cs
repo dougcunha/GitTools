@@ -8,9 +8,9 @@ namespace GitTools;
 public sealed class TagRemoveCommand
 {
     private readonly GitRepositoryScanner _scanner = new();
-    private readonly TagService _tagService = new();
+    private readonly GitService _tagService = new();
 
-    public async Task ExecuteAsync(string baseFolder, string[] tagsToSearch)
+    public async Task ExecuteAsync(string baseFolder, string[] tagsToSearch, bool removeRemote)
     {
         ShowInitialInfo(baseFolder, tagsToSearch);
         var allGitFolders = await _scanner.ScanAsync(baseFolder);
@@ -18,6 +18,7 @@ public sealed class TagRemoveCommand
         if (allGitFolders.Count == 0)
         {
             AnsiConsole.MarkupLine("[red]No Git repositories found.[/]");
+
             return;
         }
 
@@ -28,6 +29,7 @@ public sealed class TagRemoveCommand
         {
             AnsiConsole.MarkupLine($"[yellow]No repository with the specified tag(s) found.[/]");
             ShowScanErrors(scanErrors, baseFolder);
+
             return;
         }
 
@@ -35,15 +37,16 @@ public sealed class TagRemoveCommand
         if (selectedPaths.Count == 0)
         {
             AnsiConsole.MarkupLine("[yellow]No repository selected.[/]");
+
             return;
         }
 
         AnsiConsole.MarkupLine($"[blue]Removing tag(s) {string.Join(", ", tagsToSearch)}...[/]");
-        await RemoveTagsFromRepositoriesAsync(selectedPaths, repoTagsMap, baseFolder);
+        await RemoveTagsFromRepositoriesAsync(selectedPaths, repoTagsMap, baseFolder, removeRemote);
         ShowFinalStatus(scanErrors, baseFolder);
     }
 
-    private void ShowInitialInfo(string baseFolder, string[] tagsToSearch)
+    private static void ShowInitialInfo(string baseFolder, string[] tagsToSearch)
     {
         AnsiConsole.MarkupLine($"[blue]Base folder: [bold]{baseFolder}[/][/]");
         AnsiConsole.MarkupLine($"[blue]Tags to search: [bold]{string.Join(", ", tagsToSearch)}[/][/]");
@@ -79,6 +82,7 @@ public sealed class TagRemoveCommand
                             catch (Exception ex)
                             {
                                 scanErrors[repo] = ex;
+                                
                                 break;
                             }
                         }
@@ -139,7 +143,7 @@ public sealed class TagRemoveCommand
         return [.. selected.Select(display => displayNameToPath[display])];
     }
 
-    private async Task RemoveTagsFromRepositoriesAsync(List<string> selectedPaths, Dictionary<string, List<string>> repoTagsMap, string baseFolder)
+    private async Task RemoveTagsFromRepositoriesAsync(List<string> selectedPaths, Dictionary<string, List<string>> repoTagsMap, string baseFolder, bool removeRemote)
     {
         foreach (var repo in selectedPaths)
         {
@@ -152,6 +156,11 @@ public sealed class TagRemoveCommand
                 try
                 {
                     await _tagService.DeleteTagAsync(repo, tag);
+
+                    if (removeRemote)
+                    {
+                        await _tagService.DeleteRemoteTagAsync(repo, tag);
+                    }
                 }
                 catch (Exception ex)
                 {
