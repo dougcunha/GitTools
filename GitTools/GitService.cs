@@ -6,7 +6,7 @@ namespace GitTools;
 /// <summary>
 /// Provides tag-related operations for git repositories.
 /// </summary>
-public sealed class TagService
+public sealed class GitService
 {
     /// <summary>
     /// Checks if the repository has the given tag.
@@ -14,6 +14,7 @@ public sealed class TagService
     public async Task<bool> HasTagAsync(string repoPath, string tag)
     {
         var result = await RunGitCommandAsync(repoPath, $"tag -l {tag}");
+
         return !string.IsNullOrWhiteSpace(result);
     }
 
@@ -22,6 +23,12 @@ public sealed class TagService
     /// </summary>
     public async Task DeleteTagAsync(string repoPath, string tag)
         => await RunGitCommandAsync(repoPath, $"tag -d {tag}");
+
+    /// <summary>
+    /// Removes the given tag from the remote repository.
+    /// </summary>
+    public async Task DeleteRemoteTagAsync(string repoPath, string tag)
+        => await RunGitCommandAsync(repoPath, $"push origin :refs/tags/{tag}");
 
     /// <summary>
     /// Runs a git command in the correct repository directory.
