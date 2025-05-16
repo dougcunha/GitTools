@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 
-namespace GitTools;
+namespace GitTools.Services;
 
 /// <summary>
 /// Provides tag-related operations for git repositories.
