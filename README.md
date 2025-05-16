@@ -26,14 +26,14 @@ GitTools is a command-line tool for searching and removing tags in multiple Git 
 ## Usage
 
 ```sh
-GitTools tag-remove --dir <root-directory> --tags <tag1,tag2,...> [--remote]
+GitTools rm --dir <root-directory> --tags <tag1,tag2,...> [--remote]
 ```
 
 ### Parameters
 
-- `--dir`, `-d` (required): Root directory to scan for Git repositories (e.g., `C:\Projects`)
-- `--tags`, `-t` (required): Comma-separated list of tags to search and remove (e.g., `NET8,NET7`)
-- `--remote`, `-r` (optional): Also remove the tag from the remote repository (origin)
+- `--dir`, `-d`, `/dir` (required): Root directory to scan for Git repositories (e.g., `C:\Projects`)
+- `--tags`, `-t`, `/tags` (required): Comma-separated list of tags to search and remove (e.g., `NET8,NET7`)
+- `--remote`, `-r`, `/remote` (optional): Also remove the tag from the remote repository (origin)
 - `--help` or `-h`: Show help and usage information
 
 ### Example

@@ -1,4 +1,4 @@
-namespace GitTools;
+namespace GitTools.Services;
 
 /// <summary>
 /// Scans directories for git repositories and submodules.

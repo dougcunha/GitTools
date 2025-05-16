@@ -1,14 +1,47 @@
+using System.CommandLine;
+using GitTools.Services;
 using Spectre.Console;
 
-namespace GitTools;
+namespace GitTools.Commands;
 
 /// <summary>
 /// Command for removing tags from git repositories.
 /// </summary>
-public sealed class TagRemoveCommand
+public sealed class TagRemoveCommand : Command
 {
     private readonly GitRepositoryScanner _scanner = new();
     private readonly GitService _tagService = new();
+
+    public TagRemoveCommand() : base("rm", "Removes tags from git repositories.")
+    {
+        var tagsOption = new Option<string[]>(["--tags", "-t", "/tags"], "Tags to remove (comma separated or multiple)")
+        {            
+            IsRequired = true
+        };
+
+        AddOption(tagsOption);
+
+        var dirOption = new Option<string>(["--dir", "-d", "/dir"], "Root directory of git repositories")
+        {
+            IsRequired = true
+        };
+
+        AddOption(dirOption);
+
+        var remoteOption = new Option<bool>(["--remote", "-r", "/remote"], "Also remove the tag from the remote repository (if present)");
+        AddOption(remoteOption);
+
+        this.SetHandler
+        (
+            (tags, dir, removeRemote) =>
+            {
+                var tagRemoveCommand = new TagRemoveCommand();
+
+                return tagRemoveCommand.ExecuteAsync(dir, tags, removeRemote);
+            },
+            tagsOption, dirOption, remoteOption
+        );
+    }
 
     public async Task ExecuteAsync(string baseFolder, string[] tagsToSearch, bool removeRemote)
     {
