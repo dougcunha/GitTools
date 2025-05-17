@@ -1,5 +1,9 @@
 # GitTools
 
+![Build Status](https://github.com/dougcunha/GitTools/actions/workflows/build.yml/badge.svg?branch=master) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+## Index
+
 - [Features](#features)
 - [Usage](#usage)
 - [Parameters](#parameters)
