@@ -81,6 +81,7 @@ public sealed class TagRemoveCommand : Command
         }
 
         var selectedPaths = PromptRepositorySelection(repoTagsMap, reposWithTag, baseFolder, tags);
+
         if (selectedPaths.Count == 0)
         {
             _console.MarkupLine("[yellow]No repository selected.[/]");
@@ -99,7 +100,11 @@ public sealed class TagRemoveCommand : Command
         _console.MarkupLineInterpolated($"[blue]Tags to search: [bold]{string.Join(", ", tagsToSearch)}[/][/]");
     }
 
-    private async Task<(List<string> reposWithTag, Dictionary<string, List<string>> repoTagsMap, Dictionary<string, Exception> scanErrors)> FindRepositoriesWithTagsAsync(List<string> allGitFolders, string[] tagsToSearch)
+    private async Task<(List<string> reposWithTag, Dictionary<string, List<string>> repoTagsMap, Dictionary<string, Exception> scanErrors)> FindRepositoriesWithTagsAsync
+    (
+        List<string> allGitFolders,
+        string[] tagsToSearch
+    )
     {
         var reposWithTag = new List<string>();
         var repoTagsMap = new Dictionary<string, List<string>>();
@@ -131,27 +136,7 @@ public sealed class TagRemoveCommand : Command
 
                     try
                     {
-                        var foundTags = new List<string>();
-
-                        foreach (var tag in tagsToSearch)
-                        {
-                            try
-                            {
-                                if (await _tagService.HasTagAsync(repo, tag).ConfigureAwait(false))
-                                    foundTags.Add(tag);
-                            }
-                            catch (Exception ex)
-                            {
-                                scanErrors[repo] = ex;
-
-                                break;
-                            }
-                        }
-                        if (foundTags.Count > 0)
-                        {
-                            reposWithTag.Add(repo);
-                            repoTagsMap[repo] = foundTags;
-                        }
+                        await DetectTagsInRepositoryAsync(tagsToSearch, reposWithTag, repoTagsMap, scanErrors, repo).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -161,9 +146,35 @@ public sealed class TagRemoveCommand : Command
 
                 task.StopTask();
                 task.Description("Scanning completed.");
-            });
+            }).ConfigureAwait(false);
 
         return (reposWithTag, repoTagsMap, scanErrors);
+    }
+
+    private async Task DetectTagsInRepositoryAsync(string[] tagsToSearch, List<string> reposWithTag, Dictionary<string, List<string>> repoTagsMap, Dictionary<string, Exception> scanErrors, string repo)
+    {
+        var foundTags = new List<string>();
+
+        foreach (var tag in tagsToSearch)
+        {
+            try
+            {
+                if (await _tagService.HasTagAsync(repo, tag).ConfigureAwait(false))
+                    foundTags.Add(tag);
+            }
+            catch (Exception ex)
+            {
+                scanErrors[repo] = ex;
+
+                break;
+            }
+        }
+
+        if (foundTags.Count > 0)
+        {
+            reposWithTag.Add(repo);
+            repoTagsMap[repo] = foundTags;
+        }
     }
 
     private void ShowScanErrors(Dictionary<string, Exception> scanErrors, string baseFolder)
@@ -207,6 +218,18 @@ public sealed class TagRemoveCommand : Command
         return [.. selected.Select(display => displayNameToPath[display])];
     }
 
+    /// <summary>
+    /// Removes specified tags from the repositories in the provided list of paths.
+    /// </summary>
+    /// <remarks>This method iterates through the provided repositories and attempts to remove the specified
+    /// tags. If all tags are successfully removed from a repository, a success message is displayed in the
+    /// console.</remarks>
+    /// <param name="selectedPaths">A list of repository paths from which tags should be removed.</param>
+    /// <param name="repoTagsMap">A dictionary mapping repository paths to the list of tags to be removed from each repository.</param>
+    /// <param name="baseFolder">The base folder used to determine the hierarchical name of each repository.</param>
+    /// <param name="removeRemote">A boolean value indicating whether the tags should also be removed from the remote repository. <see
+    /// langword="true"/> to remove tags from the remote repository; otherwise, <see langword="false"/>.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     private async Task RemoveTagsFromRepositoriesAsync
     (
         List<string> selectedPaths,
@@ -219,29 +242,52 @@ public sealed class TagRemoveCommand : Command
         {
             var hierarchicalName = GetHierarchicalName(repo, baseFolder);
             var success = true;
-            var foundTags = repoTagsMap[repo];
 
-            foreach (var tag in foundTags)
-            {
-                try
-                {
-                    await _tagService.DeleteTagAsync(repo, tag).ConfigureAwait(false);
-
-                    if (removeRemote)
-                    {
-                        await _tagService.DeleteRemoteTagAsync(repo, tag).ConfigureAwait(false);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _console.MarkupLineInterpolated($"[red]❌ {hierarchicalName} (tag: {tag}): {ex.Message}[/]");
-                    success = false;
-                }
-            }
+            foreach (var tag in repoTagsMap[repo])
+                success = await TryRemoveTagAsync(removeRemote, repo, hierarchicalName, success, tag).ConfigureAwait(false);
 
             if (success)
                 _console.MarkupLineInterpolated($"[green]✅ {hierarchicalName}[/]");
         }
+    }
+
+    /// <summary>
+    /// Tries to remove a tag from the specified repository.
+    /// </summary>
+    /// <param name="removeRemote">
+    /// Determines whether to also remove the tag from the remote repository.
+    /// </param>
+    /// <param name="repo">
+    /// The path to the repository from which the tag should be removed.
+    /// </param>
+    /// <param name="hierarchicalName">
+    /// The hierarchical name of the repository, used for display purposes.
+    /// </param>
+    /// <param name="success">
+    /// Indicates whether the previous tag removal operations were successful.
+    /// </param>
+    /// <param name="tag">
+    /// The name of the tag to be removed.
+    /// </param>
+    /// <returns>
+    /// True if the tag was successfully removed; otherwise, false.
+    /// </returns>
+    private async Task<bool> TryRemoveTagAsync(bool removeRemote, string repo, string hierarchicalName, bool success, string tag)
+    {
+        try
+        {
+            await _tagService.DeleteTagAsync(repo, tag).ConfigureAwait(false);
+
+            if (removeRemote)
+                await _tagService.DeleteRemoteTagAsync(repo, tag).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _console.MarkupLineInterpolated($"[red]❌ {hierarchicalName} (tag: {tag}): {ex.Message}[/]");
+            success = false;
+        }
+
+        return success;
     }
 
     private void ShowFinalStatus(Dictionary<string, Exception> scanErrors, string baseFolder)

@@ -20,6 +20,7 @@ Formatting and style standards for this C# project:
 - <inherited /> for inherited members in XMLDoc.
 - Always put using before namespace declaration and sort them alphabetically.
 - Use `nameof` operator instead of hardcoded strings for member names.
+- Make anonymous function static when possible.
 
 ## For writing tests:
 
@@ -34,6 +35,7 @@ Formatting and style standards for this C# project:
 - Avoid using magic strings and numbers, declare them as constants.
 - Never try to mock non virtual classes
 - If you can't mock a class, use a real instance of it or extract it to an interface.
+- Use verbatim strings for file paths and other strings that require escaping.
 
 ## For writing documentation:
 

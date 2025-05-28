@@ -1,4 +1,3 @@
-using System.CommandLine;
 using System.IO.Abstractions;
 using GitTools.Commands;
 using GitTools.Services;

@@ -14,11 +14,6 @@ public interface IProcessRunner
     /// <param name="outputDataReceived">
     /// A handler for the standard output data received event.
     /// </param>
-    /// </summary>
-    /// <param name="startInfo">The process start information.</param>
-    /// <param name="outputDataReceived">
-    /// A handler for the standard output data received event.
-    /// </param>
     /// <param name="errorDataReceived">
     /// A handler for the standard error data received event.
     /// </param>

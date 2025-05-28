@@ -30,3 +30,5 @@ TestResults/c4e699e7-5c09-4fbf-9862-c11b180dbc7a/
 *.db-shm
 *.db-wal
 *.vsidx
+.vs/GitTools/
+.vs/ProjectEvaluation/

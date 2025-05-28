@@ -1,6 +1,5 @@
 namespace GitTools.Services;
 
-
 /// <summary>
 /// Provides tag-related operations for git repositories.
 /// </summary>

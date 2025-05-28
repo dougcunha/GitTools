@@ -58,7 +58,9 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
             if (IsGitRepository(currentDir))
             {
                 lock (gitRepos)
+                {
                     gitRepos.Add(currentDir);
+                }
 
                 AddSubmodules(currentDir, processedPaths, stack);
             }

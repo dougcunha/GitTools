@@ -12,18 +12,18 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
     /// <inheritdoc/>
     public async Task<bool> HasTagAsync(string repoPath, string tag)
     {
-        var result = await RunGitCommandAsync(repoPath, $"tag -l {tag}");
+        var result = await RunGitCommandAsync(repoPath, $"tag -l {tag}").ConfigureAwait(false);
 
         return !string.IsNullOrWhiteSpace(result);
     }
 
     /// <inheritdoc/>
-    public async Task DeleteTagAsync(string repoPath, string tag)
-        => await RunGitCommandAsync(repoPath, $"tag -d {tag}");
+    public Task DeleteTagAsync(string repoPath, string tag)
+        => RunGitCommandAsync(repoPath, $"tag -d {tag}");
 
     /// <inheritdoc/>
-    public async Task DeleteRemoteTagAsync(string repoPath, string tag)
-        => await RunGitCommandAsync(repoPath, $"push origin :refs/tags/{tag}");
+    public Task DeleteRemoteTagAsync(string repoPath, string tag)
+        => RunGitCommandAsync(repoPath, $"push origin :refs/tags/{tag}");
 
     /// <inheritdoc/>
     public async Task<string> RunGitCommandAsync(string workingDirectory, string arguments)
@@ -45,14 +45,13 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
                 UseShellExecute = false,
                 CreateNoWindow = true
             },
-            (s, e) => { if (e.Data != null) output.AppendLine(e.Data); },
-            (s, e) => { if (e.Data != null) error.AppendLine(e.Data); }
+            (_, e) => { if (e.Data != null) output.AppendLine(e.Data); },
+            (_, e) => { if (e.Data != null) error.AppendLine(e.Data); }
         ).ConfigureAwait(false);
 
-        if (exitCode != 0)
-            throw new Exception(error.ToString());
-
-        return output.ToString();
+        return exitCode != 0
+            ? throw new InvalidOperationException(error.ToString())
+            : output.ToString();
     }
 
     /// <summary>
@@ -78,15 +77,14 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
         {
             var content = fileSystem.File.ReadAllText(gitPath).Trim();
 
-            if (content.StartsWith("gitdir:"))
+            if (content.StartsWith("gitdir:", StringComparison.OrdinalIgnoreCase))
             {
                 var relativePath = content[7..].Trim();
-                var fullPath = Path.GetFullPath(Path.Combine(repoPath, relativePath));
 
-                return fullPath;
+                return Path.GetFullPath(Path.Combine(repoPath, relativePath));
             }
         }
-        
+
         return repoPath;
     }
 }

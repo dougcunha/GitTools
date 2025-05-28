@@ -27,7 +27,7 @@ public sealed class GitRepositoryScannerTests
         // Arrange
         var repoPath = Path.Combine(ROOT_FOLDER, "repo1");
         var gitPath = Path.Combine(repoPath, GIT_DIR);
-        
+
         _fileSystem.AddDirectory(gitPath);
 
         // Act
@@ -46,7 +46,7 @@ public sealed class GitRepositoryScannerTests
         var repo2Path = Path.Combine(ROOT_FOLDER, "repo2");
         var git1Path = Path.Combine(repo1Path, GIT_DIR);
         var git2Path = Path.Combine(repo2Path, GIT_DIR);
-        
+
         _fileSystem.AddDirectory(git1Path);
         _fileSystem.AddDirectory(git2Path);
 
@@ -57,8 +57,8 @@ public sealed class GitRepositoryScannerTests
         result.ShouldContain(repo1Path);
         result.ShouldContain(repo2Path);
         result.Count.ShouldBe(2);
-    }   
-    
+    }
+
     [Fact]
     public void Scan_WithNestedGitRepositories_ShouldReturnParentRepository()
     {
@@ -67,7 +67,7 @@ public sealed class GitRepositoryScannerTests
         var nestedRepoPath = Path.Combine(parentRepoPath, "nested");
         var parentGitPath = Path.Combine(parentRepoPath, GIT_DIR);
         var nestedGitPath = Path.Combine(nestedRepoPath, GIT_DIR);
-        
+
         _fileSystem.AddDirectory(parentGitPath);
         _fileSystem.AddDirectory(nestedGitPath);
 
@@ -88,7 +88,7 @@ public sealed class GitRepositoryScannerTests
         // Arrange
         var repoPath = Path.Combine(ROOT_FOLDER, "worktree");
         var gitFilePath = Path.Combine(repoPath, GIT_DIR);
-        
+
         _fileSystem.AddFile(gitFilePath, new MockFileData("gitdir: /main/repo/.git/worktrees/feature"));
 
         // Act
@@ -106,17 +106,17 @@ public sealed class GitRepositoryScannerTests
         var mainRepoPath = Path.Combine(ROOT_FOLDER, "main");
         var submodule1Path = Path.Combine(mainRepoPath, "submodule1");
         var submodule2Path = Path.Combine(mainRepoPath, "submodule2");
-        
+
         var mainGitPath = Path.Combine(mainRepoPath, GIT_DIR);
         var sub1GitPath = Path.Combine(submodule1Path, GIT_DIR);
         var sub2GitPath = Path.Combine(submodule2Path, GIT_DIR);
         var gitmodulesPath = Path.Combine(mainRepoPath, GIT_MODULES_FILE);
-        
+
         _fileSystem.AddDirectory(mainGitPath);
         _fileSystem.AddDirectory(sub1GitPath);
         _fileSystem.AddDirectory(sub2GitPath);
-        
-        var gitmodulesContent = """
+
+        const string GITMODULES_CONTENT = """
             [submodule "submodule1"]
                 path = submodule1
                 url = https://github.com/user/submodule1.git
@@ -124,7 +124,8 @@ public sealed class GitRepositoryScannerTests
                 path = submodule2
                 url = https://github.com/user/submodule2.git
             """;
-        _fileSystem.AddFile(gitmodulesPath, new MockFileData(gitmodulesContent));
+
+        _fileSystem.AddFile(gitmodulesPath, new MockFileData(GITMODULES_CONTENT));
 
         // Act
         var result = _scanner.Scan(ROOT_FOLDER);
@@ -142,15 +143,15 @@ public sealed class GitRepositoryScannerTests
         // Arrange
         var mainRepoPath = Path.Combine(ROOT_FOLDER, "main");
         var validSubmodulePath = Path.Combine(mainRepoPath, "valid-submodule");
-        
+
         var mainGitPath = Path.Combine(mainRepoPath, GIT_DIR);
         var validSubGitPath = Path.Combine(validSubmodulePath, GIT_DIR);
         var gitmodulesPath = Path.Combine(mainRepoPath, GIT_MODULES_FILE);
-        
+
         _fileSystem.AddDirectory(mainGitPath);
         _fileSystem.AddDirectory(validSubGitPath);
-        
-        var gitmodulesContent = """
+
+        const string GITMODULES_CONTENT = """
             [submodule "valid-submodule"]
                 path = valid-submodule
                 url = https://github.com/user/valid-submodule.git
@@ -158,7 +159,8 @@ public sealed class GitRepositoryScannerTests
                 path = invalid-submodule
                 url = https://github.com/user/invalid-submodule.git
             """;
-        _fileSystem.AddFile(gitmodulesPath, new MockFileData(gitmodulesContent));
+
+        _fileSystem.AddFile(gitmodulesPath, new MockFileData(GITMODULES_CONTENT));
 
         // Act
         var result = _scanner.Scan(ROOT_FOLDER);
@@ -177,7 +179,7 @@ public sealed class GitRepositoryScannerTests
         var nonGitPath = Path.Combine(ROOT_FOLDER, "not-a-repo");
         var gitRepoPath = Path.Combine(ROOT_FOLDER, "git-repo");
         var gitPath = Path.Combine(gitRepoPath, GIT_DIR);
-        
+
         _fileSystem.AddDirectory(nonGitPath);
         _fileSystem.AddDirectory(gitPath);
 
@@ -207,7 +209,7 @@ public sealed class GitRepositoryScannerTests
         // Arrange
         var accessibleRepoPath = Path.Combine(ROOT_FOLDER, "accessible");
         var accessibleGitPath = Path.Combine(accessibleRepoPath, GIT_DIR);
-        
+
         _fileSystem.AddDirectory(accessibleGitPath);
 
         // Act
@@ -225,7 +227,7 @@ public sealed class GitRepositoryScannerTests
         // Arrange
         var repoPath = Path.Combine(ROOT_FOLDER, "repo");
         var gitPath = Path.Combine(repoPath, GIT_DIR);
-        
+
         _fileSystem.AddDirectory(gitPath);
 
         // Act
@@ -242,7 +244,7 @@ public sealed class GitRepositoryScannerTests
         var mainRepoPath = Path.Combine(ROOT_FOLDER, "main");
         var mainGitPath = Path.Combine(mainRepoPath, GIT_DIR);
         var gitmodulesPath = Path.Combine(mainRepoPath, GIT_MODULES_FILE);
-        
+
         _fileSystem.AddDirectory(mainGitPath);
         _fileSystem.AddFile(gitmodulesPath, new MockFileData("invalid content"));
 

@@ -8,7 +8,7 @@ var rootCommand = new ServiceCollection()
     .BuildServiceProvider()
     .CreateRootCommand();
 
-await rootCommand.InvokeAsync(args);
+await rootCommand.InvokeAsync(args).ConfigureAwait(false);
 
 if (Debugger.IsAttached)
 {
