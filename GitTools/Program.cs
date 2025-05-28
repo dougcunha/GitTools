@@ -1,9 +1,13 @@
 ﻿using System.CommandLine;
 using System.Diagnostics;
-using GitTools.Commands;
+using GitTools;
+using Microsoft.Extensions.DependencyInjection;
 
-var rootCommand = new RootCommand("GitTools - A tool for searching and removing tags in Git repositories.");
-rootCommand.AddCommand(new TagRemoveCommand());
+var rootCommand = new ServiceCollection()
+    .RegisterServices()
+    .BuildServiceProvider()
+    .CreateRootCommand();
+
 await rootCommand.InvokeAsync(args);
 
 if (Debugger.IsAttached)

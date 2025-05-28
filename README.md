@@ -30,20 +30,20 @@ GitTools is a command-line tool for searching and removing tags in multiple Git 
 ## Usage
 
 ```sh
-GitTools rm --dir <root-directory> --tags <tag1,tag2,...> [--remote]
+GitTools rm <root-directory> <tag1,tag2,...> [--remote]
 ```
 
 ### Parameters
 
-- `--dir`, `-d`, `/dir` (required): Root directory to scan for Git repositories (e.g., `C:\Projects`)
-- `--tags`, `-t`, `/tags` (required): Comma-separated list of tags to search and remove (e.g., `NET8,NET7`)
+- `root-directory` (required): Root directory to scan for Git repositories (e.g., `C:\Projects`)
+- `tags` (required): Comma-separated list of tags to search and remove (e.g., `NET8,NET7`)
 - `--remote`, `-r`, `/remote` (optional): Also remove the tag from the remote repository (origin)
 - `--help` or `-h`: Show help and usage information
 
 ### Example
 
 ```sh
-GitTools tag-remove --dir C:\Projects --tags NET8,NET7 --remote
+GitTools rm C:/Projects NET8,NET7 --remote
 ```
 
 ## Build
@@ -57,7 +57,7 @@ dotnet build
 ## Publish as Single File (Windows x64)
 
 ```sh
-dotnet publish -c Release -r win-x64 --self-contained true
+dotnet publish -c Release -r win-x64
 ```
 
 ## Contributing

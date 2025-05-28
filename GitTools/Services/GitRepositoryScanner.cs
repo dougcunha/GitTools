@@ -1,9 +1,13 @@
+using System.IO.Abstractions;
+using System.Text.RegularExpressions;
+using Spectre.Console;
+
 namespace GitTools.Services;
 
 /// <summary>
 /// Scans directories for git repositories and submodules.
 /// </summary>
-public sealed class GitRepositoryScanner
+public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSystem fileSystem) : IGitRepositoryScanner
 {
     private const string GIT_DIR = ".git";
     private const string GIT_MODULES_FILE = ".gitmodules";
@@ -12,24 +16,21 @@ public sealed class GitRepositoryScanner
     /// Finds all Git repositories and submodules from the root folder.
     /// </summary>
     /// <param name="rootFolder">Root directory to scan.</param>
-    public async Task<List<string>> ScanAsync(string rootFolder)
+    public List<string> Scan(string rootFolder)
     {
         var gitRepos = new List<string>();
         var processedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        await Spectre.Console.AnsiConsole.Status()
-            .StartAsync("⏳ Scanning Git repositories...", async ctx =>
-            {
-                await Task.Run(() =>
-                {
-                    SearchGitRepositories(rootFolder, gitRepos, processedPaths, ctx);
-                });
-            });
+        SearchGitRepositories(rootFolder, gitRepos, processedPaths);
 
         return [.. gitRepos.Distinct()];
     }
 
-    private void SearchGitRepositories(string rootFolder, List<string> gitRepos, HashSet<string> processedPaths, Spectre.Console.StatusContext ctx)
+    private void SearchGitRepositories
+    (
+        string rootFolder,
+        List<string> gitRepos,
+        HashSet<string> processedPaths
+    )
     {
         var stack = new Stack<string>();
         stack.Push(rootFolder);
@@ -37,11 +38,17 @@ public sealed class GitRepositoryScanner
         while (stack.Count > 0)
         {
             var currentDir = stack.Pop();
-            ProcessDirectory(currentDir, gitRepos, processedPaths, stack, ctx);
+            ProcessDirectory(currentDir, gitRepos, processedPaths, stack);
         }
     }
 
-    private void ProcessDirectory(string currentDir, List<string> gitRepos, HashSet<string> processedPaths, Stack<string> stack, Spectre.Console.StatusContext ctx)
+    private void ProcessDirectory
+    (
+        string currentDir,
+        List<string> gitRepos,
+        HashSet<string> processedPaths,
+        Stack<string> stack
+    )
     {
         try
         {
@@ -57,38 +64,37 @@ public sealed class GitRepositoryScanner
             }
             else
             {
-                foreach (var dir in Directory.GetDirectories(currentDir))
+                foreach (var dir in fileSystem.Directory.GetDirectories(currentDir))
                     stack.Push(dir);
             }
         }
         catch (Exception ex)
         {
-            Spectre.Console.AnsiConsole.MarkupLine($"[grey]Ignored: {currentDir} ({ex.Message})[/]");
+            console.MarkupLineInterpolated($"[grey]Ignored: {currentDir} ({ex.Message})[/]");
         }
-
-        ctx.Status = $"Checking {Path.GetFileName(currentDir)}...";
     }
 
     private bool IsGitRepository(string dir)
     {
         var gitDirPath = Path.Combine(dir, GIT_DIR);
-        return Directory.Exists(gitDirPath) || File.Exists(gitDirPath);
+
+        return fileSystem.Directory.Exists(gitDirPath) || fileSystem.File.Exists(gitDirPath);
     }
 
     private void AddSubmodules(string repoDir, HashSet<string> processedPaths, Stack<string> stack)
     {
         var gitmodulesFile = Path.Combine(repoDir, GIT_MODULES_FILE);
 
-        if (!File.Exists(gitmodulesFile))
+        if (!fileSystem.File.Exists(gitmodulesFile))
             return;
 
         try
         {
-            var modulesContent = File.ReadAllText(gitmodulesFile);
-            var pathRegex = new System.Text.RegularExpressions.Regex(@"path\s*=\s*(.+)", System.Text.RegularExpressions.RegexOptions.Multiline);
+            var modulesContent = fileSystem.File.ReadAllText(gitmodulesFile);
+            var pathRegex = GitPathMatcher();
             var matches = pathRegex.Matches(modulesContent);
 
-            foreach (System.Text.RegularExpressions.Match match in matches)
+            foreach (Match match in matches)
             {
                 if (match.Success && match.Groups.Count > 1)
                 {
@@ -102,7 +108,10 @@ public sealed class GitRepositoryScanner
         }
         catch (Exception ex)
         {
-            Spectre.Console.AnsiConsole.MarkupLine($"[grey]Error processing submodules in: {repoDir} ({ex.Message})[/]");
+            console.MarkupLineInterpolated($"[grey]Error processing submodules in: {repoDir} ({ex.Message})[/]");
         }
     }
+
+    [GeneratedRegex(@"path\s*=\s*(.+)", RegexOptions.Multiline)]
+    private static partial Regex GitPathMatcher();
 }
