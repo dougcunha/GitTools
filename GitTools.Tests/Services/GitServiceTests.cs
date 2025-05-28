@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.IO.Abstractions;
 using System.Reflection;
-using System.Text;
 using GitTools.Services;
 
 namespace GitTools.Tests.Services;

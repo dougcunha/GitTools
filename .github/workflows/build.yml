@@ -1,4 +1,4 @@
-name: Build, Test and Version
+name: Build
 
 on:
   workflow_dispatch:
