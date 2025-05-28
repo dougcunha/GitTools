@@ -134,14 +134,7 @@ public sealed class TagRemoveCommand : Command
                     task.Description($"Checking {Path.GetFileName(repo)}...");
                     task.Increment(1);
 
-                    try
-                    {
-                        await DetectTagsInRepositoryAsync(tagsToSearch, reposWithTag, repoTagsMap, scanErrors, repo).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        scanErrors[repo] = ex;
-                    }
+                    await DetectTagsInRepositoryAsync(tagsToSearch, reposWithTag, repoTagsMap, scanErrors, repo).ConfigureAwait(false);
                 }
 
                 task.StopTask();

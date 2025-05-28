@@ -70,21 +70,16 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
         const string GIT_DIR = ".git";
         var gitPath = Path.Combine(repoPath, GIT_DIR);
 
-        if (fileSystem.Directory.Exists(gitPath))
+        if (fileSystem.Directory.Exists(gitPath) || !fileSystem.File.Exists(gitPath))
             return repoPath;
 
-        if (fileSystem.File.Exists(gitPath))
-        {
-            var content = fileSystem.File.ReadAllText(gitPath).Trim();
+        var content = fileSystem.File.ReadAllText(gitPath).Trim();
 
-            if (content.StartsWith("gitdir:", StringComparison.OrdinalIgnoreCase))
-            {
-                var relativePath = content[7..].Trim();
+        if (!content.StartsWith("gitdir:", StringComparison.OrdinalIgnoreCase))
+            return repoPath;
 
-                return Path.GetFullPath(Path.Combine(repoPath, relativePath));
-            }
-        }
+        var relativePath = content[7..].Trim();
 
-        return repoPath;
+        return Path.GetFullPath(Path.Combine(repoPath, relativePath));
     }
 }

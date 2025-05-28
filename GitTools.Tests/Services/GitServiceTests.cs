@@ -197,6 +197,39 @@ public sealed class GitServiceTests
     }
 
     [Fact]
+    public async Task RunGitCommandAsync_WhenWorkTreeWithNoPrefix_ShouldReturnRepoPath()
+    {
+        // Arrange
+        const string GIT_ARGUMENTS = "status";
+        const string MAIN_REPO_PATH = @"C:\main\repo\.git\worktrees\feature";
+        var gitPath = Path.Combine(REPO_PATH, GIT_DIR);
+
+        _fileSystem.Directory.Exists(gitPath).Returns(false);
+        _fileSystem.File.Exists(gitPath).Returns(true);
+
+        #pragma warning disable S6966
+        // ReSharper disable once MethodHasAsyncOverload
+        _fileSystem.File.ReadAllText(gitPath).Returns(MAIN_REPO_PATH);
+        #pragma warning restore S6966
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(0);
+
+        // Act
+        var res = await _gitService.RunGitCommandAsync(REPO_PATH, GIT_ARGUMENTS);
+
+        // Assert
+        res.ShouldBeEmpty(); // No output expected since we are not capturing output in this test
+
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(static psi => psi.WorkingDirectory == REPO_PATH),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
     public async Task RunGitCommandAsync_WhenGitCommandFails_ShouldThrowException()
     {
         // Arrange

@@ -1,13 +1,15 @@
+using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using GitTools.Services;
-using Spectre.Console;
+using NSubstitute.ExceptionExtensions;
+using Spectre.Console.Testing;
 
 namespace GitTools.Tests.Services;
 
 [ExcludeFromCodeCoverage]
 public sealed class GitRepositoryScannerTests
 {
-    private readonly IAnsiConsole _console = Substitute.For<IAnsiConsole>();
+    private readonly TestConsole _console = new();
     private readonly MockFileSystem _fileSystem;
     private readonly GitRepositoryScanner _scanner;
 
@@ -203,7 +205,9 @@ public sealed class GitRepositoryScannerTests
 
         // Assert
         result.ShouldBeEmpty();
-    }    [Fact]
+    }
+
+    [Fact]
     public void Scan_WithAccessDeniedDirectory_ShouldLogErrorAndContinue()
     {
         // Arrange
@@ -237,7 +241,9 @@ public sealed class GitRepositoryScannerTests
         result.ShouldContain(repoPath);
         result.Count.ShouldBe(1);
         result.Distinct().Count().ShouldBe(result.Count);
-    }    [Fact]
+    }
+
+    [Fact]
     public void Scan_WithInvalidGitmodulesFile_ShouldLogErrorAndContinue()
     {
         // Arrange
@@ -255,5 +261,52 @@ public sealed class GitRepositoryScannerTests
         result.ShouldContain(mainRepoPath);
         // Note: Testing file read exceptions requires a different approach with MockFileSystem
         // as it doesn't support mocking exceptions in the same way as Moq
+    }
+
+    [Fact]
+    public void Scan_WithExceptionInAddSubmodules_ShouldLogErrorAndContinue()
+    {
+        // Arrange
+        const string GITMODULES_CONTENT = """
+            [submodule "valid-submodule"]
+                path = valid-submodule
+                url = https://github.com/user/valid-submodule.git
+            [submodule "invalid-submodule"]
+                path = invalid-submodule
+                url = https://github.com/user/invalid-submodule.git
+            """;
+
+        var mockFileSystem = Substitute.For<IFileSystem>();
+        mockFileSystem.File.Exists(@"C:\repos\.git").Returns(true);
+        mockFileSystem.File.Exists(@"C:\repos\.gitmodules").Returns(true);
+        mockFileSystem.File.ReadAllText(Arg.Any<string>()).Returns(GITMODULES_CONTENT);
+        mockFileSystem.Directory.Exists(@"C:\repos\valid-submodule\.git").Throws(new IOException("Test exception reading submodule directory"));
+
+        var scannerWithException = new GitRepositoryScanner(_console, mockFileSystem);
+
+        // Act
+        var result = scannerWithException.Scan(ROOT_FOLDER);
+
+        // Assert
+        result.Count.ShouldBe(1);
+
+        // Verify error was logged
+        _console.Output.ShouldContain("Error processing submodules in");
+    }
+
+    [Fact]
+    public void Scan_WithExceptionInProcessDirectory_ShouldLogErrorAndContinue()
+    {
+        // Arrange
+        var mockFileSystem = Substitute.For<IFileSystem>();
+        mockFileSystem.Directory.GetDirectories(ROOT_FOLDER).Throws(new IOException("Test exception accessing directory"));
+        var scannerWithException = new GitRepositoryScanner(_console, mockFileSystem);
+
+        // Act
+        var result = scannerWithException.Scan(ROOT_FOLDER);
+
+        // Assert
+        result.ShouldBeEmpty();
+        _console.Output.ShouldContain("Test exception accessing directory");
     }
 }

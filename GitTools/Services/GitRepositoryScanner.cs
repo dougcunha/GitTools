@@ -94,18 +94,15 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
         {
             var modulesContent = fileSystem.File.ReadAllText(gitmodulesFile);
             var pathRegex = GitPathMatcher();
-            var matches = pathRegex.Matches(modulesContent);
 
-            foreach (Match match in matches)
+            foreach (var match in pathRegex.Matches(modulesContent)
+                .Where(static m => m is { Success: true, Groups.Count: > 1 }))
             {
-                if (match.Success && match.Groups.Count > 1)
-                {
-                    var submodulePath = match.Groups[1].Value.Trim();
-                    var fullSubmodulePath = Path.Combine(repoDir, submodulePath);
+                var submodulePath = match.Groups[1].Value.Trim();
+                var fullSubmodulePath = Path.Combine(repoDir, submodulePath);
 
-                    if (IsGitRepository(fullSubmodulePath) && !processedPaths.Contains(fullSubmodulePath))
-                        stack.Push(fullSubmodulePath);
-                }
+                if (IsGitRepository(fullSubmodulePath) && !processedPaths.Contains(fullSubmodulePath))
+                    stack.Push(fullSubmodulePath);
             }
         }
         catch (Exception ex)
