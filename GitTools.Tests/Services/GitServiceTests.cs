@@ -17,9 +17,7 @@ public sealed class GitServiceTests
     private const string GIT_DIR = ".git";
 
     public GitServiceTests()
-    {
-        _gitService = new GitService(_fileSystem, _processRunner);
-    }
+        => _gitService = new GitService(_fileSystem, _processRunner);
 
     private static DataReceivedEventArgs CreateDataReceivedEventArgs(string data)
     {
@@ -98,13 +96,15 @@ public sealed class GitServiceTests
         await _gitService.DeleteTagAsync(REPO_PATH, TAG_NAME);
 
         // Assert
-        await _processRunner.Received(1).RunAsync(
+        await _processRunner.Received(1).RunAsync
+        (
             Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == $"tag -d {TAG_NAME}" &&
                 psi.WorkingDirectory == REPO_PATH),
             Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>());
+            Arg.Any<DataReceivedEventHandler>()
+        );
     }
 
     [Fact]
@@ -120,13 +120,15 @@ public sealed class GitServiceTests
         await _gitService.DeleteRemoteTagAsync(REPO_PATH, TAG_NAME);
 
         // Assert
-        await _processRunner.Received(1).RunAsync(
+        await _processRunner.Received(1).RunAsync
+        (
             Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == $"push origin :refs/tags/{TAG_NAME}" &&
                 psi.WorkingDirectory == REPO_PATH),
             Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>());
+            Arg.Any<DataReceivedEventHandler>()
+        );
     }
 
     [Fact]
@@ -189,11 +191,13 @@ public sealed class GitServiceTests
         await _gitService.RunGitCommandAsync(REPO_PATH, GIT_ARGUMENTS);
 
         // Assert
-        await _processRunner.Received(1).RunAsync(
+        await _processRunner.Received(1).RunAsync
+        (
             Arg.Is<ProcessStartInfo>(static psi =>
                 psi.WorkingDirectory == Path.GetFullPath(Path.Combine(REPO_PATH, MAIN_REPO_PATH))),
             Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>());
+            Arg.Any<DataReceivedEventHandler>()
+        );
     }
 
     [Fact]
@@ -269,7 +273,8 @@ public sealed class GitServiceTests
         await _gitService.RunGitCommandAsync(REPO_PATH, GIT_ARGUMENTS);
 
         // Assert
-        await _processRunner.Received(1).RunAsync(
+        await _processRunner.Received(1).RunAsync
+        (
             Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == GIT_ARGUMENTS &&
@@ -279,6 +284,7 @@ public sealed class GitServiceTests
                 !psi.UseShellExecute &&
                 psi.CreateNoWindow),
             Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>());
+            Arg.Any<DataReceivedEventHandler>()
+        );
     }
 }

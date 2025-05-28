@@ -12,10 +12,7 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
     private const string GIT_DIR = ".git";
     private const string GIT_MODULES_FILE = ".gitmodules";
 
-    /// <summary>
-    /// Finds all Git repositories and submodules from the root folder.
-    /// </summary>
-    /// <param name="rootFolder">Root directory to scan.</param>
+    /// <inheritdoc/>
     public List<string> Scan(string rootFolder)
     {
         var gitRepos = new List<string>();
@@ -25,6 +22,18 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
         return [.. gitRepos.Distinct()];
     }
 
+    /// <summary>
+    /// Searches for git repositories starting from the root folder.
+    /// </summary>
+    /// <param name="rootFolder">
+    /// The root directory to start the search from.
+    /// </param>
+    /// <param name="gitRepos">
+    /// The list to store found git repositories.
+    /// </param>
+    /// <param name="processedPaths">
+    /// The set of already processed paths to avoid duplicates.
+    /// </param>
     private void SearchGitRepositories
     (
         string rootFolder,
@@ -42,12 +51,27 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
         }
     }
 
+    /// <summary>
+    /// Processes the current directory to check if it is a git repository.
+    /// </summary>
+    /// <param name="currentDir">
+    /// The current directory to process.
+    /// </param>
+    /// <param name="gitRepos">
+    /// The list to store found git repositories.
+    /// </param>
+    /// <param name="processedPaths">
+    /// The set of already processed paths to avoid duplicates.
+    /// </param>
+    /// <param name="pendingDirs">
+    /// The directories to keep track of directories to process.
+    /// </param>
     private void ProcessDirectory
     (
         string currentDir,
         List<string> gitRepos,
         HashSet<string> processedPaths,
-        Stack<string> stack
+        Stack<string> pendingDirs
     )
     {
         try
@@ -62,12 +86,12 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
                     gitRepos.Add(currentDir);
                 }
 
-                AddSubmodules(currentDir, processedPaths, stack);
+                AddSubmodules(currentDir, processedPaths, pendingDirs);
             }
             else
             {
                 foreach (var dir in fileSystem.Directory.GetDirectories(currentDir))
-                    stack.Push(dir);
+                    pendingDirs.Push(dir);
             }
         }
         catch (Exception ex)
@@ -76,6 +100,15 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
         }
     }
 
+    /// <summary>
+    /// Checks if the specified directory is a git repository.
+    /// </summary>
+    /// <param name="dir">
+    /// The directory to check.
+    /// </param>
+    /// <returns>
+    /// True if the directory is a git repository, otherwise false.
+    /// </returns>
     private bool IsGitRepository(string dir)
     {
         var gitDirPath = Path.Combine(dir, GIT_DIR);
@@ -83,7 +116,19 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
         return fileSystem.Directory.Exists(gitDirPath) || fileSystem.File.Exists(gitDirPath);
     }
 
-    private void AddSubmodules(string repoDir, HashSet<string> processedPaths, Stack<string> stack)
+    /// <summary>
+    /// Adds submodules found in the specified repository directory to the pendingDirs for further processing.
+    /// </summary>
+    /// <param name="repoDir">
+    /// The directory of the git repository to check for submodules.
+    /// </param>
+    /// <param name="processedPaths">
+    /// The set of already processed paths to avoid duplicates.
+    /// </param>
+    /// <param name="pendingDirs">
+    /// The stack of directories to keep track of directories to process.
+    /// </param>
+    private void AddSubmodules(string repoDir, HashSet<string> processedPaths, Stack<string> pendingDirs)
     {
         var gitmodulesFile = Path.Combine(repoDir, GIT_MODULES_FILE);
 
@@ -102,7 +147,7 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
                 var fullSubmodulePath = Path.Combine(repoDir, submodulePath);
 
                 if (IsGitRepository(fullSubmodulePath) && !processedPaths.Contains(fullSubmodulePath))
-                    stack.Push(fullSubmodulePath);
+                    pendingDirs.Push(fullSubmodulePath);
             }
         }
         catch (Exception ex)
@@ -111,6 +156,9 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
         }
     }
 
+    /// <summary>
+    /// Regex to match the path of submodules in the .gitmodules file.
+    /// </summary>
     [GeneratedRegex(@"path\s*=\s*(.+)", RegexOptions.Multiline)]
     private static partial Regex GitPathMatcher();
 }

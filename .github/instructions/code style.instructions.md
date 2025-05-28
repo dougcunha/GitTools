@@ -17,10 +17,16 @@ Formatting and style standards for this C# project:
 - DRY: avoid code repetition.
 - Write code always in english.
 - Use modern collections and initializers ([] and [..] when possible).
-- <inherited /> for inherited members in XMLDoc.
+- Add <inherited /> for inherited members in XMLDoc.
 - Always put using before namespace declaration and sort them alphabetically.
 - Use `nameof` operator instead of hardcoded strings for member names.
 - Make anonymous function static when possible.
+- Keep always one class per file.
+- Use `string.Equals` with `StringComparison.OrdinalIgnoreCase` for case-insensitive comparisons.
+- Use `StringBuilder` for string concatenation in loops or large concatenations.
+- Use .ConfigureAwait(false) for async methods to avoid deadlocks except in Windows Forms applications.
+- Use `CancellationToken` for long-running operations to allow cancellation.
+
 
 ## For writing tests:
 
@@ -45,6 +51,8 @@ Formatting and style standards for this C# project:
 - Use code blocks for code snippets.
 - Use links for references and further reading.
 - Keep documentation up to date with code changes.
-- Write allways in english.
+- Write always in english.
+- Keep a section dedicate to give credits to third-party libraries used in the project.
+
 
 
