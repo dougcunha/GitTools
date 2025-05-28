@@ -1,10 +1,5 @@
 # GitTools.Tests
 
-[![CI Tests](https://github.com/dougcunha/GitTools/actions/workflows/ci.yml/badge.svg)](https://github.com/dougcunha/GitTools/actions/workflows/ci.yml)
-[![Build](https://github.com/dougcunha/GitTools/actions/workflows/build.yml/badge.svg)](https://github.com/dougcunha/GitTools/actions/workflows/build.yml)
-[![codecov](https://codecov.io/gh/dougcunha/GitTools/graph/badge.svg?token=HC2PBRX67N)](https://codecov.io/gh/dougcunha/GitTools)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
 This project contains the unit tests for the GitTools application.
 
 ## Test Structure
