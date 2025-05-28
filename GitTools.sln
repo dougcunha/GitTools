@@ -2,7 +2,26 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitTools", "GitTools.csproj", "{532A123F-E2A4-C11F-5F0A-D284945EC774}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitTools", "GitTools\GitTools.csproj", "{532A123F-E2A4-C11F-5F0A-D284945EC774}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GitHub", "GitHub", "{A508EFC4-0EDB-31DF-620D-ECD3B3B4B781}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{07505D0E-B97B-43E0-98DD-AEE6C9E6F72D}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\build.yml = .github\workflows\build.yml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "instructions", "instructions", "{D9464A70-F947-9B45-576D-AB50CCF5CE20}"
+	ProjectSection(SolutionItems) = preProject
+		.github\instructions\code style.instructions.md = .github\instructions\code style.instructions.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docs", "Docs", "{208BA388-4CEE-2CBF-559C-5607C099C1F8}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+		LICENSE = LICENSE
+		CONTRIBUTING.md = CONTRIBUTING.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,6 +36,10 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{07505D0E-B97B-43E0-98DD-AEE6C9E6F72D} = {A508EFC4-0EDB-31DF-620D-ECD3B3B4B781}
+		{D9464A70-F947-9B45-576D-AB50CCF5CE20} = {A508EFC4-0EDB-31DF-620D-ECD3B3B4B781}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4F2251F2-7FD8-44F8-9E8D-62A11C4A0408}

@@ -1,11 +1,9 @@
 name: Build, Test and Version
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ master ]
     tags: [ '*' ]
-  pull_request:
-    branches: [ master ]
   
 permissions:
   contents: write
@@ -43,24 +41,24 @@ jobs:
       run: dotnet restore
 
     - name: Publish win-x64
-      run: dotnet publish -c Release -r win-x64 /p:Version=${{ steps.gitversion.outputs.fullSemVer }}
+      run: dotnet publish -c Release -r win-x64 /p:Version=${{ steps.gitversion.outputs.fullSemVer }} GitTools/GitTools.csproj
 
     - name: Test
       run: dotnet test --no-build --verbosity normal
-      continue-on-error: true
+      continue-on-error: false
 
     - name: Copy LICENSE to output
       if: success()
-      run: copy LICENSE bin/Release/net9.0/win-x64/publish/
+      run: copy LICENSE GitTools/bin/Release/net9.0/win-x64/publish/
 
     - name: List publish folder before zip
       if: success()
-      run: dir bin/Release/net9.0/win-x64/publish
+      run: dir GitTools/bin/Release/net9.0/win-x64/publish
 
     - name: Publish zip artifact
       if: success()
       run: |
-        cd bin/Release/net9.0/win-x64/publish
+        cd GitTools/bin/Release/net9.0/win-x64/publish
         del GitTools-*.zip 2>NUL
         7z a GitTools-${{ steps.gitversion.outputs.assemblySemVer }}.win-x64.zip .\*
 
@@ -69,7 +67,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: GitTools.win-64
-        path: bin/Release/net9.0/win-x64/publish/GitTools-${{ steps.gitversion.outputs.assemblySemVer }}.win-x64.zip
+        path: GitTools/bin/Release/net9.0/win-x64/publish/GitTools-${{ steps.gitversion.outputs.assemblySemVer }}.win-x64.zip
         if-no-files-found: ignore
         retention-days: 7
 
@@ -77,4 +75,4 @@ jobs:
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
-        files: bin/Release/net9.0/win-x64/publish/GitTools-${{ steps.gitversion.outputs.assemblySemVer }}.win-x64.zip
+        files: GitTools/bin/Release/net9.0/win-x64/publish/GitTools-${{ steps.gitversion.outputs.assemblySemVer }}.win-x64.zip
