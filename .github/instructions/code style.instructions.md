@@ -32,5 +32,17 @@ Formatting and style standards for this C# project:
 - Declare string const as const and use UPPER_CASE for names
 - Use raw string to declare multi-line strings
 - Avoid using magic strings and numbers, declare them as constants.
+- Never try to mock non virtual classes
+- If you can't mock a class, use a real instance of it or extract it to an interface.
+
+
+## For writing documentation:
+- Use Markdown for documentation.
+- Use proper headings and subheadings.
+- Use bullet points and numbered lists for clarity.
+- Use code blocks for code snippets.
+- Use links for references and further reading.
+- Keep documentation up to date with code changes.
+- Write allways in english.
 
 

@@ -4,6 +4,8 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitTools", "GitTools\GitTools.csproj", "{532A123F-E2A4-C11F-5F0A-D284945EC774}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GitTools.Tests", "GitTools.Tests\GitTools.Tests.csproj", "{8B7A9E2F-C1D4-4E5F-9A3B-6F8E7D2C1A05}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GitHub", "GitHub", "{A508EFC4-0EDB-31DF-620D-ECD3B3B4B781}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{07505D0E-B97B-43E0-98DD-AEE6C9E6F72D}"
@@ -33,6 +35,10 @@ Global
 		{532A123F-E2A4-C11F-5F0A-D284945EC774}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{532A123F-E2A4-C11F-5F0A-D284945EC774}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{532A123F-E2A4-C11F-5F0A-D284945EC774}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B7A9E2F-C1D4-4E5F-9A3B-6F8E7D2C1A05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B7A9E2F-C1D4-4E5F-9A3B-6F8E7D2C1A05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B7A9E2F-C1D4-4E5F-9A3B-6F8E7D2C1A05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B7A9E2F-C1D4-4E5F-9A3B-6F8E7D2C1A05}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
