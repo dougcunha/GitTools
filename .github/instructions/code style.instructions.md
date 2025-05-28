@@ -35,8 +35,8 @@ Formatting and style standards for this C# project:
 - Never try to mock non virtual classes
 - If you can't mock a class, use a real instance of it or extract it to an interface.
 
-
 ## For writing documentation:
+
 - Use Markdown for documentation.
 - Use proper headings and subheadings.
 - Use bullet points and numbered lists for clarity.
