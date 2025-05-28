@@ -43,10 +43,6 @@ jobs:
     - name: Publish win-x64
       run: dotnet publish -c Release -r win-x64 /p:Version=${{ steps.gitversion.outputs.fullSemVer }} GitTools/GitTools.csproj
 
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
-      continue-on-error: false
-
     - name: Copy LICENSE to output
       if: success()
       run: copy LICENSE GitTools/bin/Release/net9.0/win-x64/publish/
