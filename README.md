@@ -12,6 +12,7 @@
 - [Parameters](#parameters)
 - [Example](#example)
 - [Build](#build)
+- [Code Coverage](#code-coverage)
 - [Publish as Single File (Windows x64)](#publish-as-single-file-windows-x64)
 - [Contributing](#contributing)
 - [Third-party Libraries](#third-party-libraries)
@@ -26,6 +27,7 @@ GitTools is a command-line tool for searching and removing tags in multiple Git 
 - Allows interactive selection of repositories to remove tags from
 - Removes only the tags that actually exist in each repository
 - Supports multiple tags (comma-separated)
+- **Supports wildcard patterns** using `*` and `?` characters for flexible tag matching
 - Optionally removes tags from the remote repository as well
 - Modern, user-friendly terminal UI using [Spectre.Console](https://spectreconsole.net/)
 - Modern CLI parsing with [System.CommandLine](https://github.com/dotnet/command-line-api)
@@ -36,17 +38,58 @@ GitTools is a command-line tool for searching and removing tags in multiple Git 
 GitTools rm <root-directory> <tag1,tag2,...> [--remote]
 ```
 
+### Wildcard Support
+
+GitTools supports wildcard patterns for flexible tag matching:
+
+- `*` (asterisk): Matches zero or more characters
+- `?` (question mark): Matches exactly one character
+
+#### Wildcard Examples
+
+**Exact tag matching** (traditional behavior):
+
+```sh
+GitTools rm C:/Projects NET8,NET7 --remote
+```
+
+**Wildcard pattern matching:**
+
+```sh
+# Remove all tags starting with "v1."
+GitTools rm C:/Projects "v1.*"
+
+# Remove all tags like "TAG1.0", "TAG1.1", etc.
+GitTools rm C:/Projects "TAG1.?"
+
+# Remove multiple patterns
+GitTools rm C:/Projects "v1.*,v2.*,beta-*"
+
+# Mix exact tags and patterns
+GitTools rm C:/Projects "NET8,v1.*,beta-?"
+```
+
+**Note:** When using wildcards on Windows Command Prompt or PowerShell, wrap patterns in quotes to prevent shell expansion.
+
 ### Parameters
 
 - `root-directory` (required): Root directory to scan for Git repositories (e.g., `C:\Projects`)
-- `tags` (required): Comma-separated list of tags to search and remove (e.g., `NET8,NET7`)
+- `tags` (required): Comma-separated list of tags or wildcard patterns to search and remove (e.g., `NET8,NET7` or `v1.*,beta-?`)
 - `--remote`, `-r`, `/remote` (optional): Also remove the tag from the remote repository (origin)
 - `--help` or `-h`: Show help and usage information
 
 ### Example
 
+**Remove specific tags:**
+
 ```sh
 GitTools rm C:/Projects NET8,NET7 --remote
+```
+
+**Remove tags using wildcards:**
+
+```sh
+GitTools rm C:/Projects "v1.*,beta-*" --remote
 ```
 
 ## Build
@@ -56,6 +99,38 @@ This project requires [.NET 9 SDK](https://dotnet.microsoft.com/) to build and r
 ```sh
 dotnet build
 ```
+
+## Code Coverage
+
+To generate and view code coverage reports:
+
+### Generate Coverage Report
+
+```sh
+# Using the provided PowerShell script (recommended)
+.\generate-coverage.ps1
+
+# Or manually
+dotnet test --collect:"XPlat Code Coverage" --results-directory TestResults
+reportgenerator -reports:"TestResults\**\coverage.cobertura.xml" -targetdir:"CoverageReport" -reporttypes:"Html"
+```
+
+### View Coverage Report
+
+```sh
+# Generate and open the report automatically
+.\generate-coverage.ps1 -OpenReport
+
+# Or open manually
+start CoverageReport\index.html
+```
+
+The coverage report includes:
+
+- **Line Coverage**: Percentage of executable lines covered by tests
+- **Branch Coverage**: Percentage of decision branches covered by tests  
+- **Method Coverage**: Percentage of methods covered by tests
+- **Per-file Analysis**: Detailed coverage breakdown for each source file
 
 ## Publish as Single File (Windows x64)
 

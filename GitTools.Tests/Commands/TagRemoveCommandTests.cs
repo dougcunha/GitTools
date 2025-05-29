@@ -84,22 +84,20 @@ public sealed class TagRemoveCommandTests
     public async Task ExecuteAsync_WithNoGitRepositories_ShouldDisplayErrorAndReturn()
     {
         // Arrange
-        _mockGitScanner.Scan(@"C:\TestRepo").Returns(new List<string>());
+        _mockGitScanner.Scan(@"C:\TestRepo").Returns([]);
 
         // Act
         await _command.ExecuteAsync("v1.0.0", @"C:\TestRepo", false);
 
         // Assert
         _testConsole.Output.ShouldContain("No Git repositories found.");
-    }
-
-    [Fact]
+    }    [Fact]
     public async Task ExecuteAsync_WithRepositoriesFound_ShouldDisplayCount()
     {
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1", @"C:\TestRepo\Repo2" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(false);
+        _mockGitService.GetAllTagsAsync(Arg.Any<string>()).Returns(new List<string>());
 
         // Act
         await _command.ExecuteAsync("v1.0.0", @"C:\TestRepo", false);
@@ -114,7 +112,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1", @"C:\TestRepo\Repo2" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(false);
+        _mockGitService.GetAllTagsAsync(Arg.Any<string>()).Returns([]);
 
         // Act
         await _command.ExecuteAsync("v1.0.0", @"C:\TestRepo", false);
@@ -129,8 +127,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0").Returns(true);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v2.0.0").Returns(true);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(["v1.0.0", "v2.0.0"]);
         _testConsole.Input.PushTextWithEnter(" "); // Select first item
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Confirm selection
 
@@ -138,8 +135,7 @@ public sealed class TagRemoveCommandTests
         await _command.ExecuteAsync("v1.0.0, v2.0.0", @"C:\TestRepo", false);
 
         // Assert
-        await _mockGitService.Received(1).HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0");
-        await _mockGitService.Received(1).HasTagAsync(@"C:\TestRepo\Repo1", "v2.0.0");
+        await _mockGitService.Received(1).GetAllTagsAsync(@"C:\TestRepo\Repo1");
     }
 
     [Fact]
@@ -148,8 +144,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0").Returns(true);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v2.0.0").Returns(true);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(["v1.0.0", "v2.0.0"]);
         _testConsole.Input.PushKey(ConsoleKey.Enter);
 
         // Act
@@ -165,16 +160,16 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1", @"C:\TestRepo\Repo2" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0").Throws(new Exception("Git error"));
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo2", "v1.0.0").Returns(false);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Throws(new Exception("Git error"));
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo2").Returns([]);
         _testConsole.Input.PushTextWithEnter("n"); // Don't show scan error details
 
         // Act
         await _command.ExecuteAsync("v1.0.0", @"C:\TestRepo", false);
 
         // Assert
-        await _mockGitService.Received(1).HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0");
-        await _mockGitService.Received(1).HasTagAsync(@"C:\TestRepo\Repo2", "v1.0.0");
+        await _mockGitService.Received(1).GetAllTagsAsync(@"C:\TestRepo\Repo1");
+        await _mockGitService.Received(1).GetAllTagsAsync(@"C:\TestRepo\Repo2");
         _testConsole.Output.ShouldContain("No repository with the specified tag(s) found.");
     }
 
@@ -184,8 +179,8 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1", @"C:\TestRepo\Repo2" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0").Throws(new Exception("Git error"));
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo2", "v1.0.0").Returns(false);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Throws(new Exception("Git error"));
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo2").Returns([]);
         _testConsole.Input.PushTextWithEnter("y");
 
         // Act
@@ -201,7 +196,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0").Returns(true);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(["v1.0.0"]);
         _testConsole.Input.PushTextWithEnter(" "); // Select first item
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Confirm selection
 
@@ -219,7 +214,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0").Returns(true);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(["v1.0.0"]);
         _testConsole.Input.PushTextWithEnter(" "); // Select first item
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Confirm selection
 
@@ -237,7 +232,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0").Returns(true);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(["v1.0.0"]);
         _mockGitService.DeleteTagAsync(@"C:\TestRepo\Repo1", "v1.0.0").Throws(new Exception("Delete failed"));
         _testConsole.Input.PushTextWithEnter(" "); // Select first item
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Confirm selection
@@ -256,7 +251,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0").Returns(true);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(["v1.0.0"]);
 
         // Create a test console that automatically selects the first option
         _testConsole.Input.PushTextWithEnter(" "); // Select first item
@@ -276,7 +271,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(false);
+        _mockGitService.GetAllTagsAsync(Arg.Any<string>()).Returns([]);
 
         // Act
         await _command.ExecuteAsync("v1.0.0,v2.0.0", @"C:\TestRepo", false);
@@ -292,9 +287,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         var repositories = new List<string> { @"C:\TestRepo\Repo1" };
         _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v1.0.0").Returns(true);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v2.0.0").Returns(true);
-        _mockGitService.HasTagAsync(@"C:\TestRepo\Repo1", "v3.0.0").Returns(false);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(["v1.0.0", "v2.0.0"]); // Don't include v3.0.0 to simulate not found
         _testConsole.Input.PushTextWithEnter(" "); // Select first item
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Confirm selection
 
@@ -305,5 +298,89 @@ public sealed class TagRemoveCommandTests
         await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "v1.0.0");
         await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "v2.0.0");
         await _mockGitService.DidNotReceive().DeleteTagAsync(@"C:\TestRepo\Repo1", "v3.0.0");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithWildcardPattern_ShouldMatchMultipleTags()
+    {
+        // Arrange
+        var repositories = new List<string> { @"C:\TestRepo\Repo1" };
+        var allTags = new List<string> { "v1.0", "v1.1", "v1.2", "v2.0" };
+
+        _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(allTags);
+        _testConsole.Input.PushTextWithEnter(" "); // Select first item
+        _testConsole.Input.PushKey(ConsoleKey.Enter); // Confirm selection
+
+        // Act
+        await _command.ExecuteAsync("v1.*", @"C:\TestRepo", false);
+
+        // Assert
+        await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "v1.0");
+        await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "v1.1");
+        await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "v1.2");
+        await _mockGitService.DidNotReceive().DeleteTagAsync(@"C:\TestRepo\Repo1", "v2.0");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithMixedPatternsAndExactTags_ShouldHandleBoth()
+    {
+        // Arrange
+        var repositories = new List<string> { @"C:\TestRepo\Repo1" };
+        var allTags = new List<string> { "v1.0", "v1.1", "v2.0", "NET8", "beta-1" };
+
+        _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(allTags);
+        _testConsole.Input.PushTextWithEnter(" "); // Select first item
+        _testConsole.Input.PushKey(ConsoleKey.Enter); // Confirm selection
+
+        // Act
+        await _command.ExecuteAsync("v1.*,NET8,beta-?", @"C:\TestRepo", false);
+
+        // Assert
+        await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "v1.0");
+        await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "v1.1");
+        await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "NET8");
+        await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "beta-1");
+        await _mockGitService.DidNotReceive().DeleteTagAsync(@"C:\TestRepo\Repo1", "v2.0");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithWildcardNoMatches_ShouldNotRemoveAnyTags()
+    {
+        // Arrange
+        var repositories = new List<string> { @"C:\TestRepo\Repo1" };
+        var allTags = new List<string> { "v1.0", "v2.0", "beta-1" };
+
+        _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(allTags);
+
+        // Act
+        await _command.ExecuteAsync("release-*", @"C:\TestRepo", false);
+
+        // Assert
+        _testConsole.Output.ShouldContain("No repository with the specified tag(s) found.");
+        await _mockGitService.DidNotReceiveWithAnyArgs().DeleteTagAsync(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDuplicateWildcardMatches_ShouldRemoveEachTagOnlyOnce()
+    {
+        // Arrange
+        var repositories = new List<string> { @"C:\TestRepo\Repo1" };
+        var allTags = new List<string> { "v1.0", "v1.1", "v2.0" };
+
+        _mockGitScanner.Scan(@"C:\TestRepo").Returns(repositories);
+        _mockGitService.GetAllTagsAsync(@"C:\TestRepo\Repo1").Returns(allTags);
+        _testConsole.Input.PushTextWithEnter(" "); // Select first item
+        _testConsole.Input.PushKey(ConsoleKey.Enter); // Confirm selection
+
+        // Act - patterns overlap: v1.* matches v1.0 and v?.0 also matches v1.0
+        await _command.ExecuteAsync("v1.*,v?.0", @"C:\TestRepo", false);
+
+        // Assert - v1.0 should only be deleted once, even though it matches both patterns
+        await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "v1.0");
+        await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "v1.1");
+        await _mockGitService.Received(1).DeleteTagAsync(@"C:\TestRepo\Repo1", "v2.0");
     }
 }

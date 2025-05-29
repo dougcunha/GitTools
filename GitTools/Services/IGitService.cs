@@ -45,6 +45,21 @@ public interface IGitService
     Task<bool> HasTagAsync(string repoPath, string tag);
 
     /// <summary>
+    /// Lists all tags in the repository.
+    /// </summary>
+    /// <param name="repoPath">The path to the git repository.</param>
+    /// <returns>A list of all tag names in the repository.</returns>
+    Task<List<string>> GetAllTagsAsync(string repoPath);
+
+    /// <summary>
+    /// Lists all tags in the repository that match the specified pattern.
+    /// </summary>
+    /// <param name="repoPath">The path to the git repository.</param>
+    /// <param name="pattern">The wildcard pattern to match tags against (e.g., "v1.*", "release-*").</param>
+    /// <returns>A list of tag names that match the pattern.</returns>
+    Task<List<string>> GetTagsMatchingPatternAsync(string repoPath, string pattern);
+
+    /// <summary>
     /// Runs a git command in the correct repository directory.
     /// This method executes a git command with the specified arguments in the given working directory.
     /// </summary>

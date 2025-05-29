@@ -1,5 +1,6 @@
 using System.CommandLine;
 using GitTools.Services;
+using GitTools.Utils;
 using Spectre.Console;
 
 namespace GitTools.Commands;
@@ -52,12 +53,13 @@ public sealed class TagRemoveCommand : Command
     /// the tags locally and remotely.
     /// </summary>
     /// <remarks>This method performs the following steps: <list type="number"> <item>Scans the specified base
-    /// folder for Git repositories.</item> <item>Identifies repositories containing the specified tags.</item>
+    /// folder for Git repositories.</item> <item>Identifies repositories containing the specified tags (supports wildcards like *, ?).</item>
     /// <item>Prompts the user to select repositories for tag removal.</item> <item>Removes the specified tags from the
     /// selected repositories, optionally including remote removal.</item> </list> If no tags are specified, no action
     /// is taken. If no repositories are found or selected, the process terminates early.</remarks>
-    /// <param name="tagsToSearch">A comma-separated list of tags to search for in the Git repositories. Each tag is trimmed of whitespace. Cannot
-    /// be null or empty.</param>
+    /// <param name="tagsToSearch">A comma-separated list of tags to search for in the Git repositories. Each tag is trimmed of whitespace. 
+    /// Supports wildcard patterns: * (matches any sequence of characters) and ? (matches any single character). 
+    /// Examples: "v1.*" matches all tags starting with "v1.", "release-?" matches "release-1", "release-a", etc.</param>
     /// <param name="baseFolder">The root folder to scan for Git repositories. Must be a valid directory path.</param>
     /// <param name="removeRemote">A boolean value indicating whether the tags should also be removed from remote repositories. <see
     /// langword="true"/> to remove tags from both local and remote repositories; otherwise, <see langword="false"/> to
@@ -182,10 +184,10 @@ public sealed class TagRemoveCommand : Command
     }
 
     /// <summary>
-    /// Detects specified tags in a given repository asynchronously.
+    /// Detects specified tags in a given repository asynchronously, supporting wildcard patterns.
     /// </summary>
     /// <param name="tagsToSearch">
-    /// The tags to search for in the repository. Each tag is trimmed of whitespace.
+    /// The tags to search for in the repository. Each tag is trimmed of whitespace and can contain wildcards.
     /// </param>
     /// <param name="reposWithTag">
     /// The list to which the repository will be added if it contains any of the specified tags.
@@ -210,19 +212,24 @@ public sealed class TagRemoveCommand : Command
     {
         var foundTags = new List<string>();
 
-        foreach (var tag in tagsToSearch)
+        try
         {
-            try
-            {
-                if (await _tagService.HasTagAsync(repo, tag).ConfigureAwait(false))
-                    foundTags.Add(tag);
-            }
-            catch (Exception ex)
-            {
-                scanErrors[repo] = ex;
+            var allRepoTags = await _tagService.GetAllTagsAsync(repo).ConfigureAwait(false);
 
-                break;
+            foreach (var tagPattern in tagsToSearch)
+            {
+                var matchingTags = WildcardMatcher.MatchItems(allRepoTags, tagPattern);
+                foundTags.AddRange(matchingTags);
             }
+
+            // Remove duplicates
+            foundTags = [.. foundTags.Distinct()];
+        }
+        catch (Exception ex)
+        {
+            scanErrors[repo] = ex;
+
+            return;
         }
 
         if (foundTags.Count > 0)

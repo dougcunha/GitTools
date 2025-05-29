@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Abstractions;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace GitTools.Services;
 
@@ -24,6 +25,25 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
     /// <inheritdoc/>
     public Task DeleteRemoteTagAsync(string repoPath, string tag)
         => RunGitCommandAsync(repoPath, $"push origin :refs/tags/{tag}");
+
+    /// <inheritdoc/>
+    public async Task<List<string>> GetAllTagsAsync(string repoPath)
+    {
+        var result = await RunGitCommandAsync(repoPath, "tag -l").ConfigureAwait(false);
+
+        return string.IsNullOrWhiteSpace(result)
+            ? []
+            : [.. result.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<string>> GetTagsMatchingPatternAsync(string repoPath, string pattern)
+    {
+        var allTags = await GetAllTagsAsync(repoPath).ConfigureAwait(false);
+        var regex = ConvertWildcardToRegex(pattern);
+
+        return [.. allTags.Where(tag => regex.IsMatch(tag))];
+    }
 
     /// <inheritdoc/>
     public async Task<string> RunGitCommandAsync(string workingDirectory, string arguments)
@@ -81,5 +101,21 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
         var relativePath = content[7..].Trim();
 
         return Path.GetFullPath(Path.Combine(repoPath, relativePath));
+    }
+
+    /// <summary>
+    /// Converts a wildcard pattern to a regular expression.
+    /// </summary>
+    /// <param name="pattern">The wildcard pattern (e.g., "v1.*", "release-*").</param>
+    /// <returns>A compiled regular expression.</returns>
+    private static Regex ConvertWildcardToRegex(string pattern)
+    {
+        var escaped = Regex.Escape(pattern);
+        
+        var regexPattern = escaped
+            .Replace(@"\*", ".*")
+            .Replace(@"\?", ".");
+
+        return new Regex($"^{regexPattern}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     }
 }
