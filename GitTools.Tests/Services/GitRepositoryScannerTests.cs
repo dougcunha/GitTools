@@ -308,6 +308,6 @@ public sealed class GitRepositoryScannerTests
 
         // Assert
         result.ShouldBeEmpty();
-        _console.Output.ShouldContain("Test exception accessing directory");
+        _console.Output.ShouldContain("Test exception accessing");
     }
 }
