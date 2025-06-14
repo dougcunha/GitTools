@@ -13,7 +13,7 @@ public sealed class GitRepositoryScannerTests
     private readonly MockFileSystem _fileSystem;
     private readonly GitRepositoryScanner _scanner;
 
-    private const string ROOT_FOLDER = @"C:\repos";
+    private static readonly string ROOT_FOLDER = Path.Combine(Path.GetTempPath(), "repos");
     private const string GIT_DIR = ".git";
     private const string GIT_MODULES_FILE = ".gitmodules";
 
@@ -277,10 +277,11 @@ public sealed class GitRepositoryScannerTests
             """;
 
         var mockFileSystem = Substitute.For<IFileSystem>();
-        mockFileSystem.File.Exists(@"C:\repos\.git").Returns(true);
-        mockFileSystem.File.Exists(@"C:\repos\.gitmodules").Returns(true);
+        mockFileSystem.File.Exists(Path.Combine(ROOT_FOLDER, ".git")).Returns(true);
+        mockFileSystem.File.Exists(Path.Combine(ROOT_FOLDER, ".gitmodules")).Returns(true);
         mockFileSystem.File.ReadAllText(Arg.Any<string>()).Returns(GITMODULES_CONTENT);
-        mockFileSystem.Directory.Exists(@"C:\repos\valid-submodule\.git").Throws(new IOException("Test exception reading submodule directory"));
+        mockFileSystem.Directory.Exists(Path.Combine(ROOT_FOLDER, "valid-submodule", ".git"))
+            .Throws(new IOException("Test exception reading submodule directory"));
 
         var scannerWithException = new GitRepositoryScanner(_console, mockFileSystem);
 
