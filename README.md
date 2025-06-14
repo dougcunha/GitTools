@@ -1,7 +1,6 @@
 # GitTools
 
 [![CI Tests](https://github.com/dougcunha/GitTools/actions/workflows/ci.yml/badge.svg)](https://github.com/dougcunha/GitTools/actions/workflows/ci.yml)
-[![Test](https://github.com/dougcunha/GitTools/actions/workflows/test.yml/badge.svg)](https://github.com/dougcunha/GitTools/actions/workflows/test.yml)
 [![Release](https://github.com/dougcunha/GitTools/actions/workflows/release.yml/badge.svg)](https://github.com/dougcunha/GitTools/actions/workflows/release.yml)
 [![codecov](https://codecov.io/gh/dougcunha/GitTools/graph/badge.svg?token=HC2PBRX67N)](https://codecov.io/gh/dougcunha/GitTools)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
