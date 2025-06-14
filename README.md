@@ -1,7 +1,8 @@
 # GitTools
 
 [![CI Tests](https://github.com/dougcunha/GitTools/actions/workflows/ci.yml/badge.svg)](https://github.com/dougcunha/GitTools/actions/workflows/ci.yml)
-[![Build](https://github.com/dougcunha/GitTools/actions/workflows/build.yml/badge.svg)](https://github.com/dougcunha/GitTools/actions/workflows/build.yml)
+[![Test](https://github.com/dougcunha/GitTools/actions/workflows/test.yml/badge.svg)](https://github.com/dougcunha/GitTools/actions/workflows/test.yml)
+[![Release](https://github.com/dougcunha/GitTools/actions/workflows/release.yml/badge.svg)](https://github.com/dougcunha/GitTools/actions/workflows/release.yml)
 [![codecov](https://codecov.io/gh/dougcunha/GitTools/graph/badge.svg?token=HC2PBRX67N)](https://codecov.io/gh/dougcunha/GitTools)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -13,7 +14,7 @@
 - [Example](#example)
 - [Build](#build)
 - [Code Coverage](#code-coverage)
-- [Publish as Single File (Windows x64)](#publish-as-single-file-windows-x64)
+- [Publish as Single File](#publish-as-single-file)
 - [Contributing](#contributing)
 - [Third-party Libraries](#third-party-libraries)
 - [License](#license)
@@ -132,11 +133,14 @@ The coverage report includes:
 - **Method Coverage**: Percentage of methods covered by tests
 - **Per-file Analysis**: Detailed coverage breakdown for each source file
 
-## Publish as Single File (Windows x64)
+## Publish as Single File
 
 ```sh
-dotnet publish -c Release -r win-x64
+dotnet publish -c Release -r <RID>
 ```
+
+Replace `<RID>` with your target runtime identifier, for example `win-x64` for
+Windows or `linux-x64` for Linux.
 
 ## Contributing
 
