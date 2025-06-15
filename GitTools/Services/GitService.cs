@@ -1,14 +1,17 @@
 using System.Diagnostics;
 using System.IO.Abstractions;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using GitTools.Models;
+using Spectre.Console;
 
 namespace GitTools.Services;
 
 /// <summary>
 /// Provides tag-related operations for git repositories.
 /// </summary>
-public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRunner) : IGitService
+public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRunner, IAnsiConsole console) : IGitService
 {
     /// <inheritdoc/>
     public async Task<bool> HasTagAsync(string repoPath, string tag)
@@ -111,11 +114,98 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
     private static Regex ConvertWildcardToRegex(string pattern)
     {
         var escaped = Regex.Escape(pattern);
-        
+
         var regexPattern = escaped
             .Replace(@"\*", ".*")
             .Replace(@"\?", ".");
 
         return new Regex($"^{regexPattern}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    }
+
+    public async Task<GitRepository> GetGitRepositoryAsync(string repositoryName)
+    {
+        var repoPath = Path.Combine(fileSystem.Directory.GetCurrentDirectory(), repositoryName);
+
+        var valid = fileSystem.Directory.Exists(repoPath) &&
+            (fileSystem.Directory.Exists(Path.Combine(repoPath, ".git")) || fileSystem.File.Exists(Path.Combine(repoPath, ".git")));
+
+        string? remoteUrl;
+        try
+        {
+            if (!valid)
+                return new GitRepository { Name = repositoryName, Path = repoPath, IsValid = false };
+
+            remoteUrl = (await RunGitCommandAsync(repoPath, "config --get remote.origin.url").ConfigureAwait(false)).Trim();
+        }
+        catch
+        {
+            return new GitRepository
+            {
+                Name = repositoryName,
+                Path = repoPath,
+                RemoteUrl = null,
+                IsValid = false
+            };
+        }
+
+        return new GitRepository
+        {
+            Name = repositoryName,
+            Path = repoPath,
+            RemoteUrl = remoteUrl,
+            IsValid = valid
+        };
+    }
+    
+    /// <inheritdoc/>
+    public async Task<bool> DeleteLocalGitRepositoryAsync(string? repositoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath))
+            return false;
+
+        try
+        {
+            var resultCode = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? (await processRunner.RunAsync
+                (
+                    new ProcessStartInfo
+                    {
+                        FileName = "powershell",
+                        Arguments = $"-Command \"Remove-Item -Recurse -Force '{repositoryPath}'\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                ).ConfigureAwait(false))
+                : (
+                await processRunner.RunAsync
+                (
+                    new ProcessStartInfo
+                    {
+                        FileName = "/bin/bash",
+                        Arguments = $"-c \"rm -rf '{repositoryPath}'\"",
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                ).ConfigureAwait(false));
+
+            if (resultCode != 0)
+            {
+                console.MarkupInterpolated($"[red]Error deleting repository {repositoryPath}: result code {resultCode}[/]");
+
+                return false;
+            }
+
+            return !fileSystem.Directory.Exists(repositoryPath);
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error deleting repository {repositoryPath}: {ex.Message}[/]");
+
+            return false;
+        }
     }
 }

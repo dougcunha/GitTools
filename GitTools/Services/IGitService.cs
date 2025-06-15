@@ -1,3 +1,5 @@
+using GitTools.Models;
+
 namespace GitTools.Services;
 
 /// <summary>
@@ -73,4 +75,26 @@ public interface IGitService
     /// The output of the git command.
     /// </returns>
     Task<string> RunGitCommandAsync(string workingDirectory, string arguments);
+
+    /// <summary>
+    /// Gets the git repository information for the specified repository name.
+    /// </summary>
+    /// <param name="repositoryName">The name of the repository to retrieve.</param>
+    /// <returns>
+    /// A task that represents the asynchronous operation. The task result contains the GitRepository object.
+    /// </returns>
+    Task<GitRepository> GetGitRepositoryAsync(string repositoryName);
+
+    /// <summary>
+    /// Deletes a local git repository at the specified path.
+    /// This method will remove the git repository directory and all its contents.
+    /// </summary>
+    /// <param name="repositoryPath">
+    ///  The path to the local git repository to delete.
+    /// </param>
+    /// <returns>
+    /// true if the repository was successfully deleted; otherwise, false.
+    /// If the repository does not exist or cannot be deleted, it returns false.
+    /// </returns>
+    Task<bool> DeleteLocalGitRepositoryAsync(string? repositoryPath);
 }

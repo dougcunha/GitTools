@@ -1,6 +1,4 @@
 using System.CommandLine;
-using System.Diagnostics;
-using System.Text;
 using System.IO.Abstractions;
 using GitTools.Services;
 using Spectre.Console;
@@ -13,107 +11,124 @@ namespace GitTools.Commands;
 public sealed class ReCloneCommand : Command
 {
     private readonly IFileSystem _fileSystem;
-    private readonly IProcessRunner _processRunner;
     private readonly IBackupService _backupService;
+    private readonly IGitService _gitService;
     private readonly IAnsiConsole _console;
+
+    private readonly IProcessRunner _processRunner;
 
     public ReCloneCommand
     (
         IFileSystem fileSystem,
-        IProcessRunner processRunner,
         IBackupService backupService,
-        IAnsiConsole console
+        IGitService gitService,
+        IAnsiConsole console,
+        IProcessRunner processRunner
     )
-        : base("reclone", "Reclones the git repository in the current directory.")
+        : base("reclone", "Reclones the specified git repository.")
     {
         _fileSystem = fileSystem;
-        _processRunner = processRunner;
         _backupService = backupService;
+        _gitService = gitService;
         _console = console;
+        _processRunner = processRunner;
 
+        var repositoryNameArgument = new Argument<string>("repository-name", "Git repository folder name relative to the current directory to reclone");
         var noBackupOption = new Option<bool>("--no-backup", "Do not create a backup zip of the folder");
         var forceOption = new Option<bool>("--force", "Ignore uncommitted changes to the repository");
 
+        AddArgument(repositoryNameArgument);
         AddOption(noBackupOption);
         AddOption(forceOption);
 
-        this.SetHandler(ExecuteAsync, noBackupOption, forceOption);
+        this.SetHandler(ExecuteAsync, repositoryNameArgument, noBackupOption, forceOption);
     }
 
     /// <summary>
     /// Executes the reclone operation.
     /// </summary>
-    public async Task ExecuteAsync(bool noBackup, bool force)
+    public async Task ExecuteAsync(string repositoryName, bool noBackup, bool force)
     {
-        var repoPath = _fileSystem.Directory.GetCurrentDirectory();
-        var gitPath = _fileSystem.Path.Combine(repoPath, ".git");
+        // Normalize and validate the repository path
+        var repo = await _gitService.GetGitRepositoryAsync(repositoryName).ConfigureAwait(false);
 
-        if (!_fileSystem.Directory.Exists(gitPath) && !_fileSystem.File.Exists(gitPath))
+        if (!repo.IsValid)
         {
-            _console.MarkupLine("[red]Current directory is not a git repository.[/]");
+            _console.MarkupLineInterpolated($"[red]{repositoryName} is not valid or does not exist: {repo.Path}[/]");
+
             return;
         }
 
+        _console.MarkupLineInterpolated($"[grey]Recloning repository: {repo.Name} at {repo.Path}[/]");
+
         if (!force)
         {
-            var status = await RunGitAsync(repoPath, "status --porcelain");
+            var status = await _gitService.RunGitCommandAsync(repo.Path, "status --porcelain").ConfigureAwait(false);
+
             if (!string.IsNullOrWhiteSpace(status))
             {
                 _console.MarkupLine("[red]Uncommitted changes detected. Use --force to ignore.[/]");
+
                 return;
             }
         }
 
-        var remoteUrl = (await RunGitAsync(repoPath, "config --get remote.origin.url")).Trim();
-        var parentDir = _fileSystem.Path.GetDirectoryName(repoPath)!;
-        var repoName = _fileSystem.Path.GetFileName(repoPath.TrimEnd(_fileSystem.Path.DirectorySeparatorChar, _fileSystem.Path.AltDirectorySeparatorChar));
-
         if (!noBackup)
+            GenerateRepositoryBackup(repo.Path, repo.ParentDir, repo.Name);
+
+        var tempPath = RenameRepositoryDirectory(repo.Path);
+
+        await _console.Status()
+            .StartAsync("[yellow]Cloning repository...[/]", async ctx =>
+            {
+                return await _gitService.RunGitCommandAsync(repo.ParentDir, $"clone {repo.RemoteUrl} {repo.Name}").ConfigureAwait(false);
+            }).ConfigureAwait(false);
+
+        if (!string.IsNullOrWhiteSpace(tempPath))
         {
-            var backupFile = _fileSystem.Path.Combine(parentDir, $"{repoName}-backup.zip");
-            _backupService.CreateBackup(repoPath, backupFile);
-            _console.MarkupLineInterpolated($"[grey]Backup created: {backupFile}[/]");
+            var deleteOldRepositoryResult = await _gitService.DeleteLocalGitRepositoryAsync(tempPath)
+                .ConfigureAwait(false);
+
+            if (deleteOldRepositoryResult)
+                _console.MarkupLineInterpolated($"[green]✓[/] [grey]Old repository deleted: {tempPath}[/]");
         }
 
-        _fileSystem.Directory.Delete(repoPath, true);
-        await _processRunner.RunAsync
-        (
-            new ProcessStartInfo
-            {
-                FileName = "git",
-                Arguments = $"clone {remoteUrl} {repoName}",
-                WorkingDirectory = parentDir,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        ).ConfigureAwait(false);
+        _console.MarkupLine("[green]✓ Repository recloned successfully.[/]");
+    }
+   
+    private void GenerateRepositoryBackup(string repoPath, string parentDir, string repoName)
+    {
+        var backupFile = Path.Combine(parentDir, $"{repoName}-backup.zip");
 
-        _console.MarkupLine("[green]Repository recloned successfully.[/]");
+        _console.Status()
+            .Start("[yellow]Creating backup...[/]", ctx =>
+            {
+                _backupService.CreateBackup(repoPath, backupFile);
+            });
+
+        _console.MarkupLineInterpolated($"[green]✓[/] [grey]Backup created: {backupFile}[/]");
     }
 
-    private async Task<string> RunGitAsync(string workingDirectory, string arguments)
+    private string? RenameRepositoryDirectory(string repoPath)
     {
-        var output = new StringBuilder();
-        var error = new StringBuilder();
+        try
+        {
+            var tempPath = $"{repoPath}{Guid.NewGuid()}";
 
-        var exitCode = await _processRunner.RunAsync
-        (
-            new ProcessStartInfo
-            {
-                FileName = "git",
-                Arguments = arguments,
-                WorkingDirectory = workingDirectory,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            },
-            (_, e) => { if (e.Data is not null) output.AppendLine(e.Data); },
-            (_, e) => { if (e.Data is not null) error.AppendLine(e.Data); }
-        ).ConfigureAwait(false);
+            _console.MarkupLineInterpolated($"[grey]Renaming repository folder from {repoPath} to {tempPath}[/]");
+            _fileSystem.Directory.Move(repoPath, tempPath);
 
-        return exitCode != 0 ? throw new InvalidOperationException(error.ToString()) : output.ToString();
+            return tempPath;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // Directory doesn't exist anymore, which is fine            
+        }
+        catch (Exception ex)
+        {
+            _console.MarkupLineInterpolated($"[yellow]⚠[/] [grey]Attempt to rename folder {repoPath} failed: {ex.Message}[/]");
+        }
+
+        return null;
     }
 }

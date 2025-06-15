@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 
 namespace GitTools.Services;
 
 /// <inheritdoc/>
+[ExcludeFromCodeCoverage]
 public sealed class ZipBackupService : IBackupService
 {
     /// <inheritdoc/>
