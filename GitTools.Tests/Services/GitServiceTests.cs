@@ -1,7 +1,10 @@
 using System.Diagnostics;
 using System.IO.Abstractions;
+using System.IO.Abstractions.TestingHelpers;
 using System.Reflection;
 using GitTools.Services;
+using Spectre.Console;
+using Spectre.Console.Testing;
 
 namespace GitTools.Tests.Services;
 
@@ -10,14 +13,18 @@ public sealed class GitServiceTests
 {
     private readonly IFileSystem _fileSystem = Substitute.For<IFileSystem>();
     private readonly IProcessRunner _processRunner = Substitute.For<IProcessRunner>();
+    private readonly TestConsole _console = new();
     private readonly GitService _gitService;
 
     private const string REPO_PATH = @"C:\test\repo";
+    private const string REPO_NAME = "test-repo";
     private const string TAG_NAME = "v1.0.0";
     private const string GIT_DIR = ".git";
+    private const string REMOTE_URL = "https://github.com/user/repo.git";
+    private const string CURRENT_DIRECTORY = @"C:\current";
 
     public GitServiceTests()
-        => _gitService = new GitService(_fileSystem, _processRunner);
+        => _gitService = new GitService(_fileSystem, _processRunner, _console);
 
     private static DataReceivedEventArgs CreateDataReceivedEventArgs(string data)
     {
@@ -263,17 +270,21 @@ public sealed class GitServiceTests
     {
         // Arrange
         const string GIT_ARGUMENTS = "status";
+        var fileSystem = new MockFileSystem();
+        var processRunner = Substitute.For<IProcessRunner>();
+        var console = Substitute.For<IAnsiConsole>();
+        var gitService = new GitService(fileSystem, processRunner, console);
+        fileSystem.Directory.CreateDirectory(REPO_PATH);
+        fileSystem.Directory.CreateDirectory(Path.Combine(REPO_PATH, GIT_DIR));
 
-        _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
-
-        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+        processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
             .Returns(0);
 
         // Act
-        await _gitService.RunGitCommandAsync(REPO_PATH, GIT_ARGUMENTS);
+        await gitService.RunGitCommandAsync(REPO_PATH, GIT_ARGUMENTS);
 
         // Assert
-        await _processRunner.Received(1).RunAsync
+        await processRunner.Received(1).RunAsync
         (
             Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
@@ -673,5 +684,243 @@ public sealed class GitServiceTests
         result.ShouldContain("release-v2.0.0-final");
         result.ShouldNotContain("feature-branch-test");
         result.ShouldNotContain("hotfix-urgent-fix");
+    }    
+	
+	[Fact]
+    public async Task GetGitRepositoryAsync_WhenValidRepository_ShouldReturnValidGitRepository()
+    {
+        // Arrange
+        var fileSystem = new MockFileSystem();
+        var processRunner = Substitute.For<IProcessRunner>();
+        var console = Substitute.For<IAnsiConsole>();
+        var gitService = new GitService(fileSystem, processRunner, console);
+        
+        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
+        var gitPath = Path.Combine(expectedPath, GIT_DIR);
+
+        fileSystem.Directory.CreateDirectory(expectedPath);
+        fileSystem.Directory.CreateDirectory(gitPath);
+        fileSystem.Directory.SetCurrentDirectory(CURRENT_DIRECTORY);
+
+        processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(REMOTE_URL));
+
+                return Task.FromResult(0);
+            });
+
+        // Act
+        var result = await gitService.GetGitRepositoryAsync(REPO_NAME);
+
+        // Assert
+        result.ShouldNotBeNull();
+        result.Name.ShouldBe(REPO_NAME);
+        result.Path.ShouldBe(expectedPath);
+        result.RemoteUrl.ShouldBe(REMOTE_URL);
+        result.IsValid.ShouldBeTrue();
+
+        await processRunner.Received(1).RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(psi =>
+                psi.FileName == "git" &&
+                psi.Arguments == "config --get remote.origin.url" &&
+                psi.WorkingDirectory == expectedPath),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetGitRepositoryAsync_WhenRepositoryNotExists_ShouldReturnInvalidGitRepository()
+    {
+        // Arrange
+        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
+
+        _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
+        _fileSystem.Directory.Exists(expectedPath).Returns(false);
+
+        // Act
+        var result = await _gitService.GetGitRepositoryAsync(REPO_NAME);
+
+        // Assert
+        result.ShouldNotBeNull();
+        result.Name.ShouldBe(REPO_NAME);
+        result.Path.ShouldBe(expectedPath);
+        result.RemoteUrl.ShouldBeNull();
+        result.IsValid.ShouldBeFalse();
+
+        await _processRunner.DidNotReceive().RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>());
+    }
+
+    [Fact]
+    public async Task GetGitRepositoryAsync_WhenGitDirectoryNotExists_ShouldReturnInvalidGitRepository()
+    {
+        // Arrange
+        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
+        var gitPath = Path.Combine(expectedPath, GIT_DIR);
+
+        _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
+        _fileSystem.Directory.Exists(expectedPath).Returns(true);
+        _fileSystem.Directory.Exists(gitPath).Returns(false);
+        _fileSystem.File.Exists(gitPath).Returns(false);
+
+        // Act
+        var result = await _gitService.GetGitRepositoryAsync(REPO_NAME);
+
+        // Assert
+        result.ShouldNotBeNull();
+        result.Name.ShouldBe(REPO_NAME);
+        result.Path.ShouldBe(expectedPath);
+        result.RemoteUrl.ShouldBeNull();
+        result.IsValid.ShouldBeFalse();
+
+        await _processRunner.DidNotReceive().RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>());
+    }
+
+    [Fact]
+    public async Task GetGitRepositoryAsync_WhenGitCommandFails_ShouldReturnInvalidGitRepository()
+    {
+        // Arrange
+        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
+        var gitPath = Path.Combine(expectedPath, GIT_DIR);
+
+        _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
+        _fileSystem.Directory.Exists(expectedPath).Returns(true);
+        _fileSystem.Directory.Exists(gitPath).Returns(true);        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var errorHandler = callInfo.ArgAt<DataReceivedEventHandler>(2);
+                errorHandler?.Invoke(null!, CreateDataReceivedEventArgs("fatal: not a git repository"));
+
+                return Task.FromResult(1);
+            });
+
+        // Act
+        var result = await _gitService.GetGitRepositoryAsync(REPO_NAME);
+
+        // Assert
+        result.ShouldNotBeNull();
+        result.Name.ShouldBe(REPO_NAME);
+        result.Path.ShouldBe(expectedPath);
+        result.RemoteUrl.ShouldBeNull();
+        result.IsValid.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DeleteLocalGitRepositoryAsync_OnWindows_ShouldUsePowerShellCommand()
+    {
+        // Arrange
+        const string REPOSITORY_PATH = @"C:\test\repo";
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(0);
+
+        _fileSystem.Directory.Exists(REPOSITORY_PATH).Returns(false);
+
+        // Act
+        var result = await _gitService.DeleteLocalGitRepositoryAsync(REPOSITORY_PATH);
+
+        // Assert
+        result.ShouldBeTrue();
+
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(psi =>
+                psi.FileName == "powershell" &&
+                psi.Arguments.Contains($"Remove-Item -Recurse -Force '{REPOSITORY_PATH}'")),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task DeleteLocalGitRepositoryAsync_WhenPathIsNull_ShouldReturnFalse()
+    {
+        // Act
+        var result = await _gitService.DeleteLocalGitRepositoryAsync(null);
+
+        // Assert
+        result.ShouldBeFalse();
+
+        await _processRunner.DidNotReceive().RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>());
+    }
+
+    [Fact]
+    public async Task DeleteLocalGitRepositoryAsync_WhenPathIsEmpty_ShouldReturnFalse()
+    {
+        // Act
+        var result = await _gitService.DeleteLocalGitRepositoryAsync(string.Empty);
+
+        // Assert
+        result.ShouldBeFalse();
+
+        await _processRunner.DidNotReceive().RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>());
+    }    
+	
+	[Fact]
+    public async Task DeleteLocalGitRepositoryAsync_WhenCommandFails_ShouldReturnFalse()
+    {
+        // Arrange
+        const string REPOSITORY_PATH = @"C:\test\repo";
+        var fileSystem = new MockFileSystem();
+        var processRunner = Substitute.For<IProcessRunner>();
+        var console = new TestConsole();
+        var gitService = new GitService(fileSystem, processRunner, console);
+        fileSystem.Directory.CreateDirectory(REPOSITORY_PATH);
+
+        processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(1);
+
+        // Act
+        var result = await gitService.DeleteLocalGitRepositoryAsync(REPOSITORY_PATH);
+
+        // Assert
+        result.ShouldBeFalse();
+
+        console.Output.ShouldContain($"Error deleting repository {REPOSITORY_PATH}: result code 1");
+    }    
+	
+	[Fact]
+    public async Task DeleteLocalGitRepositoryAsync_WhenExceptionOccurs_ShouldReturnFalse()
+    {
+        // Arrange
+        const string REPOSITORY_PATH = @"C:\test\repo";
+        const string ERROR_MESSAGE = "Access denied";
+        var fileSystem = new MockFileSystem();
+        fileSystem.Directory.CreateDirectory(REPOSITORY_PATH);
+        var processRunner = Substitute.For<IProcessRunner>();
+        var console = new TestConsole();
+        var gitService = new GitService(fileSystem, processRunner, console);
+
+        processRunner.When(x => x.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>()))
+            .Do(_ => throw new Exception(ERROR_MESSAGE));
+
+        // Act
+        var result = await gitService.DeleteLocalGitRepositoryAsync(REPOSITORY_PATH);
+
+        // Assert
+        result.ShouldBeFalse();
+
+        console.Output.ShouldContain($"Error deleting repository {REPOSITORY_PATH}: {ERROR_MESSAGE}");
+    }
+
+    [Fact]
+    public async Task DeleteLocalGitRepositoryAsync_WhenDirectoryStillExists_ShouldReturnFalse()
+    {
+        // Arrange
+        const string REPOSITORY_PATH = @"C:\test\repo";
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(0);
+
+        _fileSystem.Directory.Exists(REPOSITORY_PATH).Returns(true);
+
+        // Act
+        var result = await _gitService.DeleteLocalGitRepositoryAsync(REPOSITORY_PATH);
+
+        // Assert
+        result.ShouldBeFalse();
     }
 }
