@@ -8,9 +8,9 @@
 ## Index
 
 - [Features](#features)
-- [Usage](#usage)
-- [Parameters](#parameters)
-- [Example](#example)
+- [Commands](#commands)
+  - [Remove Tags (rm)](#remove-tags-rm)
+  - [Reclone Repository (reclone)](#reclone-repository-reclone)
 - [Build](#build)
 - [Code Coverage](#code-coverage)
 - [Publish as Single File](#publish-as-single-file)
@@ -18,27 +18,33 @@
 - [Third-party Libraries](#third-party-libraries)
 - [License](#license)
 
-GitTools is a command-line tool for searching and removing tags in multiple Git repositories and their submodules. It is designed to help you manage tags across large codebases with ease.
+GitTools is a command-line tool for managing Git repositories, including searching and removing tags across multiple repositories and recloning repositories with backup support.
 
 ## Features
 
-- Recursively scans a root directory for Git repositories and submodules
-- Lists all repositories containing specified tags
-- Allows interactive selection of repositories to remove tags from
-- Removes only the tags that actually exist in each repository
-- Supports multiple tags (comma-separated)
-- **Supports wildcard patterns** using `*` and `?` characters for flexible tag matching
-- Optionally removes tags from the remote repository as well
-- Modern, user-friendly terminal UI using [Spectre.Console](https://spectreconsole.net/)
-- Modern CLI parsing with [System.CommandLine](https://github.com/dotnet/command-line-api)
+- **Tag Management**: Recursively scans directories for Git repositories and manages tags
+- **Repository Recloning**: Clean reclone of repositories with automatic backup support
+- **Submodule Support**: Works with Git repositories and their submodules
+- **Interactive Selection**: User-friendly interface for selecting repositories
+- **Wildcard Pattern Support**: Use `*` and `?` characters for flexible tag matching
+- **Remote Tag Management**: Optionally remove tags from remote repositories
+- **Backup Creation**: Automatic ZIP backup creation before destructive operations
+- **Modern Terminal UI**: Built with [Spectre.Console](https://spectreconsole.net/) for beautiful interfaces
+- **Modern CLI Parsing**: Uses [System.CommandLine](https://github.com/dotnet/command-line-api) for extensible command-line parsing
 
-## Usage
+## Commands
+
+GitTools provides two main commands for repository management:
+
+### Remove Tags (rm)
+
+Search and remove tags from multiple Git repositories with wildcard pattern support.
 
 ```sh
 GitTools rm <root-directory> <tag1,tag2,...> [--remote]
 ```
 
-### Wildcard Support
+#### Wildcard Support
 
 GitTools supports wildcard patterns for flexible tag matching:
 
@@ -71,25 +77,60 @@ GitTools rm C:/Projects "NET8,v1.*,beta-?"
 
 **Note:** When using wildcards on Windows Command Prompt or PowerShell, wrap patterns in quotes to prevent shell expansion.
 
-### Parameters
+#### Parameters
 
 - `root-directory` (required): Root directory to scan for Git repositories (e.g., `C:\Projects`)
 - `tags` (required): Comma-separated list of tags or wildcard patterns to search and remove (e.g., `NET8,NET7` or `v1.*,beta-?`)
 - `--remote`, `-r`, `/remote` (optional): Also remove the tag from the remote repository (origin)
 - `--help` or `-h`: Show help and usage information
 
-### Example
+### Reclone Repository (reclone)
 
-**Remove specific tags:**
+Reclone a Git repository with automatic backup and cleanup support. This command is useful for cleaning up repository state, removing local changes, or fixing corrupted repositories.
 
 ```sh
-GitTools rm C:/Projects NET8,NET7 --remote
+GitTools reclone <repository-name> [--no-backup] [--force]
 ```
 
-**Remove tags using wildcards:**
+#### Reclone Features
+
+- **Automatic Backup**: Creates a ZIP backup of the repository before recloning (unless `--no-backup` is specified)
+- **Uncommitted Changes Detection**: Checks for uncommitted changes and requires `--force` to proceed
+- **Temporary Directory Management**: Safely renames the original directory during the process
+- **Cleanup**: Automatically removes the old repository directory after successful recloning
+- **Remote URL Preservation**: Uses the existing remote URL for recloning
+
+#### Reclone Parameters
+
+- `repository-name` (required): Name of the Git repository folder relative to the current directory
+- `--no-backup` (optional): Skip creating a backup ZIP file before recloning
+- `--force` (optional): Ignore uncommitted changes and proceed with recloning
+- `--help` or `-h`: Show help and usage information
+
+#### Examples
+
+**Basic reclone with backup:**
 
 ```sh
-GitTools rm C:/Projects "v1.*,beta-*" --remote
+GitTools reclone my-project
+```
+
+**Reclone without backup:**
+
+```sh
+GitTools reclone my-project --no-backup
+```
+
+**Force reclone ignoring uncommitted changes:**
+
+```sh
+GitTools reclone my-project --force
+```
+
+**Reclone without backup and ignoring changes:**
+
+```sh
+GitTools reclone my-project --no-backup --force
 ```
 
 ## Build
