@@ -12,8 +12,7 @@ public sealed class GitRepositoryScannerTests
     private readonly TestConsole _console = new();
     private readonly MockFileSystem _fileSystem;
     private readonly GitRepositoryScanner _scanner;
-
-    private static readonly string ROOT_FOLDER = Path.Combine(Path.GetTempPath(), "repos");
+    private static readonly string _rootFolder = Path.Combine(Path.GetTempPath(), "repos");
     private const string GIT_DIR = ".git";
     private const string GIT_MODULES_FILE = ".gitmodules";
 
@@ -27,13 +26,13 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithSingleGitRepository_ShouldReturnRepository()
     {
         // Arrange
-        var repoPath = Path.Combine(ROOT_FOLDER, "repo1");
+        var repoPath = Path.Combine(_rootFolder, "repo1");
         var gitPath = Path.Combine(repoPath, GIT_DIR);
 
         _fileSystem.AddDirectory(gitPath);
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldContain(repoPath);
@@ -44,8 +43,8 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithMultipleGitRepositories_ShouldReturnAllRepositories()
     {
         // Arrange
-        var repo1Path = Path.Combine(ROOT_FOLDER, "repo1");
-        var repo2Path = Path.Combine(ROOT_FOLDER, "repo2");
+        var repo1Path = Path.Combine(_rootFolder, "repo1");
+        var repo2Path = Path.Combine(_rootFolder, "repo2");
         var git1Path = Path.Combine(repo1Path, GIT_DIR);
         var git2Path = Path.Combine(repo2Path, GIT_DIR);
 
@@ -53,7 +52,7 @@ public sealed class GitRepositoryScannerTests
         _fileSystem.AddDirectory(git2Path);
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldContain(repo1Path);
@@ -65,7 +64,7 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithNestedGitRepositories_ShouldReturnParentRepository()
     {
         // Arrange
-        var parentRepoPath = Path.Combine(ROOT_FOLDER, "parent");
+        var parentRepoPath = Path.Combine(_rootFolder, "parent");
         var nestedRepoPath = Path.Combine(parentRepoPath, "nested");
         var parentGitPath = Path.Combine(parentRepoPath, GIT_DIR);
         var nestedGitPath = Path.Combine(nestedRepoPath, GIT_DIR);
@@ -74,7 +73,7 @@ public sealed class GitRepositoryScannerTests
         _fileSystem.AddDirectory(nestedGitPath);
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         // The scanner stops exploring subdirectories when it finds a git repository
@@ -88,13 +87,13 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithGitWorktree_ShouldReturnRepository()
     {
         // Arrange
-        var repoPath = Path.Combine(ROOT_FOLDER, "worktree");
+        var repoPath = Path.Combine(_rootFolder, "worktree");
         var gitFilePath = Path.Combine(repoPath, GIT_DIR);
 
         _fileSystem.AddFile(gitFilePath, new MockFileData("gitdir: /main/repo/.git/worktrees/feature"));
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldContain(repoPath);
@@ -105,7 +104,7 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithSubmodules_ShouldReturnMainRepoAndSubmodules()
     {
         // Arrange
-        var mainRepoPath = Path.Combine(ROOT_FOLDER, "main");
+        var mainRepoPath = Path.Combine(_rootFolder, "main");
         var submodule1Path = Path.Combine(mainRepoPath, "submodule1");
         var submodule2Path = Path.Combine(mainRepoPath, "submodule2");
 
@@ -130,7 +129,7 @@ public sealed class GitRepositoryScannerTests
         _fileSystem.AddFile(gitmodulesPath, new MockFileData(GITMODULES_CONTENT));
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldContain(mainRepoPath);
@@ -143,7 +142,7 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithInvalidSubmodulePath_ShouldIgnoreInvalidSubmodule()
     {
         // Arrange
-        var mainRepoPath = Path.Combine(ROOT_FOLDER, "main");
+        var mainRepoPath = Path.Combine(_rootFolder, "main");
         var validSubmodulePath = Path.Combine(mainRepoPath, "valid-submodule");
 
         var mainGitPath = Path.Combine(mainRepoPath, GIT_DIR);
@@ -165,7 +164,7 @@ public sealed class GitRepositoryScannerTests
         _fileSystem.AddFile(gitmodulesPath, new MockFileData(GITMODULES_CONTENT));
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldContain(mainRepoPath);
@@ -178,15 +177,15 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithNonGitDirectories_ShouldNotReturnNonGitDirectories()
     {
         // Arrange
-        var nonGitPath = Path.Combine(ROOT_FOLDER, "not-a-repo");
-        var gitRepoPath = Path.Combine(ROOT_FOLDER, "git-repo");
+        var nonGitPath = Path.Combine(_rootFolder, "not-a-repo");
+        var gitRepoPath = Path.Combine(_rootFolder, "git-repo");
         var gitPath = Path.Combine(gitRepoPath, GIT_DIR);
 
         _fileSystem.AddDirectory(nonGitPath);
         _fileSystem.AddDirectory(gitPath);
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldNotContain(nonGitPath);
@@ -198,10 +197,10 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithEmptyDirectory_ShouldReturnEmptyList()
     {
         // Arrange
-        _fileSystem.AddDirectory(ROOT_FOLDER);
+        _fileSystem.AddDirectory(_rootFolder);
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldBeEmpty();
@@ -211,13 +210,13 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithAccessDeniedDirectory_ShouldLogErrorAndContinue()
     {
         // Arrange
-        var accessibleRepoPath = Path.Combine(ROOT_FOLDER, "accessible");
+        var accessibleRepoPath = Path.Combine(_rootFolder, "accessible");
         var accessibleGitPath = Path.Combine(accessibleRepoPath, GIT_DIR);
 
         _fileSystem.AddDirectory(accessibleGitPath);
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldContain(accessibleRepoPath);
@@ -229,13 +228,13 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithDuplicateRepositories_ShouldReturnDistinctRepositories()
     {
         // Arrange
-        var repoPath = Path.Combine(ROOT_FOLDER, "repo");
+        var repoPath = Path.Combine(_rootFolder, "repo");
         var gitPath = Path.Combine(repoPath, GIT_DIR);
 
         _fileSystem.AddDirectory(gitPath);
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldContain(repoPath);
@@ -247,7 +246,7 @@ public sealed class GitRepositoryScannerTests
     public void Scan_WithInvalidGitmodulesFile_ShouldLogErrorAndContinue()
     {
         // Arrange
-        var mainRepoPath = Path.Combine(ROOT_FOLDER, "main");
+        var mainRepoPath = Path.Combine(_rootFolder, "main");
         var mainGitPath = Path.Combine(mainRepoPath, GIT_DIR);
         var gitmodulesPath = Path.Combine(mainRepoPath, GIT_MODULES_FILE);
 
@@ -255,7 +254,7 @@ public sealed class GitRepositoryScannerTests
         _fileSystem.AddFile(gitmodulesPath, new MockFileData("invalid content"));
 
         // Act
-        var result = _scanner.Scan(ROOT_FOLDER);
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldContain(mainRepoPath);
@@ -277,16 +276,17 @@ public sealed class GitRepositoryScannerTests
             """;
 
         var mockFileSystem = Substitute.For<IFileSystem>();
-        mockFileSystem.File.Exists(Path.Combine(ROOT_FOLDER, ".git")).Returns(true);
-        mockFileSystem.File.Exists(Path.Combine(ROOT_FOLDER, ".gitmodules")).Returns(true);
+        mockFileSystem.File.Exists(Path.Combine(_rootFolder, ".git")).Returns(true);
+        mockFileSystem.File.Exists(Path.Combine(_rootFolder, ".gitmodules")).Returns(true);
         mockFileSystem.File.ReadAllText(Arg.Any<string>()).Returns(GITMODULES_CONTENT);
-        mockFileSystem.Directory.Exists(Path.Combine(ROOT_FOLDER, "valid-submodule", ".git"))
+
+        mockFileSystem.Directory.Exists(Path.Combine(_rootFolder, "valid-submodule", ".git"))
             .Throws(new IOException("Test exception reading submodule directory"));
 
         var scannerWithException = new GitRepositoryScanner(_console, mockFileSystem);
 
         // Act
-        var result = scannerWithException.Scan(ROOT_FOLDER);
+        var result = scannerWithException.Scan(_rootFolder);
 
         // Assert
         result.Count.ShouldBe(1);
@@ -300,11 +300,11 @@ public sealed class GitRepositoryScannerTests
     {
         // Arrange
         var mockFileSystem = Substitute.For<IFileSystem>();
-        mockFileSystem.Directory.GetDirectories(ROOT_FOLDER).Throws(new IOException("Test exception accessing directory"));
+        mockFileSystem.Directory.GetDirectories(_rootFolder).Throws(new IOException("Test exception accessing directory"));
         var scannerWithException = new GitRepositoryScanner(_console, mockFileSystem);
 
         // Act
-        var result = scannerWithException.Scan(ROOT_FOLDER);
+        var result = scannerWithException.Scan(_rootFolder);
 
         // Assert
         result.ShouldBeEmpty();

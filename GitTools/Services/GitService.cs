@@ -130,6 +130,7 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
             (fileSystem.Directory.Exists(Path.Combine(repoPath, ".git")) || fileSystem.File.Exists(Path.Combine(repoPath, ".git")));
 
         string? remoteUrl;
+
         try
         {
             if (!valid)
@@ -156,7 +157,7 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
             IsValid = valid
         };
     }
-    
+
     /// <inheritdoc/>
     public async Task<bool> DeleteLocalGitRepositoryAsync(string? repositoryPath)
     {

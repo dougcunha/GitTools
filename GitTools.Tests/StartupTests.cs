@@ -40,12 +40,12 @@ public sealed class StartupTests
         services.RegisterServices();
 
         // Assert
-        var ansiConsoleDescriptor = services.First(s => s.ServiceType == typeof(IAnsiConsole));
-        var processRunnerDescriptor = services.First(s => s.ServiceType == typeof(IProcessRunner));
-        var gitScannerDescriptor = services.First(s => s.ServiceType == typeof(IGitRepositoryScanner));
-        var fileSystemDescriptor = services.First(s => s.ServiceType == typeof(IFileSystem));
-        var gitServiceDescriptor = services.First(s => s.ServiceType == typeof(IGitService));
-        var tagRemoveCommandDescriptor = services.First(s => s.ServiceType == typeof(TagRemoveCommand));
+        var ansiConsoleDescriptor = services.First(static s => s.ServiceType == typeof(IAnsiConsole));
+        var processRunnerDescriptor = services.First(static s => s.ServiceType == typeof(IProcessRunner));
+        var gitScannerDescriptor = services.First(static s => s.ServiceType == typeof(IGitRepositoryScanner));
+        var fileSystemDescriptor = services.First(static s => s.ServiceType == typeof(IFileSystem));
+        var gitServiceDescriptor = services.First(static s => s.ServiceType == typeof(IGitService));
+        var tagRemoveCommandDescriptor = services.First(static s => s.ServiceType == typeof(TagRemoveCommand));
 
         ansiConsoleDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         processRunnerDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
@@ -65,15 +65,17 @@ public sealed class StartupTests
         services.RegisterServices();
 
         // Assert
-        var processRunnerDescriptor = services.First(s => s.ServiceType == typeof(IProcessRunner));
-        var gitScannerDescriptor = services.First(s => s.ServiceType == typeof(IGitRepositoryScanner));
-        var fileSystemDescriptor = services.First(s => s.ServiceType == typeof(IFileSystem));
-        var gitServiceDescriptor = services.First(s => s.ServiceType == typeof(IGitService));
+        var processRunnerDescriptor = services.First(static s => s.ServiceType == typeof(IProcessRunner));
+        var gitScannerDescriptor = services.First(static s => s.ServiceType == typeof(IGitRepositoryScanner));
+        var fileSystemDescriptor = services.First(static s => s.ServiceType == typeof(IFileSystem));
+        var gitServiceDescriptor = services.First(static s => s.ServiceType == typeof(IGitService));
+        var backupServiceDescriptor = services.First(static s => s.ServiceType == typeof(IBackupService));
 
         processRunnerDescriptor.ImplementationType.ShouldBe(typeof(ProcessRunner));
         gitScannerDescriptor.ImplementationType.ShouldBe(typeof(GitRepositoryScanner));
         fileSystemDescriptor.ImplementationType.ShouldBe(typeof(FileSystem));
         gitServiceDescriptor.ImplementationType.ShouldBe(typeof(GitService));
+        backupServiceDescriptor.ImplementationType.ShouldBe(typeof(ZipBackupService));
     }
 
     [Fact]
@@ -135,9 +137,26 @@ public sealed class StartupTests
         var rootCommand = serviceProvider.CreateRootCommand();
 
         // Assert
-        rootCommand.Subcommands.ShouldContain(cmd => cmd.Name == "rm");
-        var tagRemoveCommand = rootCommand.Subcommands.First(cmd => cmd.Name == "rm");
+        rootCommand.Subcommands.ShouldContain(static cmd => cmd.Name == "rm");
+        var tagRemoveCommand = rootCommand.Subcommands.First(static cmd => cmd.Name == "rm");
         tagRemoveCommand.ShouldBeOfType<TagRemoveCommand>();
+    }
+
+    [Fact]
+    public void CreateRootCommand_ShouldAddRecloneCommand()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Act
+        var rootCommand = serviceProvider.CreateRootCommand();
+
+        // Assert
+        rootCommand.Subcommands.ShouldContain(static cmd => cmd.Name == "reclone");
+        var recloneCommand = rootCommand.Subcommands.First(static cmd => cmd.Name == "reclone");
+        recloneCommand.ShouldBeOfType<ReCloneCommand>();
     }
 
     [Fact]

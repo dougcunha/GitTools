@@ -15,15 +15,12 @@ public sealed class ReCloneCommand : Command
     private readonly IGitService _gitService;
     private readonly IAnsiConsole _console;
 
-    private readonly IProcessRunner _processRunner;
-
     public ReCloneCommand
     (
         IFileSystem fileSystem,
         IBackupService backupService,
         IGitService gitService,
-        IAnsiConsole console,
-        IProcessRunner processRunner
+        IAnsiConsole console
     )
         : base("reclone", "Reclones the specified git repository.")
     {
@@ -31,7 +28,6 @@ public sealed class ReCloneCommand : Command
         _backupService = backupService;
         _gitService = gitService;
         _console = console;
-        _processRunner = processRunner;
 
         var repositoryNameArgument = new Argument<string>("repository-name", "Git repository folder name relative to the current directory to reclone");
         var noBackupOption = new Option<bool>("--no-backup", "Do not create a backup zip of the folder");
@@ -79,10 +75,11 @@ public sealed class ReCloneCommand : Command
         var tempPath = RenameRepositoryDirectory(repo.Path);
 
         await _console.Status()
-            .StartAsync("[yellow]Cloning repository...[/]", async ctx =>
-            {
-                return await _gitService.RunGitCommandAsync(repo.ParentDir, $"clone {repo.RemoteUrl} {repo.Name}").ConfigureAwait(false);
-            }).ConfigureAwait(false);
+            .StartAsync
+            (
+                "[yellow]Cloning repository...[/]",
+                _ => _gitService.RunGitCommandAsync(repo.ParentDir, $"clone {repo.RemoteUrl} {repo.Name}")
+            ).ConfigureAwait(false);
 
         if (!string.IsNullOrWhiteSpace(tempPath))
         {
@@ -95,16 +92,13 @@ public sealed class ReCloneCommand : Command
 
         _console.MarkupLine("[green]✓ Repository recloned successfully.[/]");
     }
-   
+
     private void GenerateRepositoryBackup(string repoPath, string parentDir, string repoName)
     {
         var backupFile = Path.Combine(parentDir, $"{repoName}-backup.zip");
 
         _console.Status()
-            .Start("[yellow]Creating backup...[/]", ctx =>
-            {
-                _backupService.CreateBackup(repoPath, backupFile);
-            });
+            .Start("[yellow]Creating backup...[/]", _ => _backupService.CreateBackup(repoPath, backupFile));
 
         _console.MarkupLineInterpolated($"[green]✓[/] [grey]Backup created: {backupFile}[/]");
     }
@@ -122,7 +116,7 @@ public sealed class ReCloneCommand : Command
         }
         catch (DirectoryNotFoundException)
         {
-            // Directory doesn't exist anymore, which is fine            
+            // Directory doesn't exist anymore, which is fine
         }
         catch (Exception ex)
         {

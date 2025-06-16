@@ -17,7 +17,6 @@ public sealed class ReCloneCommandTests
     private readonly IBackupService _mockBackupService = Substitute.For<IBackupService>();
     private readonly IGitService _mockGitService = Substitute.For<IGitService>();
     private readonly TestConsole _testConsole = new();
-    private readonly IProcessRunner _mockProcessRunner = Substitute.For<IProcessRunner>();
     private readonly ReCloneCommand _command;
 
     private const string REPO_NAME = "test-repo";
@@ -29,7 +28,7 @@ public sealed class ReCloneCommandTests
     public ReCloneCommandTests()
     {
         _testConsole.Interactive();
-        _command = new ReCloneCommand(_mockFileSystem, _mockBackupService, _mockGitService, _testConsole, _mockProcessRunner);
+        _command = new ReCloneCommand(_mockFileSystem, _mockBackupService, _mockGitService, _testConsole);
     }
 
     [Fact]
@@ -184,7 +183,7 @@ public sealed class ReCloneCommandTests
 
         // Assert
         var movedDirectories = _mockFileSystem.AllDirectories
-            .Where(d => d.StartsWith(REPO_PATH) && d != REPO_PATH && d.Length > REPO_PATH.Length)
+            .Where(static d => d.StartsWith(REPO_PATH, StringComparison.Ordinal) && d != REPO_PATH && d.Length > REPO_PATH.Length)
             .ToList();
 
         movedDirectories.ShouldNotBeEmpty();
@@ -215,7 +214,6 @@ public sealed class ReCloneCommandTests
     {
         // Arrange
         var validRepo = CreateValidGitRepository();
-        var tempPath = $"{REPO_PATH}{Guid.NewGuid()}";
 
         _mockFileSystem.AddDirectory(REPO_PATH);
         _mockGitService.GetGitRepositoryAsync(REPO_NAME).Returns(validRepo);
@@ -258,12 +256,13 @@ public sealed class ReCloneCommandTests
         var validRepo = CreateValidGitRepository();
         SetupSuccessfulReclone(validRepo);
         var mockFileSystem = Substitute.For<IFileSystem>();
-        var command = new ReCloneCommand(mockFileSystem, _mockBackupService, _mockGitService, _testConsole, _mockProcessRunner);
+        var command = new ReCloneCommand(mockFileSystem, _mockBackupService, _mockGitService, _testConsole);
 
         // Configure mock to throw an exception when Move is called
         mockFileSystem.Directory.Exists(REPO_PATH).Returns(true);
-        mockFileSystem.Directory.When(x => x.Move(Arg.Any<string>(), Arg.Any<string>()))
-            .Do(_ => throw new UnauthorizedAccessException("Access denied"));
+
+        mockFileSystem.Directory.When(static x => x.Move(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(static _ => throw new UnauthorizedAccessException("Access denied"));
 
         _mockGitService.GetGitRepositoryAsync(REPO_NAME).Returns(validRepo);
         _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
@@ -286,12 +285,13 @@ public sealed class ReCloneCommandTests
         var validRepo = CreateValidGitRepository();
         SetupSuccessfulReclone(validRepo);
         var mockFileSystem = Substitute.For<IFileSystem>();
-        var command = new ReCloneCommand(mockFileSystem, _mockBackupService, _mockGitService, _testConsole, _mockProcessRunner);
+        var command = new ReCloneCommand(mockFileSystem, _mockBackupService, _mockGitService, _testConsole);
 
         // Configure mock to throw IOException when Move is called
         mockFileSystem.Directory.Exists(REPO_PATH).Returns(true);
-        mockFileSystem.Directory.When(x => x.Move(Arg.Any<string>(), Arg.Any<string>()))
-            .Do(_ => throw new IOException("Directory is in use"));
+
+        mockFileSystem.Directory.When(static x => x.Move(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(static _ => throw new IOException("Directory is in use"));
 
         _mockGitService.GetGitRepositoryAsync(REPO_NAME).Returns(validRepo);
         _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
@@ -314,12 +314,13 @@ public sealed class ReCloneCommandTests
         var validRepo = CreateValidGitRepository();
         SetupSuccessfulReclone(validRepo);
         var mockFileSystem = Substitute.For<IFileSystem>();
-        var command = new ReCloneCommand(mockFileSystem, _mockBackupService, _mockGitService, _testConsole, _mockProcessRunner);
+        var command = new ReCloneCommand(mockFileSystem, _mockBackupService, _mockGitService, _testConsole);
 
         // Configure mock to throw DirectoryNotFoundException when Move is called
         mockFileSystem.Directory.Exists(REPO_PATH).Returns(true);
-        mockFileSystem.Directory.When(x => x.Move(Arg.Any<string>(), Arg.Any<string>()))
-            .Do(_ => throw new DirectoryNotFoundException("Directory not found"));
+
+        mockFileSystem.Directory.When(static x => x.Move(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(static _ => throw new DirectoryNotFoundException("Directory not found"));
 
         _mockGitService.GetGitRepositoryAsync(REPO_NAME).Returns(validRepo);
         _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);

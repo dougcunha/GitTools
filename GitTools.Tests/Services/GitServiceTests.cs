@@ -373,11 +373,11 @@ public sealed class GitServiceTests
     {
         // Arrange
         const string GIT_OUTPUT = """
-            v1.0.0  
+            v1.0.0
               v1.1.0
-            
+
             v2.0.0
-            
+
             """;
 
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
@@ -684,9 +684,9 @@ public sealed class GitServiceTests
         result.ShouldContain("release-v2.0.0-final");
         result.ShouldNotContain("feature-branch-test");
         result.ShouldNotContain("hotfix-urgent-fix");
-    }    
-	
-	[Fact]
+    }
+
+    [Fact]
     public async Task GetGitRepositoryAsync_WhenValidRepository_ShouldReturnValidGitRepository()
     {
         // Arrange
@@ -694,7 +694,7 @@ public sealed class GitServiceTests
         var processRunner = Substitute.For<IProcessRunner>();
         var console = Substitute.For<IAnsiConsole>();
         var gitService = new GitService(fileSystem, processRunner, console);
-        
+
         var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
         var gitPath = Path.Combine(expectedPath, GIT_DIR);
 
@@ -703,7 +703,7 @@ public sealed class GitServiceTests
         fileSystem.Directory.SetCurrentDirectory(CURRENT_DIRECTORY);
 
         processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(REMOTE_URL));
@@ -857,9 +857,9 @@ public sealed class GitServiceTests
         result.ShouldBeFalse();
 
         await _processRunner.DidNotReceive().RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>());
-    }    
-	
-	[Fact]
+    }
+
+    [Fact]
     public async Task DeleteLocalGitRepositoryAsync_WhenCommandFails_ShouldReturnFalse()
     {
         // Arrange
@@ -880,9 +880,9 @@ public sealed class GitServiceTests
         result.ShouldBeFalse();
 
         console.Output.ShouldContain($"Error deleting repository {REPOSITORY_PATH}: result code 1");
-    }    
-	
-	[Fact]
+    }
+
+    [Fact]
     public async Task DeleteLocalGitRepositoryAsync_WhenExceptionOccurs_ShouldReturnFalse()
     {
         // Arrange
