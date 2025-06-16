@@ -250,6 +250,22 @@ public sealed class ReCloneCommandTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WhenRepoValidHasErrors_ShouldShowErrorAndReturn()
+    {
+        // Arrange
+        var validRepo = CreateValidGitRepository(hasErrors: true);
+        _mockGitService.GetGitRepositoryAsync(REPO_NAME).Returns(validRepo);
+
+        // Act
+        await _command.ExecuteAsync(REPO_NAME, false, false);
+
+        // Assert
+        _testConsole.Output.ShouldContain("Repository has errors and cannot be inspected for changes.");
+        await _mockGitService.DidNotReceive().RunGitCommandAsync(REPO_PATH, "status --porcelain");
+        await _mockGitService.DidNotReceive().RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WhenDirectoryMoveThrowsException_ShouldLogWarningAndProceed()
     {
         // Arrange
@@ -336,13 +352,14 @@ public sealed class ReCloneCommandTests
         _testConsole.Output.ShouldContain("Repository recloned successfully");
     }
 
-    private GitRepository CreateValidGitRepository()
+    private GitRepository CreateValidGitRepository(bool hasErrors = false)
         => new()
         {
             Name = REPO_NAME,
             Path = REPO_PATH,
             RemoteUrl = REMOTE_URL,
-            IsValid = true
+            IsValid = true,
+            HasErrors = hasErrors
         };
 
     private void SetupSuccessfulReclone(GitRepository repo)

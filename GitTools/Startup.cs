@@ -30,6 +30,7 @@ public static class Startup
         services.AddSingleton<IGitService, GitService>();
         services.AddSingleton<IBackupService, ZipBackupService>();
         services.AddSingleton<TagRemoveCommand>();
+        services.AddSingleton<TagListCommand>();
         services.AddSingleton<ReCloneCommand>();
 
         return services;
@@ -50,8 +51,10 @@ public static class Startup
         var rootCommand = new RootCommand("GitTools - A tool for searching and removing tags in Git repositories.");
 
         var tagRemoveCommand = serviceProvider.GetRequiredService<TagRemoveCommand>();
+        var tagListCommand = serviceProvider.GetRequiredService<TagListCommand>();
         var recloneCommand = serviceProvider.GetRequiredService<ReCloneCommand>();
         rootCommand.AddCommand(tagRemoveCommand);
+        rootCommand.AddCommand(tagListCommand);
         rootCommand.AddCommand(recloneCommand);
 
         return rootCommand;

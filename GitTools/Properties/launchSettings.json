@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "GitTools": {
+      "commandName": "Project"
+    },
+    "ReClone": {
+      "commandName": "Project",
+      "commandLineArgs": "reclone pos-scripts",
+      "workingDirectory": "d:\\projetos"
+    }
+  }
+}
