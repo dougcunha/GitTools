@@ -119,7 +119,7 @@ public sealed class TagListCommand : Command
         if (scanErrors.Count == 0)
             return;
 
-        if (!_console.Confirm($"[red]{scanErrors.Count} scan errors detected.Do you want to see the details?[/]"))
+        if (!_console.Confirm($"[red]{scanErrors.Count} scan errors detected. Do you want to see the details?[/]"))
             return;
 
         foreach (var err in scanErrors)
