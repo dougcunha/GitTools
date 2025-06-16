@@ -10,6 +10,7 @@
 - [Features](#features)
 - [Commands](#commands)
   - [Remove Tags (rm)](#remove-tags-rm)
+  - [List Tags (ls)](#list-tags-ls)
   - [Reclone Repository (reclone)](#reclone-repository-reclone)
 - [Build](#build)
 - [Code Coverage](#code-coverage)
@@ -28,13 +29,14 @@ GitTools is a command-line tool for managing Git repositories, including searchi
 - **Interactive Selection**: User-friendly interface for selecting repositories
 - **Wildcard Pattern Support**: Use `*` and `?` characters for flexible tag matching
 - **Remote Tag Management**: Optionally remove tags from remote repositories
+- **Tag Listing with wildcard filtering**
 - **Backup Creation**: Automatic ZIP backup creation before destructive operations
 - **Modern Terminal UI**: Built with [Spectre.Console](https://spectreconsole.net/) for beautiful interfaces
 - **Modern CLI Parsing**: Uses [System.CommandLine](https://github.com/dotnet/command-line-api) for extensible command-line parsing
 
 ## Commands
 
-GitTools provides two main commands for repository management:
+GitTools provides three main commands for repository management:
 
 ### Remove Tags (rm)
 
@@ -83,6 +85,20 @@ GitTools rm C:/Projects "NET8,v1.*,beta-?"
 - `tags` (required): Comma-separated list of tags or wildcard patterns to search and remove (e.g., `NET8,NET7` or `v1.*,beta-?`)
 - `--remote`, `-r`, `/remote` (optional): Also remove the tag from the remote repository (origin)
 - `--help` or `-h`: Show help and usage information
+
+### List Tags (ls)
+
+List repositories containing specific tags. Supports the same wildcard patterns as tag removal.
+
+```sh
+GitTools ls <root-directory> <tag1,tag2,...>
+```
+
+Example output:
+
+```
+Repo1: v1.0, v2.0
+```
 
 ### Reclone Repository (reclone)
 

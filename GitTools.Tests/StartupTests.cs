@@ -28,6 +28,7 @@ public sealed class StartupTests
         serviceProvider.GetService<IFileSystem>().ShouldNotBeNull();
         serviceProvider.GetService<IGitService>().ShouldNotBeNull();
         serviceProvider.GetService<TagRemoveCommand>().ShouldNotBeNull();
+        serviceProvider.GetService<TagListCommand>().ShouldNotBeNull();
     }
 
     [Fact]
@@ -46,6 +47,7 @@ public sealed class StartupTests
         var fileSystemDescriptor = services.First(static s => s.ServiceType == typeof(IFileSystem));
         var gitServiceDescriptor = services.First(static s => s.ServiceType == typeof(IGitService));
         var tagRemoveCommandDescriptor = services.First(static s => s.ServiceType == typeof(TagRemoveCommand));
+        var tagListCommandDescriptor = services.First(static s => s.ServiceType == typeof(TagListCommand));
 
         ansiConsoleDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         processRunnerDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
@@ -53,6 +55,7 @@ public sealed class StartupTests
         fileSystemDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         gitServiceDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         tagRemoveCommandDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+        tagListCommandDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
     }
 
     [Fact]
@@ -143,6 +146,23 @@ public sealed class StartupTests
     }
 
     [Fact]
+    public void CreateRootCommand_ShouldAddTagListCommand()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Act
+        var rootCommand = serviceProvider.CreateRootCommand();
+
+        // Assert
+        rootCommand.Subcommands.ShouldContain(static cmd => cmd.Name == "ls");
+        var tagListCommand = rootCommand.Subcommands.First(static cmd => cmd.Name == "ls");
+        tagListCommand.ShouldBeOfType<TagListCommand>();
+    }
+
+    [Fact]
     public void CreateRootCommand_ShouldAddRecloneCommand()
     {
         // Arrange
@@ -177,6 +197,23 @@ public sealed class StartupTests
     }
 
     [Fact]
+    public void CreateRootCommand_ShouldResolveTagListCommandFromServiceProvider()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Act
+        var rootCommand = serviceProvider.CreateRootCommand();
+        var tagListCommand = rootCommand.Subcommands.OfType<TagListCommand>().First();
+
+        // Assert
+        tagListCommand.ShouldNotBeNull();
+        tagListCommand.ShouldBeOfType<TagListCommand>();
+    }
+
+    [Fact]
     public void CreateRootCommand_WithMissingTagRemoveCommand_ShouldThrowException()
     {
         // Arrange
@@ -187,6 +224,7 @@ public sealed class StartupTests
         services.AddSingleton<IGitRepositoryScanner, GitRepositoryScanner>();
         services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<IGitService, GitService>();
+        services.AddSingleton<TagListCommand>();
         var serviceProvider = services.BuildServiceProvider();
 
         // Act & Assert
@@ -226,5 +264,24 @@ public sealed class StartupTests
 
         // Assert
         tagRemoveCommand1.ShouldBeSameAs(tagRemoveCommand2);
+    }
+
+    [Fact]
+    public void CreateRootCommand_ShouldReuseTagListCommandInstance()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Act
+        var rootCommand1 = serviceProvider.CreateRootCommand();
+        var rootCommand2 = serviceProvider.CreateRootCommand();
+
+        var tagListCommand1 = rootCommand1.Subcommands.OfType<TagListCommand>().First();
+        var tagListCommand2 = rootCommand2.Subcommands.OfType<TagListCommand>().First();
+
+        // Assert
+        tagListCommand1.ShouldBeSameAs(tagListCommand2);
     }
 }
