@@ -1,6 +1,7 @@
 using System.CommandLine;
 using GitTools.Commands;
 using GitTools.Services;
+using NSubstitute.ExceptionExtensions;
 using Spectre.Console.Testing;
 
 namespace GitTools.Tests.Commands;
@@ -90,7 +91,7 @@ public sealed class TagListCommandTests
     {
         var repos = new List<string> { "C:/repos/repo1" };
         _mockGitScanner.Scan("C:/repos").Returns(repos);
-        _mockGitService.GetAllTagsAsync("C:/repos/repo1").Throws(new Exception("boom"));
+        _mockGitService.GetAllTagsAsync("C:/repos/repo1").ThrowsAsync(new Exception("boom"));
         _testConsole.Input.PushTextWithEnter("y");
 
         await _command.ExecuteAsync("v1.0", "C:/repos");

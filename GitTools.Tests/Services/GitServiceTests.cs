@@ -808,6 +808,177 @@ public sealed class GitServiceTests
         result.IsValid.ShouldBeFalse();
     }
 
+    private static async IAsyncEnumerable<string> MockReadLinesAsync(string content)
+    {
+        foreach (var line in content.Split(["\r\n", "\n"], System.StringSplitOptions.None))
+        {
+            await Task.Yield();
+
+            yield return line;
+        }
+    }
+
+    [Fact]
+    public async Task GetGitRepositoryAsync_WhenGitCommandFailsButConfigFileExists_ShouldReturnRepositoryWithUrlFromConfig()
+    {
+        // Arrange
+        const string CONFIG_CONTENT = """
+            [core]
+                repositoryformatversion = 0
+                filemode = true
+                bare = false
+            [remote "origin"]
+                url = https://github.com/user/config-repo.git
+                fetch = +refs/heads/*:refs/remotes/origin/*
+            """;
+
+        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
+        var gitPath = Path.Combine(expectedPath, GIT_DIR);
+        var configPath = Path.Combine(expectedPath, GIT_DIR, "config");
+
+        _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
+        _fileSystem.Directory.Exists(expectedPath).Returns(true);
+        _fileSystem.Directory.Exists(gitPath).Returns(true);
+        _fileSystem.File.Exists(configPath).Returns(true);
+
+        _fileSystem.File.ReadLinesAsync(configPath).Returns(MockReadLinesAsync(CONFIG_CONTENT));
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(static callInfo =>
+            {
+                var errorHandler = callInfo.ArgAt<DataReceivedEventHandler>(2);
+                errorHandler?.Invoke(null!, CreateDataReceivedEventArgs("fatal: unable to read config"));
+
+                return Task.FromResult(1);
+            });
+
+        // Act
+        var result = await _gitService.GetGitRepositoryAsync(REPO_NAME);
+
+        // Assert
+        result.ShouldNotBeNull();
+        result.Name.ShouldBe(REPO_NAME);
+        result.Path.ShouldBe(expectedPath);
+        result.RemoteUrl.ShouldBe("https://github.com/user/config-repo.git");
+        result.IsValid.ShouldBeTrue();
+        result.HasErrors.ShouldBeTrue();
+
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(psi =>
+                psi.FileName == "git" &&
+                psi.Arguments == "config --get remote.origin.url" &&
+                psi.WorkingDirectory == expectedPath),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+
+        _fileSystem.File.Received(1).ReadLinesAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task GetGitRepositoryAsync_WhenGitCommandFailsButConfigFileExistsWithNoRemote_ShouldReturnRepositoryWithoutUrl()
+    {
+        // Arrange
+        const string CONFIG_CONTENT = """
+        [core]
+            repositoryformatversion = 0
+            filemode = true
+            bare = false
+        [remote "origin"]
+            fetch = +refs/heads/*:refs/remotes/origin/*
+        """;
+
+        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
+        var gitPath = Path.Combine(expectedPath, GIT_DIR);
+        var configPath = Path.Combine(expectedPath, GIT_DIR, "config");
+
+        _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
+        _fileSystem.Directory.Exists(expectedPath).Returns(true);
+        _fileSystem.Directory.Exists(gitPath).Returns(true);
+        _fileSystem.File.Exists(configPath).Returns(true);
+
+        _fileSystem.File.ReadLinesAsync(configPath).Returns(MockReadLinesAsync(CONFIG_CONTENT));
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(static callInfo =>
+            {
+                var errorHandler = callInfo.ArgAt<DataReceivedEventHandler>(2);
+                errorHandler?.Invoke(null!, CreateDataReceivedEventArgs("fatal: unable to read config"));
+
+                return Task.FromResult(1);
+            });
+
+        // Act
+        var result = await _gitService.GetGitRepositoryAsync(REPO_NAME);
+
+        // Assert
+        result.ShouldNotBeNull();
+        result.Name.ShouldBe(REPO_NAME);
+        result.Path.ShouldBe(expectedPath);
+        result.RemoteUrl.ShouldBeNull();
+        result.IsValid.ShouldBeFalse();
+        result.HasErrors.ShouldBeTrue();
+
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(psi =>
+                psi.FileName == "git" &&
+                psi.Arguments == "config --get remote.origin.url" &&
+                psi.WorkingDirectory == expectedPath),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+
+        _fileSystem.File.Received(1).ReadLinesAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task GetGitRepositoryAsync_WhenGitCommandFailsAndConfigFileNotExists_ShouldReturnRepositoryWithoutUrl()
+    {
+        // Arrange
+        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
+        var gitPath = Path.Combine(expectedPath, GIT_DIR);
+        var configPath = Path.Combine(expectedPath, GIT_DIR, "config");
+
+        _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
+        _fileSystem.Directory.Exists(expectedPath).Returns(true);
+        _fileSystem.Directory.Exists(gitPath).Returns(true);
+        _fileSystem.File.Exists(configPath).Returns(false);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(static callInfo =>
+            {
+                var errorHandler = callInfo.ArgAt<DataReceivedEventHandler>(2);
+                errorHandler?.Invoke(null!, CreateDataReceivedEventArgs("fatal: unable to read config"));
+
+                return Task.FromResult(1);
+            });
+
+        // Act
+        var result = await _gitService.GetGitRepositoryAsync(REPO_NAME);
+
+        // Assert
+        result.ShouldNotBeNull();
+        result.Name.ShouldBe(REPO_NAME);
+        result.Path.ShouldBe(expectedPath);
+        result.RemoteUrl.ShouldBeNull();
+        result.IsValid.ShouldBeFalse();
+        result.HasErrors.ShouldBeTrue();
+
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(psi =>
+                psi.FileName == "git" &&
+                psi.Arguments == "config --get remote.origin.url" &&
+                psi.WorkingDirectory == expectedPath),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+
+        _fileSystem.File.DidNotReceive().ReadLinesAsync(Arg.Any<string>());
+    }
+
     [Fact]
     public async Task DeleteLocalGitRepositoryAsync_OnWindows_ShouldUsePowerShellCommand()
     {

@@ -59,6 +59,13 @@ public sealed class ReCloneCommand : Command
 
         if (!force)
         {
+            if (repo.HasErrors)
+            {
+                _console.MarkupLine("[red]Repository has errors and cannot be inspected for changes. If you want to reclone, use the --force option to ignore local changes.[/]");
+
+                return;
+            }
+
             var status = await _gitService.RunGitCommandAsync(repo.Path, "status --porcelain").ConfigureAwait(false);
 
             if (!string.IsNullOrWhiteSpace(status))

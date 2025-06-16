@@ -11,7 +11,7 @@ namespace GitTools.Services;
 /// <summary>
 /// Provides tag-related operations for git repositories.
 /// </summary>
-public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRunner, IAnsiConsole console) : IGitService
+public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner processRunner, IAnsiConsole console) : IGitService
 {
     /// <inheritdoc/>
     public async Task<bool> HasTagAsync(string repoPath, string tag)
@@ -129,23 +129,30 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
         var valid = fileSystem.Directory.Exists(repoPath) &&
             (fileSystem.Directory.Exists(Path.Combine(repoPath, ".git")) || fileSystem.File.Exists(Path.Combine(repoPath, ".git")));
 
-        string? remoteUrl;
+        if (!valid)
+            return new GitRepository { Name = repositoryName, Path = repoPath, IsValid = false, HasErrors = true };
+
+        string? remoteUrl = null;
 
         try
         {
-            if (!valid)
-                return new GitRepository { Name = repositoryName, Path = repoPath, IsValid = false };
-
             remoteUrl = (await RunGitCommandAsync(repoPath, "config --get remote.origin.url").ConfigureAwait(false)).Trim();
         }
         catch
         {
+            // Try to get the remote url directly from config
+            var configPath = Path.Combine(repoPath, ".git", "config");
+
+            if (fileSystem.File.Exists(configPath))
+                remoteUrl = await GetUrlFromGitConfigAsync(configPath, "origin").ConfigureAwait(false);
+
             return new GitRepository
             {
                 Name = repositoryName,
                 Path = repoPath,
-                RemoteUrl = null,
-                IsValid = false
+                RemoteUrl = remoteUrl,
+                IsValid = !string.IsNullOrWhiteSpace(remoteUrl),
+                HasErrors = true
             };
         }
 
@@ -154,8 +161,38 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
             Name = repositoryName,
             Path = repoPath,
             RemoteUrl = remoteUrl,
-            IsValid = valid
+            IsValid = valid,
+            HasErrors = false
         };
+    }
+
+    private async Task<string?> GetUrlFromGitConfigAsync(string configPath, string sectionName)
+    {
+        var sectionPattern = RegexConfigSection();
+
+        string? currentName = null;
+
+        await foreach (var line in fileSystem.File.ReadLinesAsync(configPath))
+        {
+            var sectionMatch = sectionPattern.Match(line);
+
+            if (sectionMatch.Success)
+            {
+                currentName = sectionMatch.Groups["name"].Value;
+
+                continue;
+            }
+
+            if (currentName != sectionName)
+                continue;
+
+            var urlMatch = RegexUrl().Match(line);
+
+            if (urlMatch.Success)
+                return urlMatch.Groups[1].Value.Trim();
+        }
+
+        return null;
     }
 
     /// <inheritdoc/>
@@ -167,7 +204,7 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
         try
         {
             var resultCode = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? (await processRunner.RunAsync
+                ? await processRunner.RunAsync
                 (
                     new ProcessStartInfo
                     {
@@ -178,9 +215,8 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
                         UseShellExecute = false,
                         CreateNoWindow = true
                     }
-                ).ConfigureAwait(false))
-                : (
-                await processRunner.RunAsync
+                ).ConfigureAwait(false)
+                : await processRunner.RunAsync
                 (
                     new ProcessStartInfo
                     {
@@ -191,7 +227,7 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
                         UseShellExecute = false,
                         CreateNoWindow = true
                     }
-                ).ConfigureAwait(false));
+                ).ConfigureAwait(false);
 
             if (resultCode != 0)
             {
@@ -209,4 +245,10 @@ public sealed class GitService(IFileSystem fileSystem, IProcessRunner processRun
             return false;
         }
     }
+
+    [GeneratedRegex(@"^\s*url\s*=\s*(.+)$")]
+    private static partial Regex RegexUrl();
+
+    [GeneratedRegex("""\[(?<section>remote|submodule)\s+"(?<name>[^"]+)"\]""", RegexOptions.Compiled)]
+    private static partial Regex RegexConfigSection();
 }

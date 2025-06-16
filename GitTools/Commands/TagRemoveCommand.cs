@@ -57,8 +57,8 @@ public sealed class TagRemoveCommand : Command
     /// <item>Prompts the user to select repositories for tag removal.</item> <item>Removes the specified tags from the
     /// selected repositories, optionally including remote removal.</item> </list> If no tags are specified, no action
     /// is taken. If no repositories are found or selected, the process terminates early.</remarks>
-    /// <param name="tagsToSearch">A comma-separated list of tags to search for in the Git repositories. Each tag is trimmed of whitespace. 
-    /// Supports wildcard patterns: * (matches any sequence of characters) and ? (matches any single character). 
+    /// <param name="tagsToSearch">A comma-separated list of tags to search for in the Git repositories. Each tag is trimmed of whitespace.
+    /// Supports wildcard patterns: * (matches any sequence of characters) and ? (matches any single character).
     /// Examples: "v1.*" matches all tags starting with "v1.", "release-?" matches "release-1", "release-a", etc.</param>
     /// <param name="baseFolder">The root folder to scan for Git repositories. Must be a valid directory path.</param>
     /// <param name="removeRemote">A boolean value indicating whether the tags should also be removed from remote repositories. <see
@@ -77,7 +77,12 @@ public sealed class TagRemoveCommand : Command
         }
 
         ShowInitialInfo(baseFolder, tags);
-        var allGitFolders = _gitScanner.Scan(baseFolder);
+
+        var allGitFolders = await _console.Status().StartAsync
+        (
+            $"[yellow]Scanning for Git repositories in {baseFolder}...[/]",
+            _ => Task.Run(() => _gitScanner.Scan(baseFolder))
+        ).ConfigureAwait(false);
 
         if (allGitFolders.Count == 0)
         {
@@ -92,7 +97,7 @@ public sealed class TagRemoveCommand : Command
 
         if (reposWithTag.Count == 0)
         {
-            _console.MarkupLine($"[yellow]No repository with the specified tag(s) found.[/]");
+            _console.MarkupLine("[yellow]No repository with the specified tag(s) found.[/]");
             ShowScanErrors(scanErrors, baseFolder);
 
             return;

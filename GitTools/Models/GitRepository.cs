@@ -35,4 +35,9 @@ public sealed class GitRepository
     /// Gets or sets a value indicating whether the repository is valid.
     /// </summary>
     public bool IsValid { get; init; }
+
+    /// <summary>
+    /// Get or sets a value indicating whether the repository has errors while executing git commands.
+    /// </summary>
+    public bool HasErrors { get; init; }
 }

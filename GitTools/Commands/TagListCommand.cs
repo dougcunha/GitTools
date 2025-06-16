@@ -25,6 +25,7 @@ public sealed class TagListCommand : Command
         _console = console;
 
         var dirArgument = new Argument<string>("directory", "Root directory of git repositories");
+
         var tagsArgument = new Argument<string>("tags", "Tags to search (comma separated)")
         {
             Arity = ArgumentArity.ExactlyOne
@@ -46,43 +47,24 @@ public sealed class TagListCommand : Command
         if (patterns.Length == 0)
         {
             _console.MarkupLine("[red]No tags specified to search.[/]");
+
             return;
         }
 
-        var allGitFolders = _gitScanner.Scan(baseFolder);
-
-        if (allGitFolders.Count == 0)
-        {
-            _console.MarkupLine("[red]No Git repositories found.[/]");
-            return;
-        }
-
-        var repoTagsMap = new Dictionary<string, List<string>>();
         var scanErrors = new Dictionary<string, Exception>();
+        var repoTagsMap = new Dictionary<string, List<string>>();
 
-        foreach (var repo in allGitFolders)
-        {
-            try
-            {
-                var allTags = await _gitService.GetAllTagsAsync(repo).ConfigureAwait(false);
-                var matches = new List<string>();
-                foreach (var pattern in patterns)
-                    matches.AddRange(WildcardMatcher.MatchItems(allTags, pattern));
-
-                matches = [.. matches.Distinct()];
-                if (matches.Count > 0)
-                    repoTagsMap[repo] = matches;
-            }
-            catch (Exception ex)
-            {
-                scanErrors[repo] = ex;
-            }
-        }
+        await _console.Status().StartAsync
+        (
+            $"[yellow]Searching {patterns.Length} tags...[/]",
+            ctx => ScanRepositoriesForTagsAsync(baseFolder, ctx, patterns, scanErrors, repoTagsMap)
+        ).ConfigureAwait(false);
 
         if (repoTagsMap.Count == 0)
         {
             _console.MarkupLine("[yellow]No repository with the specified tag(s) found.[/]");
             ShowScanErrors(scanErrors, baseFolder);
+
             return;
         }
 
@@ -93,6 +75,43 @@ public sealed class TagListCommand : Command
         }
 
         ShowScanErrors(scanErrors, baseFolder);
+    }
+
+    private async Task ScanRepositoriesForTagsAsync(string baseFolder, StatusContext ctx, string[] patterns, Dictionary<string, Exception> scanErrors, Dictionary<string, List<string>> repoTagsMap)
+    {
+        var allGitFolders = _gitScanner.Scan(baseFolder);
+
+        if (allGitFolders.Count == 0)
+        {
+            _console.MarkupLine("[red]No Git repositories found.[/]");
+
+            return;
+        }
+
+        foreach (var repo in allGitFolders)
+        {
+            ctx.Status = $"[yellow]Scanning repository {Path.GetDirectoryName(repo)}...[/]";
+
+            try
+            {
+                var allTags = await _gitService.GetAllTagsAsync(repo).ConfigureAwait(false);
+                var matches = new List<string>();
+
+                foreach (var pattern in patterns)
+                    matches.AddRange(WildcardMatcher.MatchItems(allTags, pattern));
+
+                matches = [.. matches.Distinct()];
+
+                if (matches.Count > 0)
+                    repoTagsMap[repo] = matches;
+            }
+            catch (Exception ex)
+            {
+                scanErrors[repo] = ex;
+            }
+        }
+
+        ctx.Status = $"[green]{allGitFolders.Count} Git repositories scanned.[/]";
     }
 
     private void ShowScanErrors(Dictionary<string, Exception> scanErrors, string baseFolder)
@@ -117,6 +136,9 @@ public sealed class TagListCommand : Command
     private static string GetHierarchicalName(string repoPath, string baseFolder)
     {
         var relativePath = Path.GetRelativePath(baseFolder, repoPath).Replace(Path.DirectorySeparatorChar, '/');
-        return relativePath.Length <= 1 ? Path.GetFileName(repoPath) : relativePath;
+
+        return relativePath.Length <= 1
+            ? Path.GetFileName(repoPath)
+            : relativePath;
     }
 }
