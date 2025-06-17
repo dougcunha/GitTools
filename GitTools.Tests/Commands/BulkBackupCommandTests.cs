@@ -40,6 +40,7 @@ public sealed class BulkBackupCommandTests
         var repo1 = "/repos/repo1";
         var repo2 = "/repos/repo2";
         _scanner.Scan(root).Returns([repo1, repo2]);
+
         _gitService.GetGitRepositoryAsync(repo1).Returns(new GitRepository
         {
             Name = "repo1",
@@ -47,6 +48,7 @@ public sealed class BulkBackupCommandTests
             RemoteUrl = "https://example.com/r1.git",
             IsValid = true
         });
+
         _gitService.GetGitRepositoryAsync(repo2).Returns(new GitRepository
         {
             Name = "repo2",
@@ -62,7 +64,11 @@ public sealed class BulkBackupCommandTests
 
         // Assert
         var json = _fileSystem.File.ReadAllText(output);
-        var repos = JsonSerializer.Deserialize<List<GitRepository>>(json);
+        
+        var repos = JsonSerializer.Deserialize<List<GitRepository>>(json, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+        });
 
         repos.ShouldNotBeNull();
         repos.Count.ShouldBe(2);
@@ -73,22 +79,19 @@ public sealed class BulkBackupCommandTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenNoRepositories_ShouldWriteEmptyFile()
+    public async Task ExecuteAsync_WhenNoRepositories_ShouldPrintMessageOnly()
     {
         // Arrange
-        var root = "/repos";
-        _scanner.Scan(root).Returns([]);
-
-        var output = "/output/repos.json";
+        const string ROOT = "/repos";
+        const string OUTPUT = "/output/repos.json";
+        _scanner.Scan(ROOT).Returns([]);
 
         // Act
-        await _command.ExecuteAsync(root, output);
+        await _command.ExecuteAsync(ROOT, OUTPUT);
 
         // Assert
-        var content = _fileSystem.File.ReadAllText(output);
-        var repos = JsonSerializer.Deserialize<List<GitRepository>>(content);
-        repos.ShouldNotBeNull();
-        repos.ShouldBeEmpty();
+        _fileSystem.File.Exists(OUTPUT).ShouldBeFalse();
+        _console.Output.ShouldContain("No Git repositories found.");
         await _gitService.DidNotReceive().GetGitRepositoryAsync(Arg.Any<string>());
     }
 
@@ -117,9 +120,13 @@ public sealed class BulkBackupCommandTests
         await _command.ExecuteAsync(root, output);
 
         // Assert
-        var repos = JsonSerializer.Deserialize<List<GitRepository>>(_fileSystem.File.ReadAllText(output));
+        var repos = JsonSerializer.Deserialize<List<GitRepository>>(_fileSystem.File.ReadAllText(output), new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+        });
+
         repos!.Count.ShouldBe(1);
-        repos[0].Path.ShouldBe(repo1);
+        repos[0].Path.ShouldBe(Path.GetRelativePath(root, repo1));
         await _gitService.Received(1).GetGitRepositoryAsync(repo1);
         await _gitService.DidNotReceive().GetGitRepositoryAsync(submodule);
     }
