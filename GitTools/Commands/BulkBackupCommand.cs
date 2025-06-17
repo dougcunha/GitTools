@@ -17,9 +17,8 @@ public sealed class BulkBackupCommand : Command
     private readonly IFileSystem _fileSystem;
     private readonly IAnsiConsole _console;
 
-    private const string DEFAULT_OUTPUT = "repositories.json";
-
-    public BulkBackupCommand(
+    public BulkBackupCommand
+    (
         IGitRepositoryScanner gitScanner,
         IGitService gitService,
         IFileSystem fileSystem,
@@ -32,7 +31,7 @@ public sealed class BulkBackupCommand : Command
         _console = console;
 
         var directoryArgument = new Argument<string>("directory", "Root directory of git repositories");
-        var outputArgument = new Argument<string?>("output", () => DEFAULT_OUTPUT, "Path to output JSON file");
+        var outputArgument = new Argument<string>("output", "Path to output JSON file");
 
         AddArgument(directoryArgument);
         AddArgument(outputArgument);
@@ -40,10 +39,8 @@ public sealed class BulkBackupCommand : Command
         this.SetHandler(ExecuteAsync, directoryArgument, outputArgument);
     }
 
-    public async Task ExecuteAsync(string directory, string? output)
+    public async Task ExecuteAsync(string directory, string output)
     {
-        output ??= DEFAULT_OUTPUT;
-
         var repoPaths = _console.Status()
             .Start
             (
@@ -64,25 +61,11 @@ public sealed class BulkBackupCommand : Command
             .StartAsync
             (
                 $"[yellow]Processing {repoPaths.Count} repositories...[/]",
-                async _ =>
-                {
-                    foreach (var repoPath in repoPaths)
-                    {
-                        if (await IsSubmoduleAsync(repoPath).ConfigureAwait(false))
-                            continue;
-
-                        var repo = await _gitService.GetGitRepositoryAsync(repoPath).ConfigureAwait(false);
-
-                        if (!repo.IsValid)
-                            continue;
-
-                        repositories.Add(repo);
-                    }
-                }
+                _ => CollectRepositoriesAsync(repoPaths, repositories)
             ).ConfigureAwait(false);
 
         var path = Path.GetFullPath(directory);
-        
+
         var json = JsonSerializer.Serialize
         (
             repositories.Select(r => new { Name = Path.GetFileName(r.Path), Path = Path.GetRelativePath(path, r.Path), r.RemoteUrl }),
@@ -100,6 +83,22 @@ public sealed class BulkBackupCommand : Command
 
         _console.MarkupLineInterpolated($"[green]{repositories.Count} repositories processed.[/]");
         _console.MarkupLineInterpolated($"[blue]Configuration written to {output}[/]");
+    }
+
+    private async Task CollectRepositoriesAsync(List<string> repoPaths, List<GitRepository> repositories)
+    {
+        foreach (var repoPath in repoPaths)
+        {
+            if (await IsSubmoduleAsync(repoPath).ConfigureAwait(false))
+                continue;
+
+            var repo = await _gitService.GetGitRepositoryAsync(repoPath).ConfigureAwait(false);
+
+            if (!repo.IsValid)
+                continue;
+
+            repositories.Add(repo);
+        }
     }
 
     private async Task<bool> IsSubmoduleAsync(string repoPath)
