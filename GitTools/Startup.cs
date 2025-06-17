@@ -32,6 +32,7 @@ public static class Startup
         services.AddSingleton<TagRemoveCommand>();
         services.AddSingleton<TagListCommand>();
         services.AddSingleton<ReCloneCommand>();
+        services.AddSingleton<BulkBackupCommand>();
 
         return services;
     }
@@ -53,9 +54,11 @@ public static class Startup
         var tagRemoveCommand = serviceProvider.GetRequiredService<TagRemoveCommand>();
         var tagListCommand = serviceProvider.GetRequiredService<TagListCommand>();
         var recloneCommand = serviceProvider.GetRequiredService<ReCloneCommand>();
+        var bulkBackupCommand = serviceProvider.GetRequiredService<BulkBackupCommand>();
         rootCommand.AddCommand(tagRemoveCommand);
         rootCommand.AddCommand(tagListCommand);
         rootCommand.AddCommand(recloneCommand);
+        rootCommand.AddCommand(bulkBackupCommand);
 
         return rootCommand;
     }

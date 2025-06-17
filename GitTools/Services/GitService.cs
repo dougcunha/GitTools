@@ -166,6 +166,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         };
     }
 
+
     private async Task<string?> GetUrlFromGitConfigAsync(string configPath, string sectionName)
     {
         var sectionPattern = RegexConfigSection();

@@ -85,6 +85,7 @@ public interface IGitService
     /// </returns>
     Task<GitRepository> GetGitRepositoryAsync(string repositoryName);
 
+
     /// <summary>
     /// Deletes a local git repository at the specified path.
     /// This method will remove the git repository directory and all its contents.

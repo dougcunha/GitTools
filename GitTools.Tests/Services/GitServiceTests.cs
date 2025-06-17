@@ -1094,4 +1094,5 @@ public sealed class GitServiceTests
         // Assert
         result.ShouldBeFalse();
     }
+
 }
