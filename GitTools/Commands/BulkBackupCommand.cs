@@ -69,7 +69,7 @@ public sealed class BulkBackupCommand : Command
         var json = JsonSerializer.Serialize
         (
             repositories.Select(r => new { Name = Path.GetFileName(r.Path), Path = Path.GetRelativePath(path, r.Path), r.RemoteUrl }),
-            new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower }
+            GitRepository.JsonSerializerOptions
         );
 
         var outputDirectory = Path.GetDirectoryName(output);

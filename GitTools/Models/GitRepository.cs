@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace GitTools.Models;
 
 /// <summary>
@@ -6,6 +8,18 @@ namespace GitTools.Models;
 /// </summary>
 public sealed class GitRepository
 {
+    /// <summary>
+    /// Provides preconfigured <see cref="JsonSerializerOptions"/> for JSON serialization and deserialization.
+    /// </summary>
+    /// <remarks>The options use a snake_case naming policy for property names, ensuring compatibility with
+    /// APIs or data formats that require snake_case naming conventions. This instance is read-only and can be used
+    /// directly for serialization and deserialization operations.</remarks>
+    public static readonly JsonSerializerOptions JsonSerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        WriteIndented = true
+    };
+
     /// <summary>
     ///  Gets or sets the name of the repository.
     ///  This is typically the folder name where the repository is located.

@@ -3,6 +3,7 @@ using System.Text.Json;
 using GitTools.Commands;
 using GitTools.Models;
 using GitTools.Services;
+using NSubstitute.ExceptionExtensions;
 using Spectre.Console.Testing;
 
 namespace GitTools.Tests.Commands;
@@ -34,8 +35,10 @@ public sealed class BulkRestoreCommandTests
     [Fact]
     public async Task ExecuteAsync_ConfigFileMissing_ShouldShowError()
     {
+        // Arrange & Act
         await _command.ExecuteAsync("missing.json", "/target");
 
+        // Assert
         _console.Output.ShouldContain("Configuration file not found");
         await _gitService.DidNotReceive().RunGitCommandAsync(Arg.Any<string>(), Arg.Any<string>());
     }
@@ -43,10 +46,13 @@ public sealed class BulkRestoreCommandTests
     [Fact]
     public async Task ExecuteAsync_InvalidJson_ShouldShowError()
     {
+        // Arrange
         _fileSystem.AddFile("config.json", new MockFileData("{invalid"));
 
+        // Act
         await _command.ExecuteAsync("config.json", "/target");
 
+        // Assert
         _console.Output.ShouldContain("Failed to read configuration");
         await _gitService.DidNotReceive().RunGitCommandAsync(Arg.Any<string>(), Arg.Any<string>());
     }
@@ -54,18 +60,87 @@ public sealed class BulkRestoreCommandTests
     [Fact]
     public async Task ExecuteAsync_WithRepositories_ShouldCloneEach()
     {
+        // Arrange
         var repos = new List<GitRepository>
         {
             new() { Name = "repo1", Path = "repo1", RemoteUrl = "https://example.com/r1.git", IsValid = true },
             new() { Name = "repo2", Path = "repo2", RemoteUrl = "https://example.com/r2.git", IsValid = true }
         };
 
-        var json = JsonSerializer.Serialize(repos, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        var json = JsonSerializer.Serialize(repos, GitRepository.JsonSerializerOptions);
         _fileSystem.AddFile("config.json", new MockFileData(json));
 
+        _console.Input.PushKey(ConsoleKey.Spacebar);
+        _console.Input.PushKey(ConsoleKey.Enter);
+
+        // Act
         await _command.ExecuteAsync("config.json", "/work");
 
+        // Assert
         await _gitService.Received(1).RunGitCommandAsync("/work", "clone https://example.com/r1.git repo1");
         await _gitService.Received(1).RunGitCommandAsync("/work", "clone https://example.com/r2.git repo2");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithErrorCloningRepository_ShouldShowError()
+    {
+        // Arrange
+        var repos = new List<GitRepository>
+        {
+            new() { Name = "repo1", Path = "repo1", RemoteUrl = "https://example.com/r1.git", IsValid = true }
+        };
+
+        var json = JsonSerializer.Serialize(repos, GitRepository.JsonSerializerOptions);
+        _fileSystem.AddFile("config.json", new MockFileData(json));
+
+        _gitService.RunGitCommandAsync("/work", "clone https://example.com/r1.git repo1")
+            .ThrowsAsync(new Exception("Clone failed"));
+
+        _console.Input.PushKey(ConsoleKey.Spacebar);
+        _console.Input.PushKey(ConsoleKey.Enter);
+
+        // Act
+        await _command.ExecuteAsync("config.json", "/work");
+
+        // Assert
+        _console.Output.ShouldContain("Repo1 failed: Clone failed");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithNoRepositories_ShouldShowNoReposMessage()
+    {
+        // Arrange
+        var json = JsonSerializer.Serialize(new List<GitRepository>(), GitRepository.JsonSerializerOptions);
+        _fileSystem.AddFile("config.json", new MockFileData(json));
+
+        // Act
+        await _command.ExecuteAsync("config.json", "/target");
+
+        // Assert
+        _console.Output.ShouldContain("No repositories found in the configuration");
+        await _gitService.DidNotReceive().RunGitCommandAsync(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithRepositoriesButNoneSelected__ShouldShowNoReposMessage()
+    {
+        // Arrange
+        var repos = new List<GitRepository>
+        {
+            new() { Name = "repo1", Path = "repo1", RemoteUrl = "https://example.com/r1.git", IsValid = true },
+            new() { Name = "repo2", Path = "repo2", RemoteUrl = "https://example.com/r2.git", IsValid = true }
+        };
+
+        var json = JsonSerializer.Serialize(repos, GitRepository.JsonSerializerOptions);
+
+        _fileSystem.AddFile("config.json", new MockFileData(json));
+        _console.Input.PushKey(ConsoleKey.Enter);
+
+        // Act
+        await _command.ExecuteAsync("config.json", "/work");
+
+        // Assert
+        _console.Output.ShouldContain("No repositories selected for retore");
+        await _gitService.DidNotReceive().RunGitCommandAsync(Arg.Any<string>(), Arg.Any<string>());
     }
 }

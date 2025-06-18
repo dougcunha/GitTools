@@ -43,6 +43,7 @@ public sealed class BulkRestoreCommand : Command
         if (!_fileSystem.File.Exists(configFile))
         {
             _console.MarkupLineInterpolated($"[red]Configuration file not found: {configFile}[/]");
+
             return;
         }
 
@@ -51,21 +52,51 @@ public sealed class BulkRestoreCommand : Command
         try
         {
             var json = await _fileSystem.File.ReadAllTextAsync(configFile).ConfigureAwait(false);
-            repositories = JsonSerializer.Deserialize<List<GitRepository>>(
+
+            repositories = JsonSerializer.Deserialize<List<GitRepository>>
+            (
                 json,
-                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+                GitRepository.JsonSerializerOptions
+            )?.OrderBy(static r => r.Name).ToList();
         }
         catch (Exception ex)
         {
             _console.MarkupLineInterpolated($"[red]Failed to read configuration: {ex.Message}[/]");
+
             return;
         }
 
         if (repositories is null || repositories.Count == 0)
         {
             _console.MarkupLine("[yellow]No repositories found in the configuration file.[/]");
+
             return;
         }
+
+        var selected = await _console.PromptAsync
+        (
+            new MultiSelectionPrompt<string>()
+                .Title("[green]Select the repositories to restore[/]")
+                .NotRequired()
+                .PageSize(20)
+                .MoreChoicesText("[grey](Use space to select, enter to confirm)[/]")
+                .InstructionsText("[grey](Press [blue]<space>[/] to select, [green]<enter>[/] to confirm)[/]")
+                .AddChoiceGroup("Select all", repositories.Select(static r => r.Path))
+        ).ConfigureAwait(false);
+
+        if (selected.Count != repositories.Count)
+            repositories = repositories
+                .Where(repo => selected.Contains(repo.Path))
+                .ToList();
+
+        if (repositories.Count == 0)
+        {
+            _console.MarkupLine("[yellow]No repositories selected for retore.[/]");
+
+            return;
+        }
+
+        _fileSystem.Directory.CreateDirectory(directory);
 
         await _console.Progress()
             .Columns(
@@ -78,28 +109,33 @@ public sealed class BulkRestoreCommand : Command
                 new PercentageColumn(),
                 new SpinnerColumn(),
                 new TaskDescriptionColumn())
-            .StartAsync(async ctx =>
+            .StartAsync(ctx => RestoreRepositoriesAsync(directory, ctx, repositories))
+            .ConfigureAwait(false);
+    }
+
+    private async Task RestoreRepositoriesAsync(string directory, ProgressContext ctx, List<GitRepository> repositories)
+    {
+        var task = ctx.AddTask("Cloning repositories...");
+        task.MaxValue = repositories.Count;
+
+        foreach (var repo in repositories)
+        {
+            task.Description($"Cloning {repo.Name}...");
+
+            try
             {
-                var task = ctx.AddTask("Cloning repositories...");
-                task.MaxValue = repositories.Count;
+                await _gitService.RunGitCommandAsync(directory, $"clone {repo.RemoteUrl} {repo.Name}").ConfigureAwait(false);
+                _console.MarkupLineInterpolated($"[green]✓[/] [grey]{repo.Name} cloned successfully.[/]");
+            }
+            catch (Exception ex)
+            {
+                _console.MarkupLineInterpolated($"[red]✗[/] [grey]{repo.Name} failed: {ex.Message}[/]");
+            }
 
-                foreach (var repo in repositories)
-                {
-                    task.Description($"Cloning {repo.Name}...");
-                    try
-                    {
-                        await _gitService.RunGitCommandAsync(directory, $"clone {repo.RemoteUrl} {repo.Name}").ConfigureAwait(false);
-                        _console.MarkupLineInterpolated($"[green]✓[/] [grey]{repo.Name} cloned successfully.[/]");
-                    }
-                    catch (Exception ex)
-                    {
-                        _console.MarkupLineInterpolated($"[red]✗[/] [grey]{repo.Name} failed: {ex.Message}[/]");
-                    }
-                    task.Increment(1);
-                }
+            task.Increment(1);
+        }
 
-                task.StopTask();
-                task.Description("Clone completed.");
-            }).ConfigureAwait(false);
+        task.StopTask();
+        task.Description("Clone completed.");
     }
 }
