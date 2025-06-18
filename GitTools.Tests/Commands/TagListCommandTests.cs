@@ -1,7 +1,6 @@
 using System.CommandLine;
 using GitTools.Commands;
 using GitTools.Services;
-using NSubstitute.ExceptionExtensions;
 using Spectre.Console.Testing;
 
 namespace GitTools.Tests.Commands;
@@ -9,15 +8,16 @@ namespace GitTools.Tests.Commands;
 [ExcludeFromCodeCoverage]
 public sealed class TagListCommandTests
 {
-    private readonly IGitRepositoryScanner _mockGitScanner = Substitute.For<IGitRepositoryScanner>();
-    private readonly IGitService _mockGitService = Substitute.For<IGitService>();
+    private readonly ITagSearchService _mockTagSearchService = Substitute.For<ITagSearchService>();
+    private readonly ITagValidationService _mockTagValidationService = Substitute.For<ITagValidationService>();
+    private readonly IConsoleDisplayService _mockConsoleDisplayService = Substitute.For<IConsoleDisplayService>();
     private readonly TestConsole _testConsole = new();
     private readonly TagListCommand _command;
 
     public TagListCommandTests()
     {
         _testConsole.Interactive();
-        _command = new TagListCommand(_mockGitScanner, _mockGitService, _testConsole);
+        _command = new TagListCommand(_mockTagSearchService, _mockTagValidationService, _mockConsoleDisplayService, _testConsole);
     }
 
     [Fact]
@@ -30,6 +30,7 @@ public sealed class TagListCommandTests
     [Fact]
     public void Constructor_ShouldConfigureArguments()
     {
+        // Act & Assert
         _command.Arguments.Count.ShouldBe(2);
 
         var dirArg = _command.Arguments[0];
@@ -45,30 +46,56 @@ public sealed class TagListCommandTests
     [Fact]
     public async Task ExecuteAsync_WithEmptyTags_ShouldShowMessage()
     {
+        // Arrange
+        _mockTagValidationService.ParseAndValidateTags("  ").Returns([]);
+
+        // Act
         await _command.ExecuteAsync("  ", "C:/repos");
 
+        // Assert
         _testConsole.Output.ShouldContain("No tags specified to search.");
     }
 
     [Fact]
     public async Task ExecuteAsync_WithNoRepositories_ShouldShowMessage()
     {
-        _mockGitScanner.Scan("C:/repos").Returns([]);
+        // Arrange
+        const string TAGS_INPUT = "v1.0";
+        var searchResult = new TagSearchResult([], [], []);
+        string[] tags = ["v1.0"];
+        
+        _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/repos", tags, Arg.Any<Action<string>>()).Returns(searchResult);
 
-        await _command.ExecuteAsync("v1.0", "C:/repos");
+        // Act
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/repos");
 
-        _testConsole.Output.ShouldContain("No Git repositories found.");
+        // Assert
+        _testConsole.Output.ShouldContain("No repository with the specified tag(s) found.");
     }
 
     [Fact]
     public async Task ExecuteAsync_WithMatchingRepositories_ShouldListThem()
     {
-        var repos = new List<string> { "C:/repos/repo1" };
-        _mockGitScanner.Scan("C:/repos").Returns(repos);
-        _mockGitService.GetAllTagsAsync("C:/repos/repo1").Returns(["v1.0", "v2.0"]);
+        // Arrange
+        const string TAGS_INPUT = "v1.0";
+        string[] tags = ["v1.0"];
 
-        await _command.ExecuteAsync("v1.0", "C:/repos");
+        var searchResult = new TagSearchResult
+        (
+            ["C:/repos/repo1"],
+            new Dictionary<string, List<string>> { ["C:/repos/repo1"] = [..tags] },
+            []
+        );
 
+        _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/repos", tags, Arg.Any<Action<string>>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName("C:/repos/repo1", "C:/repos").Returns("repo1");
+
+        // Act
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/repos");
+
+        // Assert
         _testConsole.Output.ShouldContain("repo1");
         _testConsole.Output.ShouldContain("v1.0");
     }
@@ -76,12 +103,25 @@ public sealed class TagListCommandTests
     [Fact]
     public async Task ExecuteAsync_WithWildcardPatterns_ShouldFilter()
     {
-        var repos = new List<string> { "C:/repos/repo1" };
-        _mockGitScanner.Scan("C:/repos").Returns(repos);
-        _mockGitService.GetAllTagsAsync("C:/repos/repo1").Returns(["v1.0", "v2.0", "feature"]);
+        // Arrange
+        const string TAGS_INPUT = "v1.*";
+        string[] tags = ["v1.*"];
 
-        await _command.ExecuteAsync("v1.*", "C:/repos");
+        var searchResult = new TagSearchResult
+        (
+            ["C:/repos/repo1"],
+            new Dictionary<string, List<string>> { ["C:/repos/repo1"] = ["v1.0"] },
+            []
+        );
 
+        _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/repos", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName("C:/repos/repo1", "C:/repos").Returns("repo1");
+
+        // Act
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/repos");
+
+        // Assert
         _testConsole.Output.ShouldContain("v1.0");
         _testConsole.Output.ShouldNotContain("v2.0");
     }
@@ -89,13 +129,20 @@ public sealed class TagListCommandTests
     [Fact]
     public async Task ExecuteAsync_WithScanErrors_ShouldPromptAndDisplay()
     {
-        var repos = new List<string> { "C:/repos/repo1" };
-        _mockGitScanner.Scan("C:/repos").Returns(repos);
-        _mockGitService.GetAllTagsAsync("C:/repos/repo1").ThrowsAsync(new Exception("boom"));
+        // Arrange
+        const string TAGS_INPUT = "v1.0";
+        string[] tags = ["v1.0"];
+        var scanErrors = new Dictionary<string, Exception> { ["C:/repos/repo1"] = new Exception("boom") };
+        var searchResult = new TagSearchResult([], [], scanErrors);
+
+        _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/repos", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
         _testConsole.Input.PushTextWithEnter("y");
 
-        await _command.ExecuteAsync("v1.0", "C:/repos");
+        // Act
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/repos");
 
-        _testConsole.Output.ShouldContain("boom");
+        // Assert
+        _mockConsoleDisplayService.Received(1).ShowScanErrors(scanErrors, "C:/repos");
     }
 }

@@ -1,6 +1,5 @@
 using System.CommandLine;
 using GitTools.Services;
-using GitTools.Utils;
 using Spectre.Console;
 
 namespace GitTools.Commands;
@@ -10,20 +9,26 @@ namespace GitTools.Commands;
 /// </summary>
 public sealed class TagRemoveCommand : Command
 {
-    private readonly IGitRepositoryScanner _gitScanner;
-    private readonly IGitService _tagService;
+    private readonly ITagSearchService _tagSearchService;
+    private readonly ITagValidationService _tagValidationService;
+    private readonly IConsoleDisplayService _consoleDisplayService;
+    private readonly IGitService _gitService;
     private readonly IAnsiConsole _console;
 
     public TagRemoveCommand
     (
-        IGitRepositoryScanner gitScanner,
+        ITagSearchService tagSearchService,
+        ITagValidationService tagValidationService,
+        IConsoleDisplayService consoleDisplayService,
         IGitService gitService,
         IAnsiConsole console
     )
         : base("rm", "Removes tags from git repositories.")
     {
-        _gitScanner = gitScanner;
-        _tagService = gitService;
+        _tagSearchService = tagSearchService;
+        _tagValidationService = tagValidationService;
+        _consoleDisplayService = consoleDisplayService;
+        _gitService = gitService;
         _console = console;
 
         var dirOption = new Argument<string>("directory", "Root directory of git repositories");
@@ -52,22 +57,13 @@ public sealed class TagRemoveCommand : Command
     /// Executes the process of scanning Git repositories, identifying those with specific tags, and optionally removing
     /// the tags locally and remotely.
     /// </summary>
-    /// <remarks>This method performs the following steps: <list type="number"> <item>Scans the specified base
-    /// folder for Git repositories.</item> <item>Identifies repositories containing the specified tags (supports wildcards like *, ?).</item>
-    /// <item>Prompts the user to select repositories for tag removal.</item> <item>Removes the specified tags from the
-    /// selected repositories, optionally including remote removal.</item> </list> If no tags are specified, no action
-    /// is taken. If no repositories are found or selected, the process terminates early.</remarks>
-    /// <param name="tagsToSearch">A comma-separated list of tags to search for in the Git repositories. Each tag is trimmed of whitespace.
-    /// Supports wildcard patterns: * (matches any sequence of characters) and ? (matches any single character).
-    /// Examples: "v1.*" matches all tags starting with "v1.", "release-?" matches "release-1", "release-a", etc.</param>
-    /// <param name="baseFolder">The root folder to scan for Git repositories. Must be a valid directory path.</param>
-    /// <param name="removeRemote">A boolean value indicating whether the tags should also be removed from remote repositories. <see
-    /// langword="true"/> to remove tags from both local and remote repositories; otherwise, <see langword="false"/> to
-    /// remove tags only locally.</param>
-    /// <returns>A task that represents the asynchronous operation. The task completes when the tag removal process is finished.</returns>
-    public async Task ExecuteAsync(string tagsToSearch, string baseFolder, bool removeRemote)
+    /// <param name="tagsInput">A comma-separated list of tags to search for in the Git repositories.</param>
+    /// <param name="baseFolder">The root folder to scan for Git repositories.</param>
+    /// <param name="removeRemote">Whether the tags should also be removed from remote repositories.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    public async Task ExecuteAsync(string tagsInput, string baseFolder, bool removeRemote)
     {
-        var tags = tagsToSearch.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var tags = _tagValidationService.ParseAndValidateTags(tagsInput);
 
         if (tags.Length == 0)
         {
@@ -76,85 +72,9 @@ public sealed class TagRemoveCommand : Command
             return;
         }
 
-        ShowInitialInfo(baseFolder, tags);
+        _consoleDisplayService.ShowInitialInfo(baseFolder, tags);
 
-        var allGitFolders = await _console.Status().StartAsync
-        (
-            $"[yellow]Scanning for Git repositories in {baseFolder}...[/]",
-            _ => Task.Run(() => _gitScanner.Scan(baseFolder))
-        ).ConfigureAwait(false);
-
-        if (allGitFolders.Count == 0)
-        {
-            _console.MarkupLine("[red]No Git repositories found.[/]");
-
-            return;
-        }
-
-        _console.MarkupLine($"[blue]{allGitFolders.Count} repositories found.[/]");
-
-        var (reposWithTag, repoTagsMap, scanErrors) = await FindRepositoriesWithTagsAsync(allGitFolders, tags).ConfigureAwait(false);
-
-        if (reposWithTag.Count == 0)
-        {
-            _console.MarkupLine("[yellow]No repository with the specified tag(s) found.[/]");
-            ShowScanErrors(scanErrors, baseFolder);
-
-            return;
-        }
-
-        var selectedPaths = PromptRepositorySelection(repoTagsMap, reposWithTag, baseFolder, tags);
-
-        if (selectedPaths.Count == 0)
-        {
-            _console.MarkupLine("[yellow]No repository selected.[/]");
-
-            return;
-        }
-
-        _console.MarkupLine($"[blue]Removing tag(s) {string.Join(", ", tags)}...[/]");
-        await RemoveTagsFromRepositoriesAsync(selectedPaths, repoTagsMap, baseFolder, removeRemote).ConfigureAwait(false);
-        ShowFinalStatus(scanErrors, baseFolder);
-    }
-
-    /// <summary>
-    /// Shows initial information about the base folder and tags to search for.
-    /// </summary>
-    /// <param name="baseFolder">
-    /// The base folder where the Git repositories are located.
-    /// </param>
-    /// <param name="tagsToSearch">
-    /// The tags to search for in the repositories.
-    /// </param>
-    private void ShowInitialInfo(string baseFolder, string[] tagsToSearch)
-    {
-        _console.MarkupLineInterpolated($"[blue]Base folder: [bold]{baseFolder}[/][/]");
-        _console.MarkupLineInterpolated($"[blue]Tags to search: [bold]{string.Join(", ", tagsToSearch)}[/][/]");
-    }
-
-    /// <summary>
-    /// Finds all repositories that contain the specified tags.
-    /// </summary>
-    /// <param name="allGitFolders">
-    /// The list of all Git repository paths to search for tags.
-    /// </param>
-    /// <param name="tagsToSearch">
-    /// The tags to search for in the repositories. Each tag is trimmed of whitespace.
-    /// </param>
-    /// <returns>
-    /// A list of repositories that contain the specified tags, a dictionary mapping repository paths to lists of found tags,
-    /// </returns>
-    private async Task<(List<string> reposWithTag, Dictionary<string, List<string>> repoTagsMap, Dictionary<string, Exception> scanErrors)> FindRepositoriesWithTagsAsync
-    (
-        List<string> allGitFolders,
-        string[] tagsToSearch
-    )
-    {
-        var reposWithTag = new List<string>();
-        var repoTagsMap = new Dictionary<string, List<string>>();
-        var scanErrors = new Dictionary<string, Exception>();
-
-        await _console.Progress()
+        var searchResult = await _console.Progress()
             .Columns
             (
                 new ProgressBarColumn
@@ -171,130 +91,49 @@ public sealed class TagRemoveCommand : Command
             .StartAsync(async ctx =>
             {
                 var task = ctx.AddTask("Scanning repositories for tags...");
-                task.MaxValue = allGitFolders.Count;
-
-                foreach (var repo in allGitFolders)
+                var progressCallback = new Action<string>(repoName =>
                 {
-                    task.Description($"Checking {Path.GetFileName(repo)}...");
+                    task.Description($"Checking {repoName}...");
                     task.Increment(1);
+                });
 
-                    await DetectTagsInRepositoryAsync(tagsToSearch, reposWithTag, repoTagsMap, scanErrors, repo).ConfigureAwait(false);
-                }
-
+                var result = await _tagSearchService.SearchRepositoriesWithTagsAsync(baseFolder, tags, progressCallback).ConfigureAwait(false);
                 task.StopTask();
                 task.Description("Scanning completed.");
+
+                return result;
             }).ConfigureAwait(false);
 
-        return (reposWithTag, repoTagsMap, scanErrors);
-    }
-
-    /// <summary>
-    /// Detects specified tags in a given repository asynchronously, supporting wildcard patterns.
-    /// </summary>
-    /// <param name="tagsToSearch">
-    /// The tags to search for in the repository. Each tag is trimmed of whitespace and can contain wildcards.
-    /// </param>
-    /// <param name="reposWithTag">
-    /// The list to which the repository will be added if it contains any of the specified tags.
-    /// </param>
-    /// <param name="repoTagsMap">
-    /// The dictionary mapping repository paths to lists of found tags.
-    /// </param>
-    /// <param name="scanErrors">
-    /// The dictionary to store any exceptions that occur during the tag detection process, keyed by repository path.
-    /// </param>
-    /// <param name="repo">
-    /// The path to the repository in which to search for the specified tags.
-    /// </param>
-    private async Task DetectTagsInRepositoryAsync
-    (
-        string[] tagsToSearch,
-        List<string> reposWithTag,
-        Dictionary<string, List<string>> repoTagsMap,
-        Dictionary<string, Exception> scanErrors,
-        string repo
-    )
-    {
-        var foundTags = new List<string>();
-
-        try
+        if (searchResult.RepositoriesWithTags.Count == 0)
         {
-            var allRepoTags = await _tagService.GetAllTagsAsync(repo).ConfigureAwait(false);
-
-            foreach (var tagPattern in tagsToSearch)
-            {
-                var matchingTags = WildcardMatcher.MatchItems(allRepoTags, tagPattern);
-                foundTags.AddRange(matchingTags);
-            }
-
-            // Remove duplicates
-            foundTags = [.. foundTags.Distinct()];
-        }
-        catch (Exception ex)
-        {
-            scanErrors[repo] = ex;
+            _console.MarkupLine("[yellow]No repository with the specified tag(s) found.[/]");
+            _consoleDisplayService.ShowScanErrors(searchResult.ScanErrors, baseFolder);
 
             return;
         }
 
-        if (foundTags.Count > 0)
+        var selectedPaths = PromptRepositorySelection(searchResult.RepositoryTagsMap, searchResult.RepositoriesWithTags, baseFolder, tags);
+
+        if (selectedPaths.Count == 0)
         {
-            reposWithTag.Add(repo);
-            repoTagsMap[repo] = foundTags;
-        }
-    }
+            _console.MarkupLine("[yellow]No repository selected.[/]");
 
-    /// <summary>
-    /// Shows scan errors if any were detected during the tag removal process.
-    /// </summary>
-    /// <param name="scanErrors">
-    /// The dictionary containing scan errors, where the key is the repository path and the value is the exception that occurred.
-    /// </param>
-    /// <param name="baseFolder">
-    /// The base folder used to determine the hierarchical name of each repository.
-    /// </param>
-    private void ShowScanErrors(Dictionary<string, Exception> scanErrors, string baseFolder)
-    {
-        if (scanErrors.Count == 0)
             return;
-
-        if (!_console.Confirm($"[red]{scanErrors.Count} scan errors detected.Do you want to see the details?[/]"))
-            return;
-
-        foreach (var err in scanErrors)
-        {
-            var rule = new Rule($"[red]{GetHierarchicalName(err.Key, baseFolder)}[/]")
-                .RuleStyle(new Style(Color.Red))
-                .Centered();
-
-            _console.Write(rule);
-            _console.WriteException(err.Value, ExceptionFormats.ShortenEverything);
         }
+
+        _console.MarkupLine($"[blue]Removing tag(s) {string.Join(", ", tags)}...[/]");
+        await RemoveTagsFromRepositoriesAsync(selectedPaths, searchResult.RepositoryTagsMap, baseFolder, removeRemote).ConfigureAwait(false);
+        ShowFinalStatus(searchResult.ScanErrors, baseFolder);
     }
 
     /// <summary>
     /// Prompts the user to select repositories from a list of repositories that contain the specified tags.
     /// </summary>
-    /// <param name="repoTagsMap">
-    /// The dictionary mapping repository paths to lists of tags found in each repository.
-    /// </param>
-    /// <param name="reposWithTag">
-    /// The list of repository paths that contain at least one of the specified tags.
-    /// </param>
-    /// <param name="baseFolder">
-    /// The base folder used to determine the hierarchical name of each repository.
-    /// </param>
-    /// <param name="tagsToSearch">
-    /// The tags to search for in the repositories. Each tag is trimmed of whitespace.
-    /// </param>
-    /// <returns>
-    /// The list of selected repository paths, where each path corresponds to a repository that the user has chosen to remove the specified tags from.
-    /// </returns>
     private List<string> PromptRepositorySelection(Dictionary<string, List<string>> repoTagsMap, List<string> reposWithTag, string baseFolder, string[] tagsToSearch)
     {
         var displayNameToPath = reposWithTag.ToDictionary
         (
-            repo => $"{GetHierarchicalName(repo, baseFolder)} ({string.Join(", ", repoTagsMap[repo])})",
+            repo => $"{_consoleDisplayService.GetHierarchicalName(repo, baseFolder)} ({string.Join(", ", repoTagsMap[repo])})",
             static repo => repo
         );
 
@@ -315,26 +154,11 @@ public sealed class TagRemoveCommand : Command
     /// <summary>
     /// Removes specified tags from the repositories in the provided list of paths.
     /// </summary>
-    /// <remarks>This method iterates through the provided repositories and attempts to remove the specified
-    /// tags. If all tags are successfully removed from a repository, a success message is displayed in the
-    /// console.</remarks>
-    /// <param name="selectedPaths">A list of repository paths from which tags should be removed.</param>
-    /// <param name="repoTagsMap">A dictionary mapping repository paths to the list of tags to be removed from each repository.</param>
-    /// <param name="baseFolder">The base folder used to determine the hierarchical name of each repository.</param>
-    /// <param name="removeRemote">A boolean value indicating whether the tags should also be removed from the remote repository. <see
-    /// langword="true"/> to remove tags from the remote repository; otherwise, <see langword="false"/>.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    private async Task RemoveTagsFromRepositoriesAsync
-    (
-        List<string> selectedPaths,
-        Dictionary<string, List<string>> repoTagsMap,
-        string baseFolder,
-        bool removeRemote
-    )
+    private async Task RemoveTagsFromRepositoriesAsync(List<string> selectedPaths, Dictionary<string, List<string>> repoTagsMap, string baseFolder, bool removeRemote)
     {
         foreach (var repo in selectedPaths)
         {
-            var hierarchicalName = GetHierarchicalName(repo, baseFolder);
+            var hierarchicalName = _consoleDisplayService.GetHierarchicalName(repo, baseFolder);
             var success = true;
 
             foreach (var tag in repoTagsMap[repo])
@@ -348,32 +172,14 @@ public sealed class TagRemoveCommand : Command
     /// <summary>
     /// Tries to remove a tag from the specified repository.
     /// </summary>
-    /// <param name="removeRemote">
-    /// Determines whether to also remove the tag from the remote repository.
-    /// </param>
-    /// <param name="repo">
-    /// The path to the repository from which the tag should be removed.
-    /// </param>
-    /// <param name="hierarchicalName">
-    /// The hierarchical name of the repository, used for display purposes.
-    /// </param>
-    /// <param name="success">
-    /// Indicates whether the previous tag removal operations were successful.
-    /// </param>
-    /// <param name="tag">
-    /// The name of the tag to be removed.
-    /// </param>
-    /// <returns>
-    /// True if the tag was successfully removed; otherwise, false.
-    /// </returns>
     private async Task<bool> TryRemoveTagAsync(bool removeRemote, string repo, string hierarchicalName, bool success, string tag)
     {
         try
         {
-            await _tagService.DeleteTagAsync(repo, tag).ConfigureAwait(false);
+            await _gitService.DeleteTagAsync(repo, tag).ConfigureAwait(false);
 
             if (removeRemote)
-                await _tagService.DeleteRemoteTagAsync(repo, tag).ConfigureAwait(false);
+                await _gitService.DeleteRemoteTagAsync(repo, tag).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -385,38 +191,11 @@ public sealed class TagRemoveCommand : Command
     }
 
     /// <summary>
-    /// Shows the final status of the tag removal operation, including any errors that occurred during the scan.
+    /// Shows the final status of the tag removal operation.
     /// </summary>
-    /// <param name="scanErrors">
-    /// The dictionary containing scan errors, where the key is the repository path and the value is the exception that occurred.
-    /// </param>
-    /// <param name="baseFolder">
-    /// The base folder used to determine the hierarchical name of each repository.
-    /// </param>
     private void ShowFinalStatus(Dictionary<string, Exception> scanErrors, string baseFolder)
     {
         _console.MarkupLine("[bold green]✅ Done![/]");
-        ShowScanErrors(scanErrors, baseFolder);
-    }
-
-    /// <summary>
-    /// Gets the hierarchical name of a repository based on its path relative to the base folder.
-    /// </summary>
-    /// <param name="repoPath">
-    /// The path to the repository for which to get the hierarchical name.
-    /// </param>
-    /// <param name="baseFolder">
-    /// The base folder used to calculate the relative path of the repository.
-    /// </param>
-    /// <returns>
-    /// The hierarchical name of the repository, which is its relative path from the base folder, with directory separators replaced by slashes.
-    /// </returns>
-    private static string GetHierarchicalName(string repoPath, string baseFolder)
-    {
-        var relativePath = Path.GetRelativePath(baseFolder, repoPath).Replace(Path.DirectorySeparatorChar, '/');
-
-        return relativePath.Length <= 1 // If the path is just the root or empty, return the repo name
-            ? Path.GetFileName(repoPath)
-            : relativePath;
+        _consoleDisplayService.ShowScanErrors(scanErrors, baseFolder);
     }
 }

@@ -34,6 +34,9 @@ public static class Startup
         services.AddSingleton<ReCloneCommand>();
         services.AddSingleton<BulkBackupCommand>();
         services.AddSingleton<BulkRestoreCommand>();
+        services.AddSingleton<ITagSearchService, TagSearchService>();
+        services.AddSingleton<ITagValidationService, TagValidationService>();
+        services.AddSingleton<IConsoleDisplayService, ConsoleDisplayService>();
 
         return services;
     }
