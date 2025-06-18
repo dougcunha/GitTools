@@ -91,6 +91,7 @@ public sealed class TagRemoveCommand : Command
             .StartAsync(async ctx =>
             {
                 var task = ctx.AddTask("Scanning repositories for tags...");
+
                 var progressCallback = new Action<string>(repoName =>
                 {
                     task.Description($"Checking {repoName}...");

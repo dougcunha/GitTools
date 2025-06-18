@@ -8,7 +8,6 @@ public sealed class TagValidationService : ITagValidationService
     /// <inheritdoc />
     public string[] ParseAndValidateTags(string tagsInput)
     {
-
         if (!IsValidTagsInput(tagsInput))
             return [];
 

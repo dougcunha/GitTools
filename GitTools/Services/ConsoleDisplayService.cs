@@ -21,24 +21,23 @@ public sealed class ConsoleDisplayService(IAnsiConsole console) : IConsoleDispla
     /// <inheritdoc />
     public void ShowScanErrors(Dictionary<string, Exception> scanErrors, string baseFolder)
     {
-
         if (scanErrors.Count == 0 || !console.Confirm($"[red]{scanErrors.Count} scan errors detected. Do you want to see the details?[/]"))
             return;
-            
+
         foreach (var (repoPath, exception) in scanErrors)
         {
             var rule = new Rule($"[red]{GetHierarchicalName(repoPath, baseFolder)}[/]")
                 .RuleStyle(new Style(Color.Red))
                 .Centered();
 
-            console.Write(rule);            
+            console.Write(rule);
 
             console.WriteException
             (
                 exception,
                 string.IsNullOrWhiteSpace(exception.StackTrace) // Avoid IndexOutOfRangeException inside Spectre.Console
                     ? ExceptionFormats.ShortenEverything | ExceptionFormats.NoStackTrace
-                    : ExceptionFormats.ShortenEverything 
+                    : ExceptionFormats.ShortenEverything
             );
         }
     }

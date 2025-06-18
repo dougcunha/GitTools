@@ -6,6 +6,7 @@ namespace GitTools.Tests.Services;
 /// <summary>
 /// Tests for <see cref="ConsoleDisplayService"/>.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public sealed class ConsoleDisplayServiceTests
 {
     private readonly TestConsole _testConsole = new();
@@ -20,11 +21,11 @@ public sealed class ConsoleDisplayServiceTests
     public void GetHierarchicalName_WithNestedRepository_ReturnsRelativePath()
     {
         // Arrange
-        const string baseFolder = @"C:\repos";
-        const string repositoryPath = @"C:\repos\subfolder\project";
+        const string BASE_FOLDER = @"C:\repos";
+        const string REPOSITORY_PATH = @"C:\repos\subfolder\project";
 
         // Act
-        var result = _service.GetHierarchicalName(repositoryPath, baseFolder);
+        var result = _service.GetHierarchicalName(REPOSITORY_PATH, BASE_FOLDER);
 
         // Assert
         result.ShouldBe("subfolder/project");
@@ -34,11 +35,11 @@ public sealed class ConsoleDisplayServiceTests
     public void GetHierarchicalName_WithDirectChildRepository_ReturnsDirectoryName()
     {
         // Arrange
-        const string baseFolder = @"C:\repos";
-        const string repositoryPath = @"C:\repos\project";
+        const string BASE_FOLDER = @"C:\repos";
+        const string REPOSITORY_PATH = @"C:\repos\project";
 
         // Act
-        var result = _service.GetHierarchicalName(repositoryPath, baseFolder);
+        var result = _service.GetHierarchicalName(REPOSITORY_PATH, BASE_FOLDER);
 
         // Assert
         result.ShouldBe("project");
@@ -48,11 +49,11 @@ public sealed class ConsoleDisplayServiceTests
     public void GetHierarchicalName_WithSamePathAsBase_ReturnsDirectoryName()
     {
         // Arrange
-        const string baseFolder = @"C:\repos\project";
-        const string repositoryPath = @"C:\repos\project";
+        const string BASE_FOLDER = @"C:\repos\project";
+        const string REPOSITORY_PATH = @"C:\repos\project";
 
         // Act
-        var result = _service.GetHierarchicalName(repositoryPath, baseFolder);
+        var result = _service.GetHierarchicalName(REPOSITORY_PATH, BASE_FOLDER);
 
         // Assert
         result.ShouldBe("project");
@@ -62,11 +63,11 @@ public sealed class ConsoleDisplayServiceTests
     public void GetHierarchicalName_WithDeeplyNestedRepository_ReturnsFullRelativePath()
     {
         // Arrange
-        const string baseFolder = @"C:\repos";
-        const string repositoryPath = @"C:\repos\org\team\project\subproject";
+        const string BASE_FOLDER = @"C:\repos";
+        const string REPOSITORY_PATH = @"C:\repos\org\team\project\subproject";
 
         // Act
-        var result = _service.GetHierarchicalName(repositoryPath, baseFolder);
+        var result = _service.GetHierarchicalName(REPOSITORY_PATH, BASE_FOLDER);
 
         // Assert
         result.ShouldBe("org/team/project/subproject");
@@ -92,10 +93,10 @@ public sealed class ConsoleDisplayServiceTests
     {
         // Arrange
         var scanErrors = new Dictionary<string, Exception>();
-        const string baseFolder = @"C:\repos";
+        const string BASE_FOLDER = @"C:\repos";
 
         // Act
-        _service.ShowScanErrors(scanErrors, baseFolder);
+        _service.ShowScanErrors(scanErrors, BASE_FOLDER);
 
         // Assert
         _testConsole.Output.ShouldBeEmpty();
@@ -111,13 +112,13 @@ public sealed class ConsoleDisplayServiceTests
             { @"C:\repos\project2", new ArgumentException("Error 2") }
         };
 
-        const string baseFolder = @"C:\repos";
+        const string BASE_FOLDER = @"C:\repos";
 
         _testConsole.Input.PushText("n");
         _testConsole.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        _service.ShowScanErrors(scanErrors, baseFolder);
+        _service.ShowScanErrors(scanErrors, BASE_FOLDER);
 
         // Assert
         _testConsole.Output.ShouldContain("2 scan errors detected");
@@ -134,13 +135,13 @@ public sealed class ConsoleDisplayServiceTests
             { @"C:\repos\project1", new InvalidOperationException("Error 1") }
         };
 
-        const string baseFolder = @"C:\repos";
+        const string BASE_FOLDER = @"C:\repos";
 
         _testConsole.Input.PushText("y");
         _testConsole.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        _service.ShowScanErrors(scanErrors, baseFolder);
+        _service.ShowScanErrors(scanErrors, BASE_FOLDER);
 
         // Assert
         _testConsole.Output.ShouldContain("1 scan errors detected");
@@ -157,14 +158,14 @@ public sealed class ConsoleDisplayServiceTests
             { @"C:\repos\project1", new InvalidOperationException("Error 1") },
             { @"C:\repos\subfolder\project2", new ArgumentException("Error 2") }
         };
-        
-        const string baseFolder = @"C:\repos";
+
+        const string BASE_FOLDER = @"C:\repos";
 
         _testConsole.Input.PushText("y");
         _testConsole.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        _service.ShowScanErrors(scanErrors, baseFolder);
+        _service.ShowScanErrors(scanErrors, BASE_FOLDER);
 
         // Assert
         _testConsole.Output.ShouldContain("2 scan errors detected");
@@ -178,11 +179,11 @@ public sealed class ConsoleDisplayServiceTests
     public void ShowInitialInfo_WithSingleTag_ShowsBaseFolderAndTag()
     {
         // Arrange
-        const string baseFolder = @"C:\repos";
+        const string BASE_FOLDER = @"C:\repos";
         var tags = new[] { "v1.0.0" };
 
         // Act
-        _service.ShowInitialInfo(baseFolder, tags);
+        _service.ShowInitialInfo(BASE_FOLDER, tags);
 
         // Assert
         _testConsole.Output.ShouldContain(@"Base folder: C:\repos");
@@ -193,11 +194,11 @@ public sealed class ConsoleDisplayServiceTests
     public void ShowInitialInfo_WithMultipleTags_ShowsBaseFolderAndAllTags()
     {
         // Arrange
-        const string baseFolder = @"C:\repos";
+        const string BASE_FOLDER = @"C:\repos";
         var tags = new[] { "v1.0.0", "v2.0.0", "v3.0.0" };
 
         // Act
-        _service.ShowInitialInfo(baseFolder, tags);
+        _service.ShowInitialInfo(BASE_FOLDER, tags);
 
         // Assert
         _testConsole.Output.ShouldContain(@"Base folder: C:\repos");
@@ -208,11 +209,11 @@ public sealed class ConsoleDisplayServiceTests
     public void ShowInitialInfo_WithEmptyTags_ShowsBaseFolderAndEmptyTags()
     {
         // Arrange
-        const string baseFolder = @"C:\repos";
+        const string BASE_FOLDER = @"C:\repos";
         var tags = Array.Empty<string>();
 
         // Act
-        _service.ShowInitialInfo(baseFolder, tags);
+        _service.ShowInitialInfo(BASE_FOLDER, tags);
 
         // Assert
         _testConsole.Output.ShouldContain(@"Base folder: C:\repos");
@@ -223,11 +224,11 @@ public sealed class ConsoleDisplayServiceTests
     public void ShowInitialInfo_WithWildcardTags_ShowsBaseFolderAndWildcardTags()
     {
         // Arrange
-        const string baseFolder = @"C:\repos";
+        const string BASE_FOLDER = @"C:\repos";
         var tags = new[] { "v*", "release-*", "*-beta" };
 
         // Act
-        _service.ShowInitialInfo(baseFolder, tags);
+        _service.ShowInitialInfo(BASE_FOLDER, tags);
 
         // Assert
         _testConsole.Output.ShouldContain(@"Base folder: C:\repos");

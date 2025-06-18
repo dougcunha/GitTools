@@ -2,6 +2,7 @@ using System.CommandLine;
 using GitTools.Commands;
 using GitTools.Services;
 using Spectre.Console.Testing;
+
 namespace GitTools.Tests.Commands;
 
 /// <summary>
@@ -314,6 +315,7 @@ public sealed class TagRemoveCommandTests
         const string TAGS_INPUT = "v1.0";
         string[] tags = ["v1.0"];
         const string REPO_PATH = @"C:\TestRepo\Repo1";
+
         var scanErrors = new Dictionary<string, Exception>
         {
             [@"C:\TestRepo\ErrorRepo"] = new Exception("Scan error")
