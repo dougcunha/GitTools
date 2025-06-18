@@ -68,7 +68,7 @@ public sealed class BulkBackupCommandTests
         var repos = JsonSerializer.Deserialize<List<GitRepository>>
         (
             json,
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower }
+            GitRepository.JsonSerializerOptions
         );
 
         repos.ShouldNotBeNull();
@@ -124,7 +124,7 @@ public sealed class BulkBackupCommandTests
         var repos = JsonSerializer.Deserialize<List<GitRepository>>
         (
             await _fileSystem.File.ReadAllTextAsync(OUTPUT),
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower }
+            GitRepository.JsonSerializerOptions
         );
 
         repos!.Count.ShouldBe(1);
@@ -166,7 +166,7 @@ public sealed class BulkBackupCommandTests
         var repos = JsonSerializer.Deserialize<List<GitRepository>>
         (
             await _fileSystem.File.ReadAllTextAsync(OUTPUT),
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower }
+            GitRepository.JsonSerializerOptions
         );
 
         repos.ShouldNotBeNull();

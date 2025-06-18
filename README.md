@@ -13,6 +13,7 @@
   - [List Tags (ls)](#list-tags-ls)
   - [Reclone Repository (reclone)](#reclone-repository-reclone)
   - [Bulk Backup (bkp)](#bulk-backup-bkp)
+  - [Bulk Restore (restore)](#bulk-restore-restore)
   - [Build](#build)
 - [Code Coverage](#code-coverage)
 - [Publish as Single File](#publish-as-single-file)
@@ -31,14 +32,14 @@ GitTools is a command-line tool for managing Git repositories, including searchi
 - **Wildcard Pattern Support**: Use `*` and `?` characters for flexible tag matching
 - **Remote Tag Management**: Optionally remove tags from remote repositories
 - **Tag Listing with wildcard filtering**
-- **Bulk Restore Config Generation**: Create JSON files with repository URLs for later restoration
+ - **Bulk Backup/Restore**: Generate a JSON configuration file and restore repositories from it
 - **Backup Creation**: Automatic ZIP backup creation before destructive operations
 - **Modern Terminal UI**: Built with [Spectre.Console](https://spectreconsole.net/) for beautiful interfaces
 - **Modern CLI Parsing**: Uses [System.CommandLine](https://github.com/dotnet/command-line-api) for extensible command-line parsing
 
 ## Commands
 
-GitTools provides four main commands for repository management:
+GitTools provides five main commands for repository management:
 
 ### Remove Tags (rm)
 
@@ -157,6 +158,21 @@ Generate a JSON file with the remote URL for each repository under a directory. 
 
 ```sh
 GitTools bkp <root-directory> [output-file]
+```
+
+### Bulk Restore (restore)
+
+Clone repositories from a configuration file created by the bulk backup command.
+
+```json
+[
+  {"name": "repo1", "remote_url": "https://example.com/repo1.git"},
+  {"name": "repo2", "remote_url": "https://example.com/repo2.git"}
+]
+```
+
+```sh
+GitTools restore repos.json <target-directory>
 ```
 
 

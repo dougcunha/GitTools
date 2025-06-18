@@ -30,6 +30,7 @@ public sealed class StartupTests
         serviceProvider.GetService<TagRemoveCommand>().ShouldNotBeNull();
         serviceProvider.GetService<TagListCommand>().ShouldNotBeNull();
         serviceProvider.GetService<BulkBackupCommand>().ShouldNotBeNull();
+        serviceProvider.GetService<BulkRestoreCommand>().ShouldNotBeNull();
     }
 
     [Fact]
@@ -50,6 +51,7 @@ public sealed class StartupTests
         var tagRemoveCommandDescriptor = services.First(static s => s.ServiceType == typeof(TagRemoveCommand));
         var tagListCommandDescriptor = services.First(static s => s.ServiceType == typeof(TagListCommand));
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
+        var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
 
         ansiConsoleDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         processRunnerDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
@@ -59,6 +61,7 @@ public sealed class StartupTests
         tagRemoveCommandDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         tagListCommandDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         bulkBackupDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+        bulkRestoreDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
     }
 
     [Fact]
@@ -77,6 +80,7 @@ public sealed class StartupTests
         var gitServiceDescriptor = services.First(static s => s.ServiceType == typeof(IGitService));
         var backupServiceDescriptor = services.First(static s => s.ServiceType == typeof(IBackupService));
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
+        var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
 
         processRunnerDescriptor.ImplementationType.ShouldBe(typeof(ProcessRunner));
         gitScannerDescriptor.ImplementationType.ShouldBe(typeof(GitRepositoryScanner));
@@ -84,6 +88,7 @@ public sealed class StartupTests
         gitServiceDescriptor.ImplementationType.ShouldBe(typeof(GitService));
         backupServiceDescriptor.ImplementationType.ShouldBe(typeof(ZipBackupService));
         bulkBackupDescriptor.ImplementationType.ShouldBe(typeof(BulkBackupCommand));
+        bulkRestoreDescriptor.ImplementationType.ShouldBe(typeof(BulkRestoreCommand));
     }
 
     [Fact]
@@ -199,6 +204,20 @@ public sealed class StartupTests
     }
 
     [Fact]
+    public void CreateRootCommand_ShouldAddBulkRestoreCommand()
+    {
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var provider = services.BuildServiceProvider();
+
+        var root = provider.CreateRootCommand();
+
+        root.Subcommands.ShouldContain(static c => c.Name == "restore");
+        var cmd = root.Subcommands.First(static c => c.Name == "restore");
+        cmd.ShouldBeOfType<BulkRestoreCommand>();
+    }
+
+    [Fact]
     public void CreateRootCommand_ShouldResolveTagRemoveCommandFromServiceProvider()
     {
         // Arrange
@@ -244,6 +263,20 @@ public sealed class StartupTests
 
         cmd.ShouldNotBeNull();
         cmd.ShouldBeOfType<BulkBackupCommand>();
+    }
+
+    [Fact]
+    public void CreateRootCommand_ShouldResolveBulkRestoreCommandFromServiceProvider()
+    {
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var provider = services.BuildServiceProvider();
+
+        var root = provider.CreateRootCommand();
+        var cmd = root.Subcommands.OfType<BulkRestoreCommand>().First();
+
+        cmd.ShouldNotBeNull();
+        cmd.ShouldBeOfType<BulkRestoreCommand>();
     }
 
     [Fact]
@@ -330,6 +363,22 @@ public sealed class StartupTests
 
         var c1 = root1.Subcommands.OfType<BulkBackupCommand>().First();
         var c2 = root2.Subcommands.OfType<BulkBackupCommand>().First();
+
+        c1.ShouldBeSameAs(c2);
+    }
+
+    [Fact]
+    public void CreateRootCommand_ShouldReuseBulkRestoreCommandInstance()
+    {
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var provider = services.BuildServiceProvider();
+
+        var root1 = provider.CreateRootCommand();
+        var root2 = provider.CreateRootCommand();
+
+        var c1 = root1.Subcommands.OfType<BulkRestoreCommand>().First();
+        var c2 = root2.Subcommands.OfType<BulkRestoreCommand>().First();
 
         c1.ShouldBeSameAs(c2);
     }
