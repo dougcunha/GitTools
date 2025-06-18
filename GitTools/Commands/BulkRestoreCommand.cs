@@ -91,7 +91,7 @@ public sealed class BulkRestoreCommand : Command
 
         if (repositories.Count == 0)
         {
-            _console.MarkupLine("[yellow]No repositories selected for retore.[/]");
+            _console.MarkupLine("[yellow]No repositories selected for restore.[/]");
 
             return;
         }
