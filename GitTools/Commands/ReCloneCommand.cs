@@ -29,33 +29,42 @@ public sealed class ReCloneCommand : Command
         _gitService = gitService;
         _console = console;
 
-        var repositoryNameArgument = new Argument<string>("repository-name", "Git repository folder name relative to the current directory to reclone");
+        var repositoryPathArgument = new Argument<string>
+        (
+            "repository-path",
+            "Path to the git repository to reclone"
+        );
+
         var noBackupOption = new Option<bool>("--no-backup", "Do not create a backup zip of the folder");
         var forceOption = new Option<bool>("--force", "Ignore uncommitted changes to the repository");
 
-        AddArgument(repositoryNameArgument);
+        AddArgument(repositoryPathArgument);
         AddOption(noBackupOption);
         AddOption(forceOption);
 
-        this.SetHandler(ExecuteAsync, repositoryNameArgument, noBackupOption, forceOption);
+        this.SetHandler(ExecuteAsync, repositoryPathArgument, noBackupOption, forceOption);
     }
 
     /// <summary>
     /// Executes the reclone operation.
     /// </summary>
-    public async Task ExecuteAsync(string repositoryName, bool noBackup, bool force)
+    public async Task ExecuteAsync(string repositoryPath, bool noBackup, bool force)
     {
-        // Normalize and validate the repository path
-        var repo = await _gitService.GetGitRepositoryAsync(repositoryName).ConfigureAwait(false);
+        var repo = await _gitService.GetGitRepositoryAsync(repositoryPath).ConfigureAwait(false);
 
-        if (!repo.IsValid)
+        var safeRepoPath = repo.Path;
+        var safeRepoName = repo.Name;
+        var safeParentDir = Path.GetDirectoryName(safeRepoPath) ?? string.Empty;
+        var repoPathMsg = repo.Path;
+
+        if (!repo.IsValid && !_fileSystem.Directory.Exists(safeParentDir))
         {
-            _console.MarkupLineInterpolated($"[red]{repositoryName} is not valid or does not exist: {repo.Path}[/]");
+            _console.MarkupLineInterpolated($"[red]{repositoryPath} is not valid or does not exist: {repoPathMsg}[/]");
 
             return;
         }
 
-        _console.MarkupLineInterpolated($"[grey]Recloning repository: {repo.Name} at {repo.Path}[/]");
+        _console.MarkupLineInterpolated($"[grey]Recloning repository: {safeRepoName} at {safeRepoPath}[/]");
 
         if (!force)
         {
@@ -66,7 +75,7 @@ public sealed class ReCloneCommand : Command
                 return;
             }
 
-            var status = await _gitService.RunGitCommandAsync(repo.Path, "status --porcelain").ConfigureAwait(false);
+            var status = await _gitService.RunGitCommandAsync(safeRepoPath, "status --porcelain").ConfigureAwait(false);
 
             if (!string.IsNullOrWhiteSpace(status))
             {
@@ -77,27 +86,33 @@ public sealed class ReCloneCommand : Command
         }
 
         if (!noBackup)
-            GenerateRepositoryBackup(repo.Path, repo.ParentDir, repo.Name);
+            GenerateRepositoryBackup(safeRepoPath, safeParentDir, safeRepoName);
 
-        var tempPath = RenameRepositoryDirectory(repo.Path);
+        var tempPath = RenameRepositoryDirectory(safeRepoPath);
 
         await _console.Status()
             .StartAsync
             (
                 "[yellow]Cloning repository...[/]",
-                _ => _gitService.RunGitCommandAsync(repo.ParentDir, $"clone {repo.RemoteUrl} {repo.Name}")
+                _ => _gitService.RunGitCommandAsync(safeParentDir, $"clone {repo.RemoteUrl} {safeRepoName}")
             ).ConfigureAwait(false);
 
-        if (!string.IsNullOrWhiteSpace(tempPath))
-        {
-            var deleteOldRepositoryResult = await _gitService.DeleteLocalGitRepositoryAsync(tempPath)
-                .ConfigureAwait(false);
-
-            if (deleteOldRepositoryResult)
-                _console.MarkupLineInterpolated($"[green]✓[/] [grey]Old repository deleted: {tempPath}[/]");
-        }
+        await DeleteOldRepositoryAsync(tempPath).ConfigureAwait(false);
 
         _console.MarkupLine("[green]✓ Repository recloned successfully.[/]");
+    }
+
+    private async Task DeleteOldRepositoryAsync(string? tempPath)
+    {
+        if (string.IsNullOrWhiteSpace(tempPath))
+            return;
+
+        var deleteOldRepositoryResult = await _gitService
+            .DeleteLocalGitRepositoryAsync(tempPath)
+            .ConfigureAwait(false);
+
+        if (deleteOldRepositoryResult)
+            _console.MarkupLineInterpolated($"[green]✓[/] [grey]Old repository deleted: {tempPath}[/]");
     }
 
     private void GenerateRepositoryBackup(string repoPath, string parentDir, string repoName)

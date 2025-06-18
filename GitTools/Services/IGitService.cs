@@ -79,11 +79,11 @@ public interface IGitService
     /// <summary>
     /// Gets the git repository information for the specified repository name.
     /// </summary>
-    /// <param name="repositoryName">The name of the repository to retrieve.</param>
+    /// <param name="repositoryPath">The path of the repository to retrieve.</param>
     /// <returns>
     /// A task that represents the asynchronous operation. The task result contains the GitRepository object.
     /// </returns>
-    Task<GitRepository> GetGitRepositoryAsync(string repositoryName);
+    Task<GitRepository> GetGitRepositoryAsync(string repositoryPath);
 
 
     /// <summary>

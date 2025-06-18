@@ -695,12 +695,11 @@ public sealed class GitServiceTests
         var console = Substitute.For<IAnsiConsole>();
         var gitService = new GitService(fileSystem, processRunner, console);
 
-        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
-        var gitPath = Path.Combine(expectedPath, GIT_DIR);
+        var gitPath = Path.Combine(REPO_NAME, GIT_DIR);
 
-        fileSystem.Directory.CreateDirectory(expectedPath);
-        fileSystem.Directory.CreateDirectory(gitPath);
         fileSystem.Directory.SetCurrentDirectory(CURRENT_DIRECTORY);
+        fileSystem.Directory.CreateDirectory(REPO_NAME);
+        fileSystem.Directory.CreateDirectory(gitPath);
 
         processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
             .Returns(static callInfo =>
@@ -717,7 +716,7 @@ public sealed class GitServiceTests
         // Assert
         result.ShouldNotBeNull();
         result.Name.ShouldBe(REPO_NAME);
-        result.Path.ShouldBe(expectedPath);
+        result.Path.ShouldBe(REPO_NAME);
         result.RemoteUrl.ShouldBe(REMOTE_URL);
         result.IsValid.ShouldBeTrue();
 
@@ -726,7 +725,7 @@ public sealed class GitServiceTests
             Arg.Is<ProcessStartInfo>(psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == "config --get remote.origin.url" &&
-                psi.WorkingDirectory == expectedPath),
+                psi.WorkingDirectory == REPO_NAME),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
         );
@@ -736,10 +735,9 @@ public sealed class GitServiceTests
     public async Task GetGitRepositoryAsync_WhenRepositoryNotExists_ShouldReturnInvalidGitRepository()
     {
         // Arrange
-        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
 
         _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
-        _fileSystem.Directory.Exists(expectedPath).Returns(false);
+        _fileSystem.Directory.Exists(REPO_NAME).Returns(false);
 
         // Act
         var result = await _gitService.GetGitRepositoryAsync(REPO_NAME);
@@ -747,7 +745,7 @@ public sealed class GitServiceTests
         // Assert
         result.ShouldNotBeNull();
         result.Name.ShouldBe(REPO_NAME);
-        result.Path.ShouldBe(expectedPath);
+        result.Path.ShouldBe(REPO_NAME);
         result.RemoteUrl.ShouldBeNull();
         result.IsValid.ShouldBeFalse();
 
@@ -758,11 +756,10 @@ public sealed class GitServiceTests
     public async Task GetGitRepositoryAsync_WhenGitDirectoryNotExists_ShouldReturnInvalidGitRepository()
     {
         // Arrange
-        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
-        var gitPath = Path.Combine(expectedPath, GIT_DIR);
+        var gitPath = Path.Combine(REPO_NAME, GIT_DIR);
 
         _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
-        _fileSystem.Directory.Exists(expectedPath).Returns(true);
+        _fileSystem.Directory.Exists(REPO_NAME).Returns(true);
         _fileSystem.Directory.Exists(gitPath).Returns(false);
         _fileSystem.File.Exists(gitPath).Returns(false);
 
@@ -772,7 +769,7 @@ public sealed class GitServiceTests
         // Assert
         result.ShouldNotBeNull();
         result.Name.ShouldBe(REPO_NAME);
-        result.Path.ShouldBe(expectedPath);
+        result.Path.ShouldBe(REPO_NAME);
         result.RemoteUrl.ShouldBeNull();
         result.IsValid.ShouldBeFalse();
 
@@ -783,12 +780,13 @@ public sealed class GitServiceTests
     public async Task GetGitRepositoryAsync_WhenGitCommandFails_ShouldReturnInvalidGitRepository()
     {
         // Arrange
-        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
-        var gitPath = Path.Combine(expectedPath, GIT_DIR);
+        var gitPath = Path.Combine(REPO_NAME, GIT_DIR);
 
         _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
-        _fileSystem.Directory.Exists(expectedPath).Returns(true);
-        _fileSystem.Directory.Exists(gitPath).Returns(true);        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+        _fileSystem.Directory.Exists(REPO_NAME).Returns(true);
+        _fileSystem.Directory.Exists(gitPath).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
             .Returns(callInfo =>
             {
                 var errorHandler = callInfo.ArgAt<DataReceivedEventHandler>(2);
@@ -803,7 +801,7 @@ public sealed class GitServiceTests
         // Assert
         result.ShouldNotBeNull();
         result.Name.ShouldBe(REPO_NAME);
-        result.Path.ShouldBe(expectedPath);
+        result.Path.ShouldBe(REPO_NAME);
         result.RemoteUrl.ShouldBeNull();
         result.IsValid.ShouldBeFalse();
     }
@@ -832,12 +830,11 @@ public sealed class GitServiceTests
                 fetch = +refs/heads/*:refs/remotes/origin/*
             """;
 
-        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
-        var gitPath = Path.Combine(expectedPath, GIT_DIR);
-        var configPath = Path.Combine(expectedPath, GIT_DIR, "config");
+        var gitPath = Path.Combine(REPO_NAME, GIT_DIR);
+        var configPath = Path.Combine(REPO_NAME, GIT_DIR, "config");
 
         _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
-        _fileSystem.Directory.Exists(expectedPath).Returns(true);
+        _fileSystem.Directory.Exists(REPO_NAME).Returns(true);
         _fileSystem.Directory.Exists(gitPath).Returns(true);
         _fileSystem.File.Exists(configPath).Returns(true);
 
@@ -858,7 +855,7 @@ public sealed class GitServiceTests
         // Assert
         result.ShouldNotBeNull();
         result.Name.ShouldBe(REPO_NAME);
-        result.Path.ShouldBe(expectedPath);
+        result.Path.ShouldBe(REPO_NAME);
         result.RemoteUrl.ShouldBe("https://github.com/user/config-repo.git");
         result.IsValid.ShouldBeTrue();
         result.HasErrors.ShouldBeTrue();
@@ -868,7 +865,7 @@ public sealed class GitServiceTests
             Arg.Is<ProcessStartInfo>(psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == "config --get remote.origin.url" &&
-                psi.WorkingDirectory == expectedPath),
+                psi.WorkingDirectory == REPO_NAME),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
         );
@@ -889,12 +886,11 @@ public sealed class GitServiceTests
             fetch = +refs/heads/*:refs/remotes/origin/*
         """;
 
-        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
-        var gitPath = Path.Combine(expectedPath, GIT_DIR);
-        var configPath = Path.Combine(expectedPath, GIT_DIR, "config");
+        var gitPath = Path.Combine(REPO_NAME, GIT_DIR);
+        var configPath = Path.Combine(REPO_NAME, GIT_DIR, "config");
 
         _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
-        _fileSystem.Directory.Exists(expectedPath).Returns(true);
+        _fileSystem.Directory.Exists(REPO_NAME).Returns(true);
         _fileSystem.Directory.Exists(gitPath).Returns(true);
         _fileSystem.File.Exists(configPath).Returns(true);
 
@@ -915,7 +911,7 @@ public sealed class GitServiceTests
         // Assert
         result.ShouldNotBeNull();
         result.Name.ShouldBe(REPO_NAME);
-        result.Path.ShouldBe(expectedPath);
+        result.Path.ShouldBe(REPO_NAME);
         result.RemoteUrl.ShouldBeNull();
         result.IsValid.ShouldBeFalse();
         result.HasErrors.ShouldBeTrue();
@@ -925,7 +921,7 @@ public sealed class GitServiceTests
             Arg.Is<ProcessStartInfo>(psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == "config --get remote.origin.url" &&
-                psi.WorkingDirectory == expectedPath),
+                psi.WorkingDirectory == REPO_NAME),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
         );
@@ -937,12 +933,11 @@ public sealed class GitServiceTests
     public async Task GetGitRepositoryAsync_WhenGitCommandFailsAndConfigFileNotExists_ShouldReturnRepositoryWithoutUrl()
     {
         // Arrange
-        var expectedPath = Path.Combine(CURRENT_DIRECTORY, REPO_NAME);
-        var gitPath = Path.Combine(expectedPath, GIT_DIR);
-        var configPath = Path.Combine(expectedPath, GIT_DIR, "config");
+        var gitPath = Path.Combine(REPO_NAME, GIT_DIR);
+        var configPath = Path.Combine(REPO_NAME, GIT_DIR, "config");
 
         _fileSystem.Directory.GetCurrentDirectory().Returns(CURRENT_DIRECTORY);
-        _fileSystem.Directory.Exists(expectedPath).Returns(true);
+        _fileSystem.Directory.Exists(REPO_NAME).Returns(true);
         _fileSystem.Directory.Exists(gitPath).Returns(true);
         _fileSystem.File.Exists(configPath).Returns(false);
 
@@ -961,17 +956,19 @@ public sealed class GitServiceTests
         // Assert
         result.ShouldNotBeNull();
         result.Name.ShouldBe(REPO_NAME);
-        result.Path.ShouldBe(expectedPath);
+        result.Path.ShouldBe(REPO_NAME);
         result.RemoteUrl.ShouldBeNull();
         result.IsValid.ShouldBeFalse();
         result.HasErrors.ShouldBeTrue();
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
-                psi.FileName == "git" &&
-                psi.Arguments == "config --get remote.origin.url" &&
-                psi.WorkingDirectory == expectedPath),
+            Arg.Is<ProcessStartInfo>
+            (
+                static psi =>
+                    psi.FileName == "git" &&
+                    psi.Arguments == "config --get remote.origin.url" &&
+                    psi.WorkingDirectory == REPO_NAME),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
         );

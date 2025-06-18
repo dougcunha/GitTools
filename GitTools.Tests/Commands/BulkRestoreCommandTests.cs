@@ -140,7 +140,7 @@ public sealed class BulkRestoreCommandTests
         await _command.ExecuteAsync("config.json", "/work");
 
         // Assert
-        _console.Output.ShouldContain("No repositories selected for retore");
+        _console.Output.ShouldContain("No repositories selected for restore");
         await _gitService.DidNotReceive().RunGitCommandAsync(Arg.Any<string>(), Arg.Any<string>());
     }
 }

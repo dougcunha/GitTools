@@ -108,7 +108,7 @@ Repo1: v1.0, v2.0
 Reclone a Git repository with automatic backup and cleanup support. This command is useful for cleaning up repository state, removing local changes, or fixing corrupted repositories.
 
 ```sh
-GitTools reclone <repository-name> [--no-backup] [--force]
+GitTools reclone <repository-path> [--no-backup] [--force]
 ```
 
 #### Reclone Features
@@ -121,7 +121,7 @@ GitTools reclone <repository-name> [--no-backup] [--force]
 
 #### Reclone Parameters
 
-- `repository-name` (required): Name of the Git repository folder relative to the current directory
+- `repository-path` (required): Path to the Git repository (absolute or relative to the current directory)
 - `--no-backup` (optional): Skip creating a backup ZIP file before recloning
 - `--force` (optional): Ignore uncommitted changes and proceed with recloning
 - `--help` or `-h`: Show help and usage information
@@ -131,25 +131,26 @@ GitTools reclone <repository-name> [--no-backup] [--force]
 **Basic reclone with backup:**
 
 ```sh
-GitTools reclone my-project
+GitTools reclone ./my-project
+GitTools reclone C:/Projects/my-project
 ```
 
 **Reclone without backup:**
 
 ```sh
-GitTools reclone my-project --no-backup
+GitTools reclone ./my-project --no-backup
 ```
 
 **Force reclone ignoring uncommitted changes:**
 
 ```sh
-GitTools reclone my-project --force
+GitTools reclone ./my-project --force
 ```
 
 **Reclone without backup and ignoring changes:**
 
 ```sh
-GitTools reclone my-project --no-backup --force
+GitTools reclone ./my-project --no-backup --force
 ```
 
 ### Bulk Backup (bkp)

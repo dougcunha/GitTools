@@ -122,34 +122,37 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         return new Regex($"^{regexPattern}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     }
 
-    public async Task<GitRepository> GetGitRepositoryAsync(string repositoryName)
+    public async Task<GitRepository> GetGitRepositoryAsync(string repositoryPath)
     {
-        var repoPath = Path.Combine(fileSystem.Directory.GetCurrentDirectory(), repositoryName);
+        var valid = fileSystem.Directory.Exists(repositoryPath) &&
+            (fileSystem.Directory.Exists(Path.Combine(repositoryPath, ".git")) || fileSystem.File.Exists(Path.Combine(repositoryPath, ".git")));
 
-        var valid = fileSystem.Directory.Exists(repoPath) &&
-            (fileSystem.Directory.Exists(Path.Combine(repoPath, ".git")) || fileSystem.File.Exists(Path.Combine(repoPath, ".git")));
+        var repoName = fileSystem.Path.GetFileName(repositoryPath);
+
+        if (string.IsNullOrWhiteSpace(repoName))
+            repoName = repositoryPath;
 
         if (!valid)
-            return new GitRepository { Name = repositoryName, Path = repoPath, IsValid = false, HasErrors = true };
+            return new GitRepository { Name = repoName, Path = repositoryPath, IsValid = false, HasErrors = true };
 
         string? remoteUrl = null;
 
         try
         {
-            remoteUrl = (await RunGitCommandAsync(repoPath, "config --get remote.origin.url").ConfigureAwait(false)).Trim();
+            remoteUrl = (await RunGitCommandAsync(repositoryPath, "config --get remote.origin.url").ConfigureAwait(false)).Trim();
         }
         catch
         {
             // Try to get the remote url directly from config
-            var configPath = Path.Combine(repoPath, ".git", "config");
+            var configPath = Path.Combine(repositoryPath, ".git", "config");
 
             if (fileSystem.File.Exists(configPath))
                 remoteUrl = await GetUrlFromGitConfigAsync(configPath, "origin").ConfigureAwait(false);
 
             return new GitRepository
             {
-                Name = repositoryName,
-                Path = repoPath,
+                Name = repoName,
+                Path = repositoryPath,
                 RemoteUrl = remoteUrl,
                 IsValid = !string.IsNullOrWhiteSpace(remoteUrl),
                 HasErrors = true
@@ -158,8 +161,8 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
 
         return new GitRepository
         {
-            Name = repositoryName,
-            Path = repoPath,
+            Name = repoName,
+            Path = repositoryPath,
             RemoteUrl = remoteUrl,
             IsValid = valid,
             HasErrors = false
