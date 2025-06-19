@@ -148,3 +148,4 @@ public sealed class TagValidationServiceTests
         _service.IsValidTagsInput("\n").ShouldBeFalse();
     }
 }
+

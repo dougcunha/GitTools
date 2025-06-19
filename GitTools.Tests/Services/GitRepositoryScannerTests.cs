@@ -311,3 +311,4 @@ public sealed class GitRepositoryScannerTests
         _console.Output.ShouldContain("Test exception accessing");
     }
 }
+

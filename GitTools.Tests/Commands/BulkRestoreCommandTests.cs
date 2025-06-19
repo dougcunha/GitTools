@@ -144,3 +144,4 @@ public sealed class BulkRestoreCommandTests
         await _gitService.DidNotReceive().RunGitCommandAsync(Arg.Any<string>(), Arg.Any<string>());
     }
 }
+
