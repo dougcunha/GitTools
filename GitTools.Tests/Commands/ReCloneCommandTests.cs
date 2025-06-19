@@ -371,3 +371,4 @@ public sealed class ReCloneCommandTests
             .Returns(true);
     }
 }
+

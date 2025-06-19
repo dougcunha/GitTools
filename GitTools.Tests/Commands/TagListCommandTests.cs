@@ -146,3 +146,4 @@ public sealed class TagListCommandTests
         _mockConsoleDisplayService.Received(1).ShowScanErrors(scanErrors, "C:/repos");
     }
 }
+

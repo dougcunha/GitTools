@@ -235,3 +235,4 @@ public sealed class ConsoleDisplayServiceTests
         _testConsole.Output.ShouldContain("Tags to search: v*, release-*, *-beta");
     }
 }
+

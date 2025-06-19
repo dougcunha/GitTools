@@ -83,3 +83,4 @@ public sealed class WildcardMatcherTests
         regex.IsMatch("v2.0").ShouldBeFalse();
     }
 }
+

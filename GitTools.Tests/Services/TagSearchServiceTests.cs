@@ -255,3 +255,4 @@ public sealed class TagSearchServiceTests
         result.ShouldBeEmpty();
     }
 }
+

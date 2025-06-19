@@ -35,7 +35,9 @@ public sealed class ProcessRunner : IProcessRunner
         process.WaitForExit();
 
         return process.ExitCode;
-    }    /// <inheritdoc/>
+    }
+
+    /// <inheritdoc/>
     public async Task<int> RunAsync
     (
         ProcessStartInfo startInfo,
