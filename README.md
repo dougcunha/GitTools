@@ -176,6 +176,12 @@ Clone repositories from a configuration file created by the bulk backup command.
 GitTools restore repos.json <target-directory>
 ```
 
+Use `--force-ssh` to convert all repository URLs in the JSON file to SSH before cloning.
+
+```sh
+GitTools restore repos.json <target-directory> --force-ssh
+```
+
 
 ## Build
 
