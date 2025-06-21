@@ -34,6 +34,7 @@ public static class Startup
         services.AddSingleton<ReCloneCommand>();
         services.AddSingleton<BulkBackupCommand>();
         services.AddSingleton<BulkRestoreCommand>();
+        services.AddSingleton<OutdatedCommand>();
         services.AddSingleton<ITagSearchService, TagSearchService>();
         services.AddSingleton<ITagValidationService, TagValidationService>();
         services.AddSingleton<IConsoleDisplayService, ConsoleDisplayService>();
@@ -60,11 +61,13 @@ public static class Startup
         var recloneCommand = serviceProvider.GetRequiredService<ReCloneCommand>();
         var bulkBackupCommand = serviceProvider.GetRequiredService<BulkBackupCommand>();
         var bulkRestoreCommand = serviceProvider.GetRequiredService<BulkRestoreCommand>();
+        var outdatedCommand = serviceProvider.GetRequiredService<OutdatedCommand>();
         rootCommand.AddCommand(tagRemoveCommand);
         rootCommand.AddCommand(tagListCommand);
         rootCommand.AddCommand(recloneCommand);
         rootCommand.AddCommand(bulkBackupCommand);
         rootCommand.AddCommand(bulkRestoreCommand);
+        rootCommand.AddCommand(outdatedCommand);
 
         return rootCommand;
     }
