@@ -31,6 +31,7 @@ public sealed class StartupTests
         serviceProvider.GetService<TagListCommand>().ShouldNotBeNull();
         serviceProvider.GetService<BulkBackupCommand>().ShouldNotBeNull();
         serviceProvider.GetService<BulkRestoreCommand>().ShouldNotBeNull();
+        serviceProvider.GetService<OutdatedCommand>().ShouldNotBeNull();
     }
 
     [Fact]
@@ -52,6 +53,7 @@ public sealed class StartupTests
         var tagListCommandDescriptor = services.First(static s => s.ServiceType == typeof(TagListCommand));
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
         var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
+        var outdatedDescriptor = services.First(static s => s.ServiceType == typeof(OutdatedCommand));
 
         ansiConsoleDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         processRunnerDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
@@ -62,6 +64,7 @@ public sealed class StartupTests
         tagListCommandDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         bulkBackupDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         bulkRestoreDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+        outdatedDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
     }
 
     [Fact]
@@ -89,6 +92,7 @@ public sealed class StartupTests
         backupServiceDescriptor.ImplementationType.ShouldBe(typeof(ZipBackupService));
         bulkBackupDescriptor.ImplementationType.ShouldBe(typeof(BulkBackupCommand));
         bulkRestoreDescriptor.ImplementationType.ShouldBe(typeof(BulkRestoreCommand));
+        outdatedDescriptor.ImplementationType.ShouldBe(typeof(OutdatedCommand));
     }
 
     [Fact]
@@ -218,6 +222,20 @@ public sealed class StartupTests
     }
 
     [Fact]
+    public void CreateRootCommand_ShouldAddOutdatedCommand()
+    {
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var provider = services.BuildServiceProvider();
+
+        var root = provider.CreateRootCommand();
+
+        root.Subcommands.ShouldContain(static c => c.Name == "outdated");
+        var cmd = root.Subcommands.First(static c => c.Name == "outdated");
+        cmd.ShouldBeOfType<OutdatedCommand>();
+    }
+
+    [Fact]
     public void CreateRootCommand_ShouldResolveTagRemoveCommandFromServiceProvider()
     {
         // Arrange
@@ -277,6 +295,20 @@ public sealed class StartupTests
 
         cmd.ShouldNotBeNull();
         cmd.ShouldBeOfType<BulkRestoreCommand>();
+    }
+
+    [Fact]
+    public void CreateRootCommand_ShouldResolveOutdatedCommandFromServiceProvider()
+    {
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var provider = services.BuildServiceProvider();
+
+        var root = provider.CreateRootCommand();
+        var cmd = root.Subcommands.OfType<OutdatedCommand>().First();
+
+        cmd.ShouldNotBeNull();
+        cmd.ShouldBeOfType<OutdatedCommand>();
     }
 
     [Fact]
@@ -379,6 +411,22 @@ public sealed class StartupTests
 
         var c1 = root1.Subcommands.OfType<BulkRestoreCommand>().First();
         var c2 = root2.Subcommands.OfType<BulkRestoreCommand>().First();
+
+        c1.ShouldBeSameAs(c2);
+    }
+
+    [Fact]
+    public void CreateRootCommand_ShouldReuseOutdatedCommandInstance()
+    {
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var provider = services.BuildServiceProvider();
+
+        var root1 = provider.CreateRootCommand();
+        var root2 = provider.CreateRootCommand();
+
+        var c1 = root1.Subcommands.OfType<OutdatedCommand>().First();
+        var c2 = root2.Subcommands.OfType<OutdatedCommand>().First();
 
         c1.ShouldBeSameAs(c2);
     }
