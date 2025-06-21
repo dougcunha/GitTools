@@ -28,17 +28,19 @@ public sealed class BulkRestoreCommand : Command
 
         var configArg = new Argument<string>("config-file", "Path to JSON produced by backup");
         var directoryArg = new Argument<string>("directory", "Target root directory");
+        var forceSshOption = new Option<bool>("--force-ssh", "Convert repository URLs to SSH");
 
         AddArgument(configArg);
         AddArgument(directoryArg);
+        AddOption(forceSshOption);
 
-        this.SetHandler(ExecuteAsync, configArg, directoryArg);
+        this.SetHandler(ExecuteAsync, configArg, directoryArg, forceSshOption);
     }
 
     /// <summary>
     /// Executes the restoration process.
     /// </summary>
-    public async Task ExecuteAsync(string configFile, string directory)
+    public async Task ExecuteAsync(string configFile, string directory, bool forceSsh)
     {
         if (!_fileSystem.File.Exists(configFile))
         {
@@ -109,11 +111,11 @@ public sealed class BulkRestoreCommand : Command
                 new PercentageColumn(),
                 new SpinnerColumn(),
                 new TaskDescriptionColumn())
-            .StartAsync(ctx => RestoreRepositoriesAsync(directory, ctx, repositories))
+            .StartAsync(ctx => RestoreRepositoriesAsync(directory, ctx, repositories, forceSsh))
             .ConfigureAwait(false);
     }
 
-    private async Task RestoreRepositoriesAsync(string directory, ProgressContext ctx, List<GitRepository> repositories)
+    private async Task RestoreRepositoriesAsync(string directory, ProgressContext ctx, List<GitRepository> repositories, bool forceSsh)
     {
         var task = ctx.AddTask("Cloning repositories...");
         task.MaxValue = repositories.Count;
@@ -124,7 +126,8 @@ public sealed class BulkRestoreCommand : Command
 
             try
             {
-                await _gitService.RunGitCommandAsync(directory, $"clone {repo.RemoteUrl} {repo.Name}").ConfigureAwait(false);
+                var url = forceSsh ? ConvertToSsh(repo.RemoteUrl) : repo.RemoteUrl;
+                await _gitService.RunGitCommandAsync(directory, $"clone {url} {repo.Name}").ConfigureAwait(false);
                 _console.MarkupLineInterpolated($"[green]✓[/] [grey]{repo.Name} cloned successfully.[/]");
             }
             catch (Exception ex)
@@ -137,5 +140,22 @@ public sealed class BulkRestoreCommand : Command
 
         task.StopTask();
         task.Description("Clone completed.");
+    }
+
+    private static string ConvertToSsh(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return string.Empty;
+
+        if (url.StartsWith("git@", StringComparison.OrdinalIgnoreCase) || url.StartsWith("ssh://", StringComparison.OrdinalIgnoreCase))
+            return url;
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return url;
+
+        var host = uri.Host;
+        var path = uri.AbsolutePath.TrimStart('/');
+
+        return $"git@{host}:{path}";
     }
 }
