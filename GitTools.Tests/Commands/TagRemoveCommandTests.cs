@@ -361,6 +361,22 @@ public sealed class TagRemoveCommandTests
             []
         );
 
+        _mockTagSearchService.WhenForAnyArgs
+        (
+            substituteCall => substituteCall.SearchRepositoriesWithTagsAsync(
+                Arg.Any<string>(),
+                Arg.Any<string[]>(),
+                Arg.Any<Action<string>?>())
+        )
+        .Do
+        (
+            callInfo =>
+            {
+                var action = callInfo.Arg<Action<string>?>(); // Capture the action to simulate progress updates
+                action?.Invoke("Searching repositories...");
+            }
+        );
+
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
         _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
         _mockConsoleDisplayService.GetHierarchicalName(REPO1_PATH, @"C:\TestRepo").Returns("Repo1");

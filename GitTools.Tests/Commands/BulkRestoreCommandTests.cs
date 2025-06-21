@@ -35,7 +35,8 @@ public sealed class BulkRestoreCommandTests
     [Fact]
     public void Constructor_ShouldConfigureOptions()
     {
-        _command.Options.ShouldContain(o => o.Name == "force-ssh" && o.Description == "Convert repository URLs to SSH");
+        _command.Options.Count.ShouldBe(1);
+        _command.Options.ShouldContain(o => o.Name == "force-ssh" && o.Description == "Force SSH URLs for cloning repositories");
     }
 
     [Fact]

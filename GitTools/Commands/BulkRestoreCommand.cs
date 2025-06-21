@@ -28,7 +28,7 @@ public sealed class BulkRestoreCommand : Command
 
         var configArg = new Argument<string>("config-file", "Path to JSON produced by backup");
         var directoryArg = new Argument<string>("directory", "Target root directory");
-        var forceSshOption = new Option<bool>("--force-ssh", "Convert repository URLs to SSH");
+        var forceSshOption = new Option<bool>("--force-ssh", "Force SSH URLs for cloning repositories");
 
         AddArgument(configArg);
         AddArgument(directoryArg);
@@ -59,7 +59,9 @@ public sealed class BulkRestoreCommand : Command
             (
                 json,
                 GitRepository.JsonSerializerOptions
-            )?.OrderBy(static r => r.Name).ToList();
+            )
+            ?.Where(static r => !string.IsNullOrWhiteSpace(r.RemoteUrl))
+            ?.OrderBy(static r => r.Name).ToList();
         }
         catch (Exception ex)
         {
@@ -87,9 +89,7 @@ public sealed class BulkRestoreCommand : Command
         ).ConfigureAwait(false);
 
         if (selected.Count != repositories.Count)
-            repositories = repositories
-                .Where(repo => selected.Contains(repo.Path))
-                .ToList();
+            repositories = [.. repositories.Where(repo => selected.Contains(repo.Path))];
 
         if (repositories.Count == 0)
         {
@@ -126,7 +126,7 @@ public sealed class BulkRestoreCommand : Command
 
             try
             {
-                var url = forceSsh ? ConvertToSsh(repo.RemoteUrl) : repo.RemoteUrl;
+                var url = forceSsh ? ConvertToSsh(repo.RemoteUrl!) : repo.RemoteUrl;
                 await _gitService.RunGitCommandAsync(directory, $"clone {url} {repo.Name}").ConfigureAwait(false);
                 _console.MarkupLineInterpolated($"[green]✓[/] [grey]{repo.Name} cloned successfully.[/]");
             }
@@ -142,11 +142,8 @@ public sealed class BulkRestoreCommand : Command
         task.Description("Clone completed.");
     }
 
-    private static string ConvertToSsh(string? url)
+    private static string ConvertToSsh(string url)
     {
-        if (string.IsNullOrWhiteSpace(url))
-            return string.Empty;
-
         if (url.StartsWith("git@", StringComparison.OrdinalIgnoreCase) || url.StartsWith("ssh://", StringComparison.OrdinalIgnoreCase))
             return url;
 
