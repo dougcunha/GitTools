@@ -380,11 +380,10 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             if (!branch.IsTracked)
             {
                 if (!pushNewBranches)
-                    return true;
+                    return true; // If we don't want to send new branches, its ok.
 
                 console.MarkupInterpolated($"[yellow]Pushing new branch {branch.Name} to remote...[/]");
                 await RunGitCommandAsync(branch.RepositoryPath, $"push --set-upstream origin {branch.Name}").ConfigureAwait(false);
-
                 return true;
             }
 
@@ -427,6 +426,26 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<bool> PopAsync(string repositoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return false;
+
+        try
+        {
+            await RunGitCommandAsync(repositoryPath, "stash pop").ConfigureAwait(false);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error poping stashing changes in {repositoryPath}: {ex.Message}[/]");
+
+            return false;
+        }
+    }
+
     /// <summary>
     /// Gets the hierarchical name of a repository based on its path and a base folder.
     /// </summary>
@@ -452,10 +471,15 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     /// <inheritdoc/>
     public async Task<GitRepositoryStatus> GetRepositoryStatusAsync(string repositoryPath, string rootDir)
     {
-        var hierarchicalName = GetHierarchicalName(repositoryPath, rootDir);
-
         if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
-            return new GitRepositoryStatus(Path.GetFileName(repositoryPath), hierarchicalName, repositoryPath, null, false, [], "Repository does not exist.");
+        {
+            var safeName = string.IsNullOrWhiteSpace(repositoryPath) ? string.Empty : Path.GetFileName(repositoryPath);
+            var safeHierarchicalName = string.IsNullOrWhiteSpace(repositoryPath) ? string.Empty : GetHierarchicalName(repositoryPath, rootDir);
+
+            return new GitRepositoryStatus(safeName, safeHierarchicalName, repositoryPath, null, false, [], "Repository does not exist.");
+        }
+
+        var hierarchicalName = GetHierarchicalName(repositoryPath, rootDir);
 
         try
         {
@@ -466,7 +490,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             if (branches.Count == 0)
                 return new GitRepositoryStatus(Path.GetFileName(repositoryPath), hierarchicalName, repositoryPath, remoteUrl, false, [], "No local branches found.");
 
-            var branchStatuses = new List<BranchStatus>();
+            List<BranchStatus> branchStatuses = [];
             await FetchAsync(repositoryPath, true).ConfigureAwait(false);
 
             foreach (var branch in branches
@@ -490,19 +514,8 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         }
     }
 
-    /// <summary>
-    /// Gets if the specified branch is the current branch in the repository.
-    /// </summary>
-    /// <param name="repositoryPath">
-    /// The path to the git repository to check.
-    /// </param>
-    /// <param name="branch">
-    /// The name of the branch to check if it is the current branch.
-    /// </param>
-    /// <returns>
-    /// true if the specified branch is the current branch; otherwise, false.
-    /// </returns>
-    private async Task<bool> IsCurrentBranchAsync(string repositoryPath, string branch)
+    /// <inheritdoc/>
+    public async Task<bool> IsCurrentBranchAsync(string repositoryPath, string branch)
     {
         if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
             return false;
@@ -548,6 +561,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         }
     }
 
+    /// <inheritdoc/>
     public async Task<bool> PushAsync(string repositoryPath, string? branchName = null, bool force = false, bool tags = true)
     {
         if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
@@ -614,30 +628,37 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             if (withUncommited && repo.HasUncommitedChanges)
             {
                 console.MarkupLineInterpolated($"[yellow]⚠[/] [grey]{repo.HierarchicalName} has uncommitted changes. Stashing them.[/]");
-                hasStash = await StashAsync(repo.Name, includeUntracked: true).ConfigureAwait(false);
+                hasStash = await StashAsync(repo.RepoPath, includeUntracked: true).ConfigureAwait(false);
             }
 
             if (repo.LocalBranches.Count == 0)
             {
                 progress?.Invoke($"[red]✗[/] [grey]{repo.HierarchicalName} has no local branches. Skipping.[/]");
-
                 return false;
             }
 
+            var allBranchesOk = true;
             foreach (var branch in repo.LocalBranches)
             {
-                if (await SynchronizeBranchAsync(branch, pushNewBranches).ConfigureAwait(false))
+                var branchOk = await SynchronizeBranchAsync(branch, pushNewBranches).ConfigureAwait(false);
+
+                if (branchOk)
                     continue;
 
                 progress?.Invoke($"[red]✗[/] [grey]{repo.HierarchicalName} failed to synchronize branch {branch.Name}.[/]");
+                allBranchesOk = false;
             }
 
-            await CheckoutAsync(repo.RepoPath, repo.CurrentBranch).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(repo.CurrentBranch))
+                await CheckoutAsync(repo.RepoPath, repo.CurrentBranch).ConfigureAwait(false);
 
             if (hasStash)
-                await RunGitCommandAsync(repo.RepoPath, "stash pop").ConfigureAwait(false);
+                await PopAsync(repo.RepoPath).ConfigureAwait(false);
 
             await PushAsync(repo.RepoPath).ConfigureAwait(false);
+
+            if (!allBranchesOk)
+                return false;
 
             progress?.Invoke($"[green]✓[/] [grey]{repo.HierarchicalName} updated.[/]");
 
@@ -645,7 +666,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         }
         catch (Exception ex)
         {
-            progress?.Invoke($"[red]✗[/] [grey]{repo.HierarchicalName} failed: {ex.Message}[/]");
+            progress?.Invoke($"[red]✗[/] [grey]{repo.HierarchicalName} sync error: {ex.Message}[/]");
 
             return false;
         }

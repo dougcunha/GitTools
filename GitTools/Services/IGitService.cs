@@ -177,6 +177,17 @@ public interface IGitService
     Task<bool> StashAsync(string repositoryPath, bool includeUntracked = false);
 
     /// <summary>
+    /// Pop the stashed change in the specified repository.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to stash changes in.
+    /// </param>
+    /// <returns>
+    /// true if the pop stash was successful; otherwise, false.
+    /// </returns>
+    Task<bool> PopAsync(string repositoryPath);
+
+    /// <summary>
     /// Gets the status of the specified repository, including local branches and their remote tracking status.
     /// </summary>
     /// <param name="repositoryPath">
@@ -241,4 +252,18 @@ public interface IGitService
         bool withUncommited = false,
         bool pushNewBranches = false
     );
+
+    /// <summary>
+    /// Gets if the specified branch is the current branch in the repository.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to check.
+    /// </param>
+    /// <param name="branch">
+    /// The name of the branch to check if it is the current branch.
+    /// </param>
+    /// <returns>
+    /// true if the specified branch is the current branch; otherwise, false.
+    /// </returns>
+    Task<bool> IsCurrentBranchAsync(string repositoryPath, string branch);
 }

@@ -231,8 +231,8 @@ public sealed class StartupTests
 
         var root = provider.CreateRootCommand();
 
-        root.Subcommands.ShouldContain(static c => c.Name == "outdated");
-        var cmd = root.Subcommands.First(static c => c.Name == "outdated");
+        root.Subcommands.ShouldContain(static c => c.Name == "sync");
+        var cmd = root.Subcommands.First(static c => c.Name == "sync");
         cmd.ShouldBeOfType<SynchronizeCommand>();
     }
 
