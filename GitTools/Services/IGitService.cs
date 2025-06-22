@@ -237,7 +237,7 @@ public interface IGitService
     Task<bool> SynchronizeRepositoryAsync
     (
         GitRepositoryStatus repo,
-        Action<string>? progress,
+        Action<FormattableString>? progress,
         bool withUncommited = false,
         bool pushNewBranches = false
     );

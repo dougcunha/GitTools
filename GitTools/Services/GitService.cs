@@ -377,7 +377,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
 
         try
         {
-            if (string.IsNullOrWhiteSpace(branch.Upstream))
+            if (!branch.IsTracked)
             {
                 if (!pushNewBranches)
                     return true;
@@ -599,7 +599,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     public async Task<bool> SynchronizeRepositoryAsync
     (
         GitRepositoryStatus repo,
-        Action<string>? progress,
+        Action<FormattableString>? progress,
         bool withUncommited = false,
         bool pushNewBranches = false
     )

@@ -28,7 +28,16 @@ namespace GitTools.Models;
 /// An optional error message if there was an issue retrieving the repository status.
 /// If there are no errors, this can be null.
 /// </param>
-public record GitRepositoryStatus(string Name, string HierarchicalName, string RepoPath, string? RemoteUrl, bool HasUncommitedChanges, List<BranchStatus> LocalBranches, string? ErrorMessage = null)
+public record GitRepositoryStatus
+(
+    string Name,
+    string HierarchicalName,
+    string RepoPath,
+    string? RemoteUrl,
+    bool HasUncommitedChanges,
+    List<BranchStatus> LocalBranches,
+    string? ErrorMessage = null
+)
 {
     /// <summary>
     /// Gets the parent directory of the repository path.
@@ -92,7 +101,15 @@ public record GitRepositoryStatus(string Name, string HierarchicalName, string R
 /// <param name="RemoteBehindCount">
 /// The number of commits the local branch is ahead of the remote branch.
 /// </param>
-public record BranchStatus(string RepositoryPath, string Name, string? Upstream, bool IsCurrent, int RemoteAheadCount, int RemoteBehindCount)
+public record BranchStatus
+(
+    string RepositoryPath,
+    string Name,
+    string? Upstream,
+    bool IsCurrent,
+    int RemoteAheadCount,
+    int RemoteBehindCount
+)
 {
     /// <summary>
     /// Gets if the branch is in sync with its remote counterpart.
@@ -100,4 +117,10 @@ public record BranchStatus(string RepositoryPath, string Name, string? Upstream,
     /// </summary>
     public bool IsSynced
         => RemoteAheadCount == 0 && RemoteBehindCount == 0;
+
+    /// <summary>
+    /// Gets if the branch is tracked by an upstream branch.
+    /// </summary>
+    public bool IsTracked
+        => !string.IsNullOrWhiteSpace(Upstream);
 }
