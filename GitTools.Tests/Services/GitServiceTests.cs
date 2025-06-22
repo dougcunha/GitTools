@@ -808,7 +808,7 @@ public sealed class GitServiceTests
 
     private static async IAsyncEnumerable<string> MockReadLinesAsync(string content)
     {
-        foreach (var line in content.Split(["\r\n", "\n"], System.StringSplitOptions.None))
+        foreach (var line in content.Split(["\r\n", "\n"], StringSplitOptions.None))
         {
             await Task.Yield();
 

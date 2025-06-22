@@ -5,8 +5,20 @@
     },
     "ReClone": {
       "commandName": "Project",
-      "commandLineArgs": "reclone pos-scripts",
+      "commandLineArgs": "reclone pos",
       "workingDirectory": "d:\\projetos"
+    },
+    "WSL": {
+      "commandName": "WSL2",
+      "distributionName": ""
+    },
+    "Sync": {
+      "commandName": "Project",
+      "commandLineArgs": "sync d:\\projs"
+    },
+    "Sync show": {
+      "commandName": "Project",
+      "commandLineArgs": "sync d:\\projs --show-only"
     }
   }
 }

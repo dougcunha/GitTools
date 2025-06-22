@@ -151,16 +151,16 @@ public interface IGitService
     /// <summary>
     /// Synchronizes the specified branch in the repository with the remote.
     /// </summary>
-    /// <param name="repositoryPath">
-    /// The path to the git repository to synchronize.
+    /// <param name="branch">
+    /// The branch to synchronize.
     /// </param>
-    /// <param name="branchName">
-    /// The name of the branch to synchronize.
+    /// <param name="pushNewBranches">
+    /// true to push new branches to the remote; otherwise, false.
     /// </param>
     /// <returns>
     /// true if the synchronization was successful; otherwise, false.
     /// </returns>
-    Task<bool> SynchronizeBranchAsync(string repositoryPath, string branchName);
+    Task<bool> SynchronizeBranchAsync(BranchStatus branch, bool pushNewBranches = false);
 
     /// <summary>
     /// Stashes uncommitted changes in the specified repository.
@@ -180,12 +180,13 @@ public interface IGitService
     /// Gets the status of the specified repository, including local branches and their remote tracking status.
     /// </summary>
     /// <param name="repositoryPath">
-    /// The path to the git repository to get the status of.
+    ///     The path to the git repository to get the status of.
     /// </param>
+    /// <param name="rootDir"></param>
     /// <returns>
     /// A instance of <see cref="GitRepositoryStatus"/> containing the repository's status information.
     /// </returns>
-    Task<GitRepositoryStatus> GetRepositoryStatusAsync(string repositoryPath);
+    Task<GitRepositoryStatus> GetRepositoryStatusAsync(string repositoryPath, string rootDir);
 
     /// <summary>
     /// Checks if a specific branch is tracked by the remote repository.
@@ -198,6 +199,46 @@ public interface IGitService
     /// </param>
     /// <returns>
     /// true if the branch is tracked by a remote branch; otherwise, false.
+    /// The name of the upstream branch that the specified branch is tracking, if any
     /// </returns>
-    Task<bool> IsBranchTrackedAsync(string repositoryPath, string branch);
+    Task<(bool isTracked, string? upstream)> IsBranchTrackedAsync(string repositoryPath, string branch);
+
+    /// <summary>
+    /// Pushes changes from the specified repository to a remote server.
+    /// </summary>
+    /// <param name="repositoryPath">The file system path to the local repository to push from. Cannot be null or empty.</param>
+    /// <param name="branchName">The name of the branch to push. If null, the current branch is used.</param>
+    /// <param name="force">If <see langword="true"/>, forces the push operation, potentially overwriting remote changes. Defaults to <see
+    /// langword="false"/>.</param>
+    /// <param name="tags">If <see langword="true"/>, includes tags in the push operation. Defaults to <see langword="true"/>.</param>
+    /// <returns><see langword="true"/> if the push operation succeeds; otherwise, <see langword="false"/>.</returns>
+    Task<bool> PushAsync(string repositoryPath, string? branchName = null, bool force = false, bool tags = true);
+
+    /// <summary>
+    /// Checks out the specified branch in the given repository asynchronously.
+    /// </summary>
+    /// <param name="repoRepoPath">The file system path to the repository where the branch will be checked out. Cannot be null or empty.</param>
+    /// <param name="repoCurrentBranch">The name of the branch to check out. If null, nothing will be changed.</param>
+    /// <returns>A task that represents the asynchronous checkout operation.</returns>
+    Task CheckoutAsync(string repoRepoPath, string? repoCurrentBranch);
+
+    /// <summary>
+    /// Synchronizes the specified Git repository with its remote counterpart.
+    /// </summary>
+    /// <remarks>This method performs a two-way synchronization between the local and remote repositories,
+    /// optionally including uncommitted changes and new branches.</remarks>
+    /// <param name="repo">The repository status object representing the local repository to synchronize.</param>
+    /// <param name="progress">An optional callback action to report progress messages during the synchronization process.</param>
+    /// <param name="withUncommited">If <see langword="true"/>, includes uncommitted changes in the synchronization; otherwise, only committed
+    /// changes are synchronized.</param>
+    /// <param name="pushNewBranches">If <see langword="true"/>, pushes any new branches to the remote repository; otherwise, new branches are not
+    /// pushed.</param>
+    /// <returns><see langword="true"/> if the synchronization is successful; otherwise, <see langword="false"/>.</returns>
+    Task<bool> SynchronizeRepositoryAsync
+    (
+        GitRepositoryStatus repo,
+        Action<string>? progress,
+        bool withUncommited = false,
+        bool pushNewBranches = false
+    );
 }

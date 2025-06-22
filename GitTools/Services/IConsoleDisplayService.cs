@@ -1,3 +1,5 @@
+using GitTools.Models;
+
 namespace GitTools.Services;
 
 /// <summary>
@@ -26,4 +28,15 @@ public interface IConsoleDisplayService
     /// <param name="baseFolder">The base folder being scanned.</param>
     /// <param name="tags">The tags being searched for.</param>
     void ShowInitialInfo(string baseFolder, string[] tags);
+
+    /// <summary>
+    /// Displays a table of repositories statuses.
+    /// </summary>
+    /// <remarks>The table includes columns for the repository name, remote URL, and the number of commits the
+    /// local branches are ahead or behind the remote branches.</remarks>
+    /// <param name="reposStatus">A list of <see cref="GitRepositoryStatus"/> objects representing the status of each repository.</param>
+    /// <param name="baseFolder">
+    /// The base folder used to calculate the hierarchical names of the repositories.
+    /// </param>
+    void DisplayRepositoriesStatus(List<GitRepositoryStatus> reposStatus, string baseFolder);
 }

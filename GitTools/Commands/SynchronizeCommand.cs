@@ -13,26 +13,30 @@ public sealed class SynchronizeCommand : Command
     private readonly IGitRepositoryScanner _scanner;
     private readonly IGitService _gitService;
     private readonly IAnsiConsole _console;
+    private readonly IConsoleDisplayService _displayService;
 
-    public SynchronizeCommand(IGitRepositoryScanner scanner, IGitService gitService, IAnsiConsole console)
+    public SynchronizeCommand(IGitRepositoryScanner scanner, IGitService gitService, IAnsiConsole console, IConsoleDisplayService displayService)
         : base("sync", "Checks and synchronize repositories with the remote server.")
     {
         _scanner = scanner;
         _gitService = gitService;
         _console = console;
+        _displayService = displayService;
 
         var rootArg = new Argument<string>("root-directory", "Root directory of git repositories");
         var showOnlyOption = new Option<bool>("--show-only", "Do not update repositories, just show which ones are outdated");
         var withUncommitedOption = new Option<bool>("--with-uncommited", "Try to update repositories with uncommitted changes");
+        var pushUntrackedBranchesOption = new Option<bool>("--push-untracked-branches", "Push untracked branches to the remote repository");
 
         AddArgument(rootArg);
         AddOption(showOnlyOption);
         AddOption(withUncommitedOption);
+        AddOption(pushUntrackedBranchesOption);
 
-        this.SetHandler(ExecuteAsync, rootArg, showOnlyOption, withUncommitedOption);
+        this.SetHandler(ExecuteAsync, rootArg, showOnlyOption, withUncommitedOption, pushUntrackedBranchesOption);
     }
 
-    public async Task ExecuteAsync(string rootDirectory, bool showOnly, bool withUncommited)
+    private async Task ExecuteAsync(string rootDirectory, bool showOnly, bool withUncommited, bool pushUntrackedBranches)
     {
         var repoPaths = _console.Status()
             .Start
@@ -59,34 +63,39 @@ public sealed class SynchronizeCommand : Command
                 new PercentageColumn(),
                 new SpinnerColumn(),
                 new TaskDescriptionColumn())
-            .StartAsync(ctx => GetRepositoriesStatusAsync(withUncommited, ctx, repoPaths))
+            .StartAsync(ctx => GetRepositoriesStatusAsync(ctx, repoPaths, rootDirectory))
             .ConfigureAwait(false);
 
         if (reposStatus.Count == 0)
         {
-            _console.MarkupLine("[green]All repositories are up to date.[/]");
+            _console.MarkupLine("[green]No repositories found.[/]");
 
             return;
         }
+
+        var outdatedRepos = reposStatus
+            .Where(r => !r.AreBranchesSynced)
+            .ToList();
+
+        _displayService.DisplayRepositoriesStatus(outdatedRepos, rootDirectory);
 
         if (showOnly)
-        {
-            DisplayOutdatedRepositories(reposStatus);
-
             return;
-        }
 
-        var selected = await _console.PromptAsync(
+        var selected = await _console.PromptAsync
+        (
             new MultiSelectionPrompt<string>()
                 .Title("[green]Select repositories to update[/]")
                 .NotRequired()
                 .PageSize(20)
                 .MoreChoicesText("[grey](Use space to select, enter to confirm)[/]")
                 .InstructionsText("[grey](Press [blue]<space>[/] to select, [green]<enter>[/] to confirm)[/]")
-                .AddChoiceGroup("Select all", reposStatus.Select(static r => r.Name))).ConfigureAwait(false);
+                .AddChoiceGroup("Select all", outdatedRepos.Select(static r => r.RepoPath))
+                .UseConverter(r => r is "Select all" ? "Select all" : _displayService.GetHierarchicalName(r, rootDirectory))
+        ).ConfigureAwait(false);
 
-        var toUpdate = reposStatus
-            .Where(r => selected.Contains(r.Name))
+        var toUpdate = outdatedRepos
+            .Where(r => selected.Contains(r.RepoPath))
             .ToList();
 
         if (toUpdate.Count == 0)
@@ -107,44 +116,33 @@ public sealed class SynchronizeCommand : Command
                 new PercentageColumn(),
                 new SpinnerColumn(),
                 new TaskDescriptionColumn())
-            .StartAsync(ctx => UpdateRepositoriesAsync(withUncommited, ctx, toUpdate))
+            .StartAsync(ctx => UpdateRepositoriesAsync(withUncommited, ctx, toUpdate, pushUntrackedBranches))
             .ConfigureAwait(false);
 
         _console.MarkupLineInterpolated($"[blue]{success} succeeded, {fail} failed.[/]");
     }
 
-    private void DisplayOutdatedRepositories(List<GitRepositoryStatus> reposStatus)
-    {
-        var table = new Table()
-            .Border(TableBorder.Rounded)
-            .Title("[yellow]Outdated Repositories[/]")
-            .AddColumn("[grey]Repository[/]")
-            .AddColumn("[blue]Remote URL[/]")
-            .AddColumn("[red]Ahead[/]")
-            .AddColumn("[yellow]Behind[/]");
-
-        foreach (var repo in reposStatus)
-        {
-            var commitsAhead = repo.LocalBranches.Sum(static b => b.RemoteAheadCount);
-            var commitsBehind = repo.LocalBranches.Sum(static b => b.RemoteBehindCount);
-
-            table.AddRow
-            (
-                $"[grey]{repo.Name}[/]",
-                $"[blue]{repo.RemoteUrl}[/]",
-                $"[red]{commitsAhead}[/]",
-                $"[yellow]{commitsBehind}[/]"
-            );
-        }
-
-        _console.Write(table);
-    }
-
+    /// <summary>
+    /// Asynchronously updates a list of Git repositories, optionally stashing uncommitted changes.
+    /// </summary>
+    /// <remarks>This method iterates over each repository in the <paramref name="toUpdate"/> list, updating
+    /// each one. If a repository has no local branches, it is skipped. If <paramref name="withUncommited"/> is  <see
+    /// langword="true"/> and the repository has uncommitted changes, those changes are stashed before  updating. The
+    /// method logs progress and results to the console.</remarks>
+    /// <param name="withUncommited">A boolean value indicating whether to stash uncommitted changes before updating.  If <see langword="true"/>,
+    /// uncommitted changes will be stashed.</param>
+    /// <param name="ctx">The <see cref="ProgressContext"/> used to track the progress of the update operation.</param>
+    /// <param name="toUpdate">A list of <see cref="GitRepositoryStatus"/> objects representing the repositories to be updated.</param>
+    /// <param name="pushUntrackedBranches">
+    /// true to push untracked branches to the remote repository; otherwise, false.
+    /// </param>
+    /// <returns>A tuple containing the number of successful updates and the number of failed updates.</returns>
     private async Task<(int success, int fail)> UpdateRepositoriesAsync
     (
         bool withUncommited,
         ProgressContext ctx,
-        List<GitRepositoryStatus> toUpdate
+        List<GitRepositoryStatus> toUpdate,
+        bool pushUntrackedBranches
     )
     {
         var (success, fail) = (0, 0);
@@ -153,48 +151,8 @@ public sealed class SynchronizeCommand : Command
 
         foreach (var repo in toUpdate)
         {
-            task.Description($"Updating {Path.GetFileName(repo.Name)}...");
-            try
-            {
-                bool hasStash = false;
-
-                if (withUncommited && repo.HasUncommitedChanges)
-                {
-                    _console.MarkupLineInterpolated($"[yellow]⚠[/] [grey]{repo} has uncommitted changes. Stashing them.[/]");
-                    hasStash = await _gitService.StashAsync(repo.Name, includeUntracked: true).ConfigureAwait(false);
-                }
-
-                if (repo.LocalBranches.Count == 0)
-                {
-                    _console.MarkupLineInterpolated($"[red]✗[/] [grey]{repo} has no local branches. Skipping.[/]");
-                    fail++;
-                    task.Increment(1);
-
-                    continue;
-                }
-
-                foreach (var branch in repo.LocalBranches)
-                {
-                    if (!await _gitService.SynchronizeBranchAsync(repo.Name, branch.Name).ConfigureAwait(false))
-                    {
-                        _console.MarkupLineInterpolated($"[red]✗[/] [grey]{repo} failed to synchronize branch {branch.Name}.[/]");
-                        fail++;
-
-                        continue;
-                    }
-                }
-
-                if (hasStash)
-                    await _gitService.RunGitCommandAsync(repo.Name, "stash pop").ConfigureAwait(false);
-
-                _console.MarkupLineInterpolated($"[green]✓[/] [grey]{repo} updated.[/]");
-                success++;
-            }
-            catch (Exception ex)
-            {
-                _console.MarkupLineInterpolated($"[red]✗[/] [grey]{repo} failed: {ex.Message}[/]");
-                fail++;
-            }
+            task.Description($"Updating {repo.HierarchicalName}...");
+            await _gitService.SynchronizeRepositoryAsync(repo, msg => _console.MarkupLine(msg), withUncommited, pushUntrackedBranches);
 
             task.Increment(1);
         }
@@ -204,11 +162,20 @@ public sealed class SynchronizeCommand : Command
         return (success, fail);
     }
 
+    /// <summary>
+    /// Asynchronously retrieves the status of multiple Git repositories.
+    /// </summary>
+    /// <param name="ctx">The progress context used to report the status of the operation.</param>
+    /// <param name="repoPaths">A list of file paths to the repositories to be checked.</param>
+    /// <param name="rootDirectory">The root directory.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains a list of <see
+    /// cref="GitRepositoryStatus"/> objects representing the status of each repository that is not synced or has
+    /// uncommitted changes if specified.</returns>
     private async Task<List<GitRepositoryStatus>> GetRepositoriesStatusAsync
     (
-        bool withUncommited,
         ProgressContext ctx,
-        List<string> repoPaths
+        List<string> repoPaths,
+        string rootDirectory
     )
     {
         var statuses = new List<GitRepositoryStatus>();
@@ -217,21 +184,12 @@ public sealed class SynchronizeCommand : Command
 
         foreach (var repo in repoPaths)
         {
-            task.Description($"Checking {Path.GetFileName(repo)}...");
+            task.Description($"Checking {_displayService.GetHierarchicalName(repo, rootDirectory)}...");
             try
             {
-                var repoStatus = await _gitService.GetRepositoryStatusAsync(repo).ConfigureAwait(false);
+                var repoStatus = await _gitService.GetRepositoryStatusAsync(repo, rootDirectory).ConfigureAwait(false);
 
-                if (repoStatus.HasErros)
-                {
-                    _console.MarkupLineInterpolated($"[red]✗[/] [grey]{repo} has errors: {repoStatus.ErrorMessage}[/]");
-                    task.Increment(1);
-
-                    continue;
-                }
-
-                if (!repoStatus.AreBranchesSynced && (!repoStatus.HasUncommitedChanges || withUncommited))
-                    statuses.Add(repoStatus);
+                statuses.Add(repoStatus);
             }
             catch (Exception ex)
             {
@@ -244,6 +202,5 @@ public sealed class SynchronizeCommand : Command
         task.StopTask();
 
         return statuses;
-    }    
+    }
 }
-

@@ -7,15 +7,18 @@ namespace GitTools.Models;
 /// <param name="Name">
 /// The name of the repository, typically the folder name.
 /// </param>
-/// <param name="Path">
-/// The file system path to the repository directory.
+/// <param name="HierarchicalName">
+/// The hierarchical name of the repository, which is a relative path from a base folder.
 /// </param>
-/// <param name="HasUncommitedChanges">
-/// A value indicating whether the repository has uncommitted changes.
+/// <param name="RepoPath">
+/// The file system path to the repository directory.
 /// </param>
 /// <param name="RemoteUrl">
 /// The remote URL of the repository, where the code is hosted (e.g., GitHub, GitLab).
 /// If the repository does not have a remote, this can be null.
+/// </param>
+/// <param name="HasUncommitedChanges">
+/// A value indicating whether the repository has uncommitted changes.
 /// </param>
 /// <param name="LocalBranches">
 /// A list of local branches in the repository, each represented by a <see cref="BranchStatus"/>.
@@ -25,7 +28,7 @@ namespace GitTools.Models;
 /// An optional error message if there was an issue retrieving the repository status.
 /// If there are no errors, this can be null.
 /// </param>
-public record GitRepositoryStatus(string Name, string RepoPath, string? RemoteUrl, bool HasUncommitedChanges, List<BranchStatus> LocalBranches, string? ErrorMessage = null)
+public record GitRepositoryStatus(string Name, string HierarchicalName, string RepoPath, string? RemoteUrl, bool HasUncommitedChanges, List<BranchStatus> LocalBranches, string? ErrorMessage = null)
 {
     /// <summary>
     /// Gets the parent directory of the repository path.
@@ -47,18 +50,41 @@ public record GitRepositoryStatus(string Name, string RepoPath, string? RemoteUr
     /// </summary>
     public bool AreBranchesSynced
         => LocalBranches.All(branch => branch.IsSynced);
+
+    /// <summary>
+    /// Gets the number of local branches that do not have an upstream branch configured.
+    /// </summary>
+    public int UntrackedBranchesCount
+        => LocalBranches.Count(branch => string.IsNullOrWhiteSpace(branch.Upstream));
+
+    /// <summary>
+    /// Gets the number of tracked branches in the repository.
+    /// </summary>
+    public int TrackedBranchesCount
+        => LocalBranches.Count(branch => !string.IsNullOrWhiteSpace(branch.Upstream));
+
+    /// <summary>
+    /// Gets the name of the current branch in the repository.
+    /// </summary>
+    public string? CurrentBranch
+        => LocalBranches.FirstOrDefault(branch => branch.IsCurrent)?.Name;
 };
 
 /// <summary>
 /// Represents the status of a local branch in a Git repository.
 /// This record contains the branch name, whether it is valid, and how many commits it is ahead of the remote.
 /// </summary>
+/// <param name="RepositoryPath">
+/// The path to the repository that contains this branch.
+/// </param>
 /// <param name="Name">
 /// The name of the branch.
 /// </param>
-/// <param name="IsTracked">
-/// A value indicating whether the branch is tracked by a remote branch.
-/// If true, the branch is set to track a remote branch.
+/// <param name="Upstream">
+/// The name of the upstream branch this branch is tracking.
+/// </param>
+/// <param name="IsCurrent">
+/// true if this branch is the currently checked out branch; otherwise, false.
 /// </param>
 /// <param name="RemoteAheadCount">
 /// The number of commits the remote branch is ahead of the local branch.
@@ -66,10 +92,7 @@ public record GitRepositoryStatus(string Name, string RepoPath, string? RemoteUr
 /// <param name="RemoteBehindCount">
 /// The number of commits the local branch is ahead of the remote branch.
 /// </param>
-/// <param name="IsCurrentBranch">
-/// A value indicating whether this branch is the current branch in the repository.
-/// </param>
-public record BranchStatus(string Name, bool IsTracked, int RemoteAheadCount, int RemoteBehindCount, bool IsCurrentBranch = false)
+public record BranchStatus(string RepositoryPath, string Name, string? Upstream, bool IsCurrent, int RemoteAheadCount, int RemoteBehindCount)
 {
     /// <summary>
     /// Gets if the branch is in sync with its remote counterpart.
