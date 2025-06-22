@@ -34,7 +34,7 @@ GitTools is a command-line tool for managing Git repositories, including searchi
 - **Remote Tag Management**: Optionally remove tags from remote repositories
 - **Tag Listing with wildcard filtering**
 - **Bulk Backup/Restore**: Generate a JSON configuration file and restore repositories from it
-- **Outdated Detection**: Identify repositories behind a remote branch and update them
+- **Synchonize**: Identify repositories behind a remote branch and update them
 - **Backup Creation**: Automatic ZIP backup creation before destructive operations
 - **Modern Terminal UI**: Built with [Spectre.Console](https://spectreconsole.net/) for beautiful interfaces
 - **Modern CLI Parsing**: Uses [System.CommandLine](https://github.com/dotnet/command-line-api) for extensible command-line parsing
@@ -184,16 +184,17 @@ Use `--force-ssh` to convert all repository URLs in the JSON file to SSH before 
 GitTools restore repos.json <target-directory> --force-ssh
 ```
 
-### Check Outdated (outdated)
+### Synchronize (sync)
 
 Detect repositories that are behind the specified branch and optionally update them.
 
 ```sh
-GitTools outdated <root-directory> [--branch BRANCH] [--update] [--with-uncommited]
+GitTools sync <root-directory> [--show-only] [--with-uncommited]
 ```
 
 By default repositories with uncommitted changes are skipped. Use `--with-uncommited` to include them; any changes are stashed before updating.
 
+Use `--show-only` if you want to see what is new without changing anything on local repository.
 
 ## Build
 

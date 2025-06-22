@@ -13,6 +13,12 @@ namespace GitTools.Services;
 /// </summary>
 public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner processRunner, IAnsiConsole console) : IGitService
 {
+    [GeneratedRegex(@"^\s*url\s*=\s*(.+)$")]
+    private static partial Regex RegexUrl();
+
+    [GeneratedRegex("""\[(?<section>remote|submodule)\s+"(?<name>[^"]+)"\]""", RegexOptions.Compiled)]
+    private static partial Regex RegexConfigSection();
+
     /// <inheritdoc/>
     public async Task<bool> HasTagAsync(string repoPath, string tag)
     {
@@ -72,9 +78,9 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             (_, e) => { if (e.Data != null) error.AppendLine(e.Data); }
         ).ConfigureAwait(false);
 
-        return exitCode != 0
-            ? throw new InvalidOperationException(error.ToString())
-            : output.ToString();
+        return exitCode != 0 && !string.IsNullOrWhiteSpace(error.ToString())
+            ? throw new InvalidOperationException(error.ToString().Trim())
+            : output.ToString().Trim();
     }
 
     /// <summary>
@@ -249,9 +255,225 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         }
     }
 
-    [GeneratedRegex(@"^\s*url\s*=\s*(.+)$")]
-    private static partial Regex RegexUrl();
+    /// <inheritdoc/>
+    public async Task<bool> HasUncommittedChangesAsync(string repositoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return false;
 
-    [GeneratedRegex("""\[(?<section>remote|submodule)\s+"(?<name>[^"]+)"\]""", RegexOptions.Compiled)]
-    private static partial Regex RegexConfigSection();
+        try
+        {
+            var status = await RunGitCommandAsync(repositoryPath, "status --porcelain").ConfigureAwait(false);
+
+            return !string.IsNullOrWhiteSpace(status);
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error checking uncommitted changes in {repositoryPath}: {ex.Message}[/]");
+            return false;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<(int ahead, int behind)> GetRemoteAheadBehindCountAsync(string repositoryPath, string branchName, bool fetch = true)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return (0, 0);
+
+        try
+        {
+            if (fetch)
+                await RunGitCommandAsync(repositoryPath, "fetch").ConfigureAwait(false);
+
+            var countStr = await RunGitCommandAsync
+            (
+                repositoryPath,
+                $"rev-list --left-right --count {branchName}...origin/{branchName}"
+            ).ConfigureAwait(false);
+
+            var counts = countStr.Split('\t', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var (aheadCount, behindCount) = counts.Length == 2
+                ? (counts[0], counts[1])
+                : (counts[0], "0");
+
+            if (!int.TryParse(aheadCount, out var ahead) || !int.TryParse(behindCount, out var behind))
+                return (0, 0);
+
+            return (ahead, behind);
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error getting remote ahead/behind count in {repositoryPath}: {ex.Message}[/]");
+
+            return (0, 0);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> FetchAsync(string repositoryPath, bool prune = false)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return false;
+
+        try
+        {
+            var arguments = "fetch --all";
+
+            if (prune)
+                arguments += " --prune";
+
+            await RunGitCommandAsync(repositoryPath, arguments).ConfigureAwait(false);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error fetching updates in {repositoryPath}: {ex.Message}[/]");
+
+            return false;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<string>> GetLocalBranchesAsync(string repositoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return [];
+
+        try
+        {
+            var result = await RunGitCommandAsync(repositoryPath, "branch --format='%(refname:short)'").ConfigureAwait(false);
+
+            if (string.IsNullOrWhiteSpace(result))
+                return [];
+
+            return [
+                .. result.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(static s => s.Replace("'", string.Empty, StringComparison.OrdinalIgnoreCase))
+            ];
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error getting local branches in {repositoryPath}: {ex.Message}[/]");
+            
+            return [];
+        }
+
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> SynchronizeBranchAsync(string repositoryPath, string branchName)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return false;
+
+        try
+        {
+            await RunGitCommandAsync(repositoryPath, $"fetch origin {branchName}").ConfigureAwait(false);
+            await RunGitCommandAsync(repositoryPath, $"git branch --quiet --set-upstream-to=origin/{branchName} {branchName}").ConfigureAwait(false);
+            await RunGitCommandAsync(repositoryPath, $"rebase origin/{branchName}").ConfigureAwait(false);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error synchronizing branch {branchName} in {repositoryPath}: {ex.Message}[/]");
+
+            return false;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> StashAsync(string repositoryPath, bool includeUntracked = false)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return false;
+
+        try
+        {
+            var arguments = "stash";
+
+            if (includeUntracked)
+                arguments += " --include-untracked";
+
+            await RunGitCommandAsync(repositoryPath, arguments).ConfigureAwait(false);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error stashing changes in {repositoryPath}: {ex.Message}[/]");
+
+            return false;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<GitRepositoryStatus> GetRepositoryStatusAsync(string repositoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return new GitRepositoryStatus(Path.GetFileName(repositoryPath), repositoryPath, null, false, [], "Repository does not exist.");
+
+        try
+        {
+            var currentBranch = await RunGitCommandAsync(repositoryPath, "branch --show-current").ConfigureAwait(false);
+            var remoteUrl = await RunGitCommandAsync(repositoryPath, "config --get remote.origin.url").ConfigureAwait(false);
+            var branches = await GetLocalBranchesAsync(repositoryPath).ConfigureAwait(false);
+            var hasUncommittedChanges = await HasUncommittedChangesAsync(repositoryPath).ConfigureAwait(false);
+
+            if (branches.Count == 0)
+                return new GitRepositoryStatus(Path.GetFileName(repositoryPath), repositoryPath, remoteUrl, false, [], "No local branches found.");
+
+            var branchStatuses = new List<BranchStatus>();
+            await FetchAsync(repositoryPath, true).ConfigureAwait(false);
+
+            foreach (var branch in branches
+                .Where(static b => !b.Contains("HEAD", StringComparison.OrdinalIgnoreCase) && !b.Contains("detached", StringComparison.OrdinalIgnoreCase)))
+            {
+                var isTracked = await IsBranchTrackedAsync(repositoryPath, branch).ConfigureAwait(false);
+
+                var (aheadCount, behindCount) = isTracked
+                    ? await GetRemoteAheadBehindCountAsync(repositoryPath, branch, fetch: false).ConfigureAwait(false)
+                    : (0, 0);
+
+                var isCurrentBranch = string.Equals(branch, currentBranch.Trim(), StringComparison.OrdinalIgnoreCase);
+
+                branchStatuses.Add(new BranchStatus(branch, isTracked, aheadCount, behindCount, isCurrentBranch));
+            }
+
+            return new GitRepositoryStatus(Path.GetFileName(repositoryPath), repositoryPath, remoteUrl, hasUncommittedChanges, branchStatuses);
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error getting repository status for {repositoryPath}: {ex.Message}[/]");
+
+            return new GitRepositoryStatus(Path.GetFileName(repositoryPath), repositoryPath, null, false, [], ex.Message);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> IsBranchTrackedAsync(string repositoryPath, string branch)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return false;
+
+        try
+        {
+            var result = await RunGitCommandAsync(repositoryPath, $"for-each-ref --format=\"%(upstream:short)\" refs/heads/{branch}").ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(result))
+            {
+                var refs = await RunGitCommandAsync(repositoryPath, $"show-ref origin/{branch}").ConfigureAwait(false);
+
+                return !string.IsNullOrWhiteSpace(refs) && refs.Contains($"refs/remotes/origin/{branch}", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error checking if branch {branch} is tracked in {repositoryPath}: {ex.Message}[/]");
+            return false;
+        }
+    }
 }

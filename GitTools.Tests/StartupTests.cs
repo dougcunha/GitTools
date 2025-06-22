@@ -31,7 +31,7 @@ public sealed class StartupTests
         serviceProvider.GetService<TagListCommand>().ShouldNotBeNull();
         serviceProvider.GetService<BulkBackupCommand>().ShouldNotBeNull();
         serviceProvider.GetService<BulkRestoreCommand>().ShouldNotBeNull();
-        serviceProvider.GetService<OutdatedCommand>().ShouldNotBeNull();
+        serviceProvider.GetService<SynchronizeCommand>().ShouldNotBeNull();
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public sealed class StartupTests
         var tagListCommandDescriptor = services.First(static s => s.ServiceType == typeof(TagListCommand));
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
         var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
-        var outdatedDescriptor = services.First(static s => s.ServiceType == typeof(OutdatedCommand));
+        var outdatedDescriptor = services.First(static s => s.ServiceType == typeof(SynchronizeCommand));
 
         ansiConsoleDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         processRunnerDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
@@ -84,6 +84,7 @@ public sealed class StartupTests
         var backupServiceDescriptor = services.First(static s => s.ServiceType == typeof(IBackupService));
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
         var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
+        var outdatedDescriptor = services.First(static s => s.ServiceType == typeof(SynchronizeCommand));
 
         processRunnerDescriptor.ImplementationType.ShouldBe(typeof(ProcessRunner));
         gitScannerDescriptor.ImplementationType.ShouldBe(typeof(GitRepositoryScanner));
@@ -92,7 +93,7 @@ public sealed class StartupTests
         backupServiceDescriptor.ImplementationType.ShouldBe(typeof(ZipBackupService));
         bulkBackupDescriptor.ImplementationType.ShouldBe(typeof(BulkBackupCommand));
         bulkRestoreDescriptor.ImplementationType.ShouldBe(typeof(BulkRestoreCommand));
-        outdatedDescriptor.ImplementationType.ShouldBe(typeof(OutdatedCommand));
+        outdatedDescriptor.ImplementationType.ShouldBe(typeof(SynchronizeCommand));
     }
 
     [Fact]
@@ -232,7 +233,7 @@ public sealed class StartupTests
 
         root.Subcommands.ShouldContain(static c => c.Name == "outdated");
         var cmd = root.Subcommands.First(static c => c.Name == "outdated");
-        cmd.ShouldBeOfType<OutdatedCommand>();
+        cmd.ShouldBeOfType<SynchronizeCommand>();
     }
 
     [Fact]
@@ -305,10 +306,10 @@ public sealed class StartupTests
         var provider = services.BuildServiceProvider();
 
         var root = provider.CreateRootCommand();
-        var cmd = root.Subcommands.OfType<OutdatedCommand>().First();
+        var cmd = root.Subcommands.OfType<SynchronizeCommand>().First();
 
         cmd.ShouldNotBeNull();
-        cmd.ShouldBeOfType<OutdatedCommand>();
+        cmd.ShouldBeOfType<SynchronizeCommand>();
     }
 
     [Fact]
@@ -425,8 +426,8 @@ public sealed class StartupTests
         var root1 = provider.CreateRootCommand();
         var root2 = provider.CreateRootCommand();
 
-        var c1 = root1.Subcommands.OfType<OutdatedCommand>().First();
-        var c2 = root2.Subcommands.OfType<OutdatedCommand>().First();
+        var c1 = root1.Subcommands.OfType<SynchronizeCommand>().First();
+        var c2 = root2.Subcommands.OfType<SynchronizeCommand>().First();
 
         c1.ShouldBeSameAs(c2);
     }

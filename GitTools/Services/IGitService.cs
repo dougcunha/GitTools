@@ -85,7 +85,6 @@ public interface IGitService
     /// </returns>
     Task<GitRepository> GetGitRepositoryAsync(string repositoryPath);
 
-
     /// <summary>
     /// Deletes a local git repository at the specified path.
     /// This method will remove the git repository directory and all its contents.
@@ -98,4 +97,107 @@ public interface IGitService
     /// If the repository does not exist or cannot be deleted, it returns false.
     /// </returns>
     Task<bool> DeleteLocalGitRepositoryAsync(string? repositoryPath);
+
+    /// <summary>
+    /// Checks if the repository has uncommitted changes.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to check for uncommitted changes.
+    /// </param>
+    /// <returns>
+    /// true if there are uncommitted changes; otherwise, false.
+    /// </returns>
+    Task<bool> HasUncommittedChangesAsync(string repositoryPath);
+
+    /// <summary>
+    /// Gets the number of commits the remote repository is ahead/behind of the local repository.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to check.
+    /// </param>
+    /// <param name="branchName">
+    /// The name of the branch to check for ahead/behind status.
+    /// </param>
+    /// <param name="fetch">
+    /// true to fetch updates from the remote repository before checking; otherwise, false.
+    /// </param>
+    /// <returns>
+    /// The number of commits the remote repository is ahead/behind of the local repository.
+    /// </returns>
+    Task<(int ahead, int behind)> GetRemoteAheadBehindCountAsync(string repositoryPath, string branchName, bool fetch = true);
+
+    /// <summary>
+    /// Fetches updates from the remote repository.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to fetch updates from.
+    /// </param>
+    /// <param name="prune">
+    /// true to prune deleted branches; otherwise, false.
+    /// </param>
+    Task<bool> FetchAsync(string repositoryPath, bool prune = false);
+
+    /// <summary>
+    /// Gets a list of all local branches in the specified repository.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to list branches from.
+    /// </param>
+    /// <returns>
+    /// A list of local branch names in the repository.
+    /// </returns>
+    Task<List<string>> GetLocalBranchesAsync(string repositoryPath);
+
+    /// <summary>
+    /// Synchronizes the specified branch in the repository with the remote.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to synchronize.
+    /// </param>
+    /// <param name="branchName">
+    /// The name of the branch to synchronize.
+    /// </param>
+    /// <returns>
+    /// true if the synchronization was successful; otherwise, false.
+    /// </returns>
+    Task<bool> SynchronizeBranchAsync(string repositoryPath, string branchName);
+
+    /// <summary>
+    /// Stashes uncommitted changes in the specified repository.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to stash changes in.
+    /// </param>
+    /// <param name="includeUntracked">
+    /// true to include untracked files in the stash; otherwise, false.
+    /// </param>
+    /// <returns>
+    /// true if the stash was successful; otherwise, false.
+    /// </returns>
+    Task<bool> StashAsync(string repositoryPath, bool includeUntracked = false);
+
+    /// <summary>
+    /// Gets the status of the specified repository, including local branches and their remote tracking status.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to get the status of.
+    /// </param>
+    /// <returns>
+    /// A instance of <see cref="GitRepositoryStatus"/> containing the repository's status information.
+    /// </returns>
+    Task<GitRepositoryStatus> GetRepositoryStatusAsync(string repositoryPath);
+
+    /// <summary>
+    /// Checks if a specific branch is tracked by the remote repository.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to check.
+    /// </param>
+    /// <param name="branch">
+    /// The name of the branch to check for tracking status.
+    /// </param>
+    /// <returns>
+    /// true if the branch is tracked by a remote branch; otherwise, false.
+    /// </returns>
+    Task<bool> IsBranchTrackedAsync(string repositoryPath, string branch);
 }
