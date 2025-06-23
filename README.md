@@ -14,6 +14,7 @@
   - [Reclone Repository (reclone)](#reclone-repository-reclone)
   - [Bulk Backup (bkp)](#bulk-backup-bkp)
   - [Bulk Restore (restore)](#bulk-restore-restore)
+  - [Check Outdated (outdated)](#check-outdated-outdated)
   - [Build](#build)
 - [Code Coverage](#code-coverage)
 - [Publish as Single File](#publish-as-single-file)
@@ -32,7 +33,8 @@ GitTools is a command-line tool for managing Git repositories, including searchi
 - **Wildcard Pattern Support**: Use `*` and `?` characters for flexible tag matching
 - **Remote Tag Management**: Optionally remove tags from remote repositories
 - **Tag Listing with wildcard filtering**
- - **Bulk Backup/Restore**: Generate a JSON configuration file and restore repositories from it
+- **Bulk Backup/Restore**: Generate a JSON configuration file and restore repositories from it
+- **Synchonize**: Identify repositories behind a remote branch and update them
 - **Backup Creation**: Automatic ZIP backup creation before destructive operations
 - **Modern Terminal UI**: Built with [Spectre.Console](https://spectreconsole.net/) for beautiful interfaces
 - **Modern CLI Parsing**: Uses [System.CommandLine](https://github.com/dotnet/command-line-api) for extensible command-line parsing
@@ -182,6 +184,17 @@ Use `--force-ssh` to convert all repository URLs in the JSON file to SSH before 
 GitTools restore repos.json <target-directory> --force-ssh
 ```
 
+### Synchronize (sync)
+
+Detect repositories that are behind the specified branch and optionally update them.
+
+```sh
+GitTools sync <root-directory> [--show-only] [--with-uncommitted]
+```
+
+By default repositories with uncommitted changes are skipped. Use `--with-uncommitted` to include them; any changes are stashed before updating.
+
+Use `--show-only` if you want to see what is new without changing anything on local repository.
 
 ## Build
 

@@ -63,7 +63,7 @@ public sealed class TagListCommandTests
         const string TAGS_INPUT = "v1.0";
         var searchResult = new TagSearchResult([], [], []);
         string[] tags = ["v1.0"];
-        
+
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
         _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/repos", tags, Arg.Any<Action<string>>()).Returns(searchResult);
 
@@ -90,6 +90,10 @@ public sealed class TagListCommandTests
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
         _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/repos", tags, Arg.Any<Action<string>>()).Returns(searchResult);
+
+        _mockTagSearchService.WhenForAnyArgs(x => x.SearchRepositoriesWithTagsAsync("C:/repos", tags, Arg.Any<Action<string>?>()))
+            .Do(static callInfo => callInfo.Arg<Action<string>?>()?.Invoke("Searching..."));
+
         _mockConsoleDisplayService.GetHierarchicalName("C:/repos/repo1", "C:/repos").Returns("repo1");
 
         // Act

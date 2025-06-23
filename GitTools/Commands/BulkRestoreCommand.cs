@@ -61,7 +61,7 @@ public sealed class BulkRestoreCommand : Command
                 GitRepository.JsonSerializerOptions
             )
             ?.Where(static r => !string.IsNullOrWhiteSpace(r.RemoteUrl))
-            ?.OrderBy(static r => r.Name).ToList();
+            .OrderBy(static r => r.Name).ToList();
         }
         catch (Exception ex)
         {

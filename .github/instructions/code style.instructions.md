@@ -10,6 +10,9 @@ Formatting and style standards for this C# project:
 - Always add a blank line before if, for, foreach, and return.
 - Always add a blank line after opening or before closing braces.
 - Use expression-bodied members and start a new line before =>
+- When calling a method with more than 4 arguments, chop the arguments so that each argument is written on its own line, 
+the opening parenthesis of the method call or lambda expression must be placed on a new line after the method name. 
+Additionally, if an argument uses a lambda expression or a nested call with its own parentheses, apply the same rule recursively.
 - Constant names in UPPER_CASE.
 - Use var when the type is obvious.
 - XMLDoc is mandatory for public classes and methods.
