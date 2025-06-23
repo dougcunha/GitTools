@@ -279,6 +279,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         catch (Exception ex)
         {
             console.MarkupInterpolated($"[red]Error checking uncommitted changes in {repositoryPath}: {ex.Message}[/]");
+
             return false;
         }
     }
@@ -301,7 +302,8 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             ).ConfigureAwait(false);
 
             var counts = countStr.Split('\t', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var (aheadCount, behindCount) = counts.Length == 2
+
+            (string aheadCount, string behindCount) = counts.Length == 2
                 ? (counts[0], counts[1])
                 : (counts[0], "0");
 
@@ -384,6 +386,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
 
                 console.MarkupInterpolated($"[yellow]Pushing new branch {branch.Name} to remote...[/]");
                 await RunGitCommandAsync(branch.RepositoryPath, $"push --set-upstream origin {branch.Name}").ConfigureAwait(false);
+
                 return true;
             }
 
@@ -529,6 +532,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         catch (Exception ex)
         {
             console.MarkupInterpolated($"[red]Error checking current branch in {repositoryPath}: {ex.Message}[/]");
+
             return false;
         }
     }
@@ -627,27 +631,18 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
 
             if (withUncommited && repo.HasUncommitedChanges)
             {
-                console.MarkupLineInterpolated($"[yellow]⚠[/] [grey]{repo.HierarchicalName} has uncommitted changes. Stashing them.[/]");
+                progress?.Invoke($"[yellow]⚠[/] [grey]{repo.HierarchicalName} has uncommitted changes. Stashing them.[/]");
                 hasStash = await StashAsync(repo.RepoPath, includeUntracked: true).ConfigureAwait(false);
             }
 
             if (repo.LocalBranches.Count == 0)
             {
                 progress?.Invoke($"[red]✗[/] [grey]{repo.HierarchicalName} has no local branches. Skipping.[/]");
+
                 return false;
             }
 
-            var allBranchesOk = true;
-            foreach (var branch in repo.LocalBranches)
-            {
-                var branchOk = await SynchronizeBranchAsync(branch, pushNewBranches).ConfigureAwait(false);
-
-                if (branchOk)
-                    continue;
-
-                progress?.Invoke($"[red]✗[/] [grey]{repo.HierarchicalName} failed to synchronize branch {branch.Name}.[/]");
-                allBranchesOk = false;
-            }
+            var allBranchesOk = await SynchronizeAllBranchesAsync(repo, progress, pushNewBranches).ConfigureAwait(false);
 
             if (!string.IsNullOrWhiteSpace(repo.CurrentBranch))
                 await CheckoutAsync(repo.RepoPath, repo.CurrentBranch).ConfigureAwait(false);
@@ -670,5 +665,38 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
 
             return false;
         }
+    }
+
+    /// <summary>
+    /// Synchronizes all branches of a given repository.
+    /// </summary>
+    /// <param name="repo">
+    /// The repository to synchronize.
+    /// </param>
+    /// <param name="progress">
+    /// An optional action to report progress messages.
+    /// </param>
+    /// <param name="pushNewBranches">
+    /// true to push new branches to the remote repository; otherwise, false.
+    /// </param>
+    /// <returns>
+    /// true if all branches were successfully synchronized; otherwise, false.
+    /// </returns>
+    private async Task<bool> SynchronizeAllBranchesAsync(GitRepositoryStatus repo, Action<FormattableString>? progress, bool pushNewBranches)
+    {
+        var allBranchesOk = true;
+
+        foreach (var branch in repo.LocalBranches)
+        {
+            var branchOk = await SynchronizeBranchAsync(branch, pushNewBranches).ConfigureAwait(false);
+
+            if (branchOk)
+                continue;
+
+            progress?.Invoke($"[red]✗[/] [grey]{repo.HierarchicalName} failed to synchronize branch {branch.Name}.[/]");
+            allBranchesOk = false;
+        }
+
+        return allBranchesOk;
     }
 }

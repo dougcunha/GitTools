@@ -157,7 +157,9 @@ public sealed class BulkRestoreCommandTests
         // Arrange
         var repos = new List<GitRepository>
         {
-            new() { Name = "repo1", Path = "repo1", RemoteUrl = "https://example.com/r1.git", IsValid = true }
+            new() { Name = "repo1", Path = "repo1", RemoteUrl = "https://example.com/r1.git", IsValid = true },
+            new() { Name = "repo2", Path = "repo2", RemoteUrl = "git@example:example.com/r1.git", IsValid = true },
+            new() { Name = "repo3", Path = "repo3", RemoteUrl = "invalid.com/r1.git", IsValid = true },
         };
 
         var json = JsonSerializer.Serialize(repos, GitRepository.JsonSerializerOptions);

@@ -311,7 +311,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_OUTPUT));
@@ -333,7 +333,7 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == "tag -l" &&
                 psi.WorkingDirectory == REPO_PATH),
@@ -349,7 +349,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
@@ -380,7 +380,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_OUTPUT));
@@ -414,7 +414,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_OUTPUT));
@@ -448,7 +448,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_OUTPUT));
@@ -485,7 +485,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_OUTPUT));
@@ -520,7 +520,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_OUTPUT));
@@ -545,7 +545,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
@@ -632,7 +632,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(SPECIAL_TAG));
@@ -662,7 +662,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(Arg.Any<string>()).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_OUTPUT));
@@ -992,7 +992,7 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "powershell" &&
                 psi.Arguments.Contains($"Remove-Item -Recurse -Force '{REPOSITORY_PATH}'")),
             Arg.Any<DataReceivedEventHandler>(),
@@ -1059,8 +1059,8 @@ public sealed class GitServiceTests
         var console = new TestConsole();
         var gitService = new GitService(fileSystem, processRunner, console);
 
-        processRunner.When(x => x.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>()))
-            .Do(_ => throw new Exception(ERROR_MESSAGE));
+        processRunner.When(static x => x.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>()))
+            .Do(static _ => throw new Exception(ERROR_MESSAGE));
 
         // Act
         var result = await gitService.DeleteLocalGitRepositoryAsync(REPOSITORY_PATH);
@@ -1164,7 +1164,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var result = await _gitService.HasUncommittedChangesAsync(REPO_PATH);
@@ -1208,7 +1208,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 var psi = callInfo.ArgAt<ProcessStartInfo>(0);
@@ -1250,7 +1250,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 var psi = callInfo.ArgAt<ProcessStartInfo>(0);
@@ -1285,7 +1285,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_COUNT_OUTPUT));
@@ -1301,7 +1301,7 @@ public sealed class GitServiceTests
         result.behind.ShouldBe(0);
 
         await _processRunner.Received(1).RunAsync(
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments.Contains("rev-list") &&
                 !psi.Arguments.Contains("fetch")),
@@ -1343,7 +1343,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var result = await _gitService.GetRemoteAheadBehindCountAsync(REPO_PATH, BRANCH_NAME);
@@ -1367,7 +1367,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 var psi = callInfo.ArgAt<ProcessStartInfo>(0);
@@ -1401,7 +1401,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_FETCH_OUTPUT));
@@ -1417,7 +1417,7 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == "fetch --all --tags" &&
                 psi.WorkingDirectory == REPO_PATH),
@@ -1435,7 +1435,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_FETCH_OUTPUT));
@@ -1451,7 +1451,7 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == "fetch --all --tags --prune" &&
                 psi.WorkingDirectory == REPO_PATH),
@@ -1509,7 +1509,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var result = await _gitService.FetchAsync(REPO_PATH);
@@ -1554,7 +1554,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_PUSH_OUTPUT));
@@ -1571,7 +1571,7 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == $"push --set-upstream origin {BRANCH_NAME}" &&
                 psi.WorkingDirectory == REPO_PATH),
@@ -1592,7 +1592,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_OUTPUT));
@@ -1609,7 +1609,7 @@ public sealed class GitServiceTests
         // Verify all three commands were executed in sequence
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.Arguments == $"branch --quiet --set-upstream-to=origin/{BRANCH_NAME} {BRANCH_NAME}"),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
@@ -1617,7 +1617,7 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.Arguments == $"checkout {BRANCH_NAME}"),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
@@ -1625,7 +1625,7 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.Arguments == $"rebase --autostash origin/{BRANCH_NAME}"),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
@@ -1688,7 +1688,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var result = await _gitService.SynchronizeBranchAsync(trackedBranch);
@@ -1723,11 +1723,11 @@ public sealed class GitServiceTests
             {
                 var startInfo = info.Arg<ProcessStartInfo>();
 
-                if (startInfo.Arguments.StartsWith("checkout main"))
+                if (startInfo.Arguments.StartsWith("checkout main", StringComparison.Ordinal))
                     checkoutMainCalled = true;
-                else if (startInfo.Arguments.StartsWith("rebase --autostash origin/main"))
+                else if (startInfo.Arguments.StartsWith("rebase --autostash origin/main", StringComparison.Ordinal))
                     rebaseAutoStashCalled = true;
-                else if (startInfo.Arguments.StartsWith("branch --quiet --set-upstream-to=origin/main"))
+                else if (startInfo.Arguments.StartsWith("branch --quiet --set-upstream-to=origin/main", StringComparison.Ordinal))
                     setUpstreamCalled = true;
             }
         );
@@ -1839,9 +1839,9 @@ public sealed class GitServiceTests
             {
                 var startInfo = info.Arg<ProcessStartInfo>();
 
-                if (startInfo.Arguments.StartsWith("stash pop"))
+                if (startInfo.Arguments.StartsWith("stash pop", StringComparison.Ordinal))
                     stashPopCalled = true;
-                else if (startInfo.Arguments.StartsWith("stash"))
+                else if (startInfo.Arguments.StartsWith("stash", StringComparison.Ordinal))
                     stashCalled = true;
             }
         );
@@ -1891,8 +1891,10 @@ public sealed class GitServiceTests
         var branch = new BranchStatus(REPO_PATH, "main", "origin/main", true, 0, 0);
         var repo = new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, REMOTE_URL, false, [branch]);
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
             .Returns(0);
+
         string? progressMsg = null;
 
         // Act
@@ -1926,10 +1928,12 @@ public sealed class GitServiceTests
             if (!shouldThrow)
             {
                 _console.MarkupLineInterpolated(msg);
+
                 return;
             }
 
             shouldThrow = false;
+
             throw new InvalidOperationException("Unexpected error");
         }
 
@@ -1950,7 +1954,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_STASH_OUTPUT));
@@ -1966,7 +1970,7 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == "stash" &&
                 psi.WorkingDirectory == REPO_PATH),
@@ -1984,7 +1988,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_STASH_OUTPUT));
@@ -2000,7 +2004,7 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == "stash --include-untracked" &&
                 psi.WorkingDirectory == REPO_PATH),
@@ -2058,7 +2062,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var result = await _gitService.StashAsync(REPO_PATH);
@@ -2129,7 +2133,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 var psi = callInfo.ArgAt<ProcessStartInfo>(0);
@@ -2170,7 +2174,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var result = await _gitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIR);        // Assert
@@ -2185,6 +2189,7 @@ public sealed class GitServiceTests
     }
 
     [Fact]
+    // ReSharper disable once CognitiveComplexity
     public async Task GetRepositoryStatusAsync_WithMultipleBranches_ShouldReturnCompleteStatusWithAllBranches()
     {
         // Arrange
@@ -2198,7 +2203,7 @@ public sealed class GitServiceTests
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
             // ReSharper disable once CyclomaticComplexity
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 var psi = callInfo.ArgAt<ProcessStartInfo>(0);
@@ -2210,8 +2215,8 @@ public sealed class GitServiceTests
                 }
                 else if (psi.Arguments.Contains("branch --format"))
                 {
-                    var branches = $"'{MAIN_BRANCH}'\n'{FEATURE_BRANCH}'\n'{DEVELOP_BRANCH}'";
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(branches));
+                    const string BRANCHES = $"'{MAIN_BRANCH}'\n'{FEATURE_BRANCH}'\n'{DEVELOP_BRANCH}'";
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(BRANCHES));
                 }
                 else if (psi.Arguments.Contains("status --porcelain"))
                 {
@@ -2270,7 +2275,7 @@ public sealed class GitServiceTests
         result.HasErros.ShouldBeFalse();
 
         // Verify main branch details
-        var mainBranch = result.LocalBranches.FirstOrDefault(b => b.Name == MAIN_BRANCH);
+        var mainBranch = result.LocalBranches.FirstOrDefault(static b => b.Name == MAIN_BRANCH);
         mainBranch.ShouldNotBeNull();
         mainBranch.IsCurrent.ShouldBeTrue();
         mainBranch.IsTracked.ShouldBeTrue();
@@ -2279,7 +2284,7 @@ public sealed class GitServiceTests
         mainBranch.RemoteBehindCount.ShouldBe(2);
 
         // Verify develop branch details
-        var developBranch = result.LocalBranches.FirstOrDefault(b => b.Name == DEVELOP_BRANCH);
+        var developBranch = result.LocalBranches.FirstOrDefault(static b => b.Name == DEVELOP_BRANCH);
         developBranch.ShouldNotBeNull();
         developBranch.IsCurrent.ShouldBeFalse();
         developBranch.IsTracked.ShouldBeTrue();
@@ -2288,7 +2293,7 @@ public sealed class GitServiceTests
         developBranch.RemoteBehindCount.ShouldBe(0);
 
         // Verify feature branch details
-        var featureBranch = result.LocalBranches.FirstOrDefault(b => b.Name == FEATURE_BRANCH);
+        var featureBranch = result.LocalBranches.FirstOrDefault(static b => b.Name == FEATURE_BRANCH);
         featureBranch.ShouldNotBeNull();
         featureBranch.IsCurrent.ShouldBeFalse();
         featureBranch.IsTracked.ShouldBeFalse();
@@ -2308,11 +2313,13 @@ public sealed class GitServiceTests
         // Arrange
         const string BRANCH_NAME = "main";
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(BRANCH_NAME));
+
                 return 0;
             });
 
@@ -2330,11 +2337,13 @@ public sealed class GitServiceTests
         const string BRANCH_NAME = "main";
         const string CURRENT_BRANCH = "develop";
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(CURRENT_BRANCH));
+
                 return 0;
             });
 
@@ -2358,7 +2367,9 @@ public sealed class GitServiceTests
 
         // Assert
         result.ShouldBeFalse();
-        await _processRunner.DidNotReceive().RunAsync(
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
             Arg.Any<ProcessStartInfo>(),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
@@ -2372,8 +2383,9 @@ public sealed class GitServiceTests
         const string BRANCH_NAME = "main";
         const string ERROR_MESSAGE = "Git error";
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var result = await _gitService.IsCurrentBranchAsync(REPO_PATH, BRANCH_NAME);
@@ -2392,15 +2404,18 @@ public sealed class GitServiceTests
         const string BRANCH_NAME = "main";
         const string UPSTREAM = "origin/main";
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 var psi = callInfo.ArgAt<ProcessStartInfo>(0);
+
                 if (psi.Arguments.Contains("for-each-ref"))
                     outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(UPSTREAM));
                 else if (psi.Arguments.Contains("show-ref"))
                     outputHandler?.Invoke(null!, CreateDataReceivedEventArgs($"abc123 refs/remotes/{UPSTREAM}"));
+
                 return 0;
             });
 
@@ -2418,15 +2433,18 @@ public sealed class GitServiceTests
         // Arrange
         const string BRANCH_NAME = "feature/no-upstream";
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
+            .Returns(static callInfo =>
             {
                 var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
                 var psi = callInfo.ArgAt<ProcessStartInfo>(0);
+
                 if (psi.Arguments.Contains("for-each-ref"))
                     outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
                 else if (psi.Arguments.Contains("show-ref"))
                     outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
+
                 return 0;
             });
 
@@ -2452,7 +2470,9 @@ public sealed class GitServiceTests
         // Assert
         isTracked.ShouldBeFalse();
         upstream.ShouldBeNull();
-        await _processRunner.DidNotReceive().RunAsync(
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
             Arg.Any<ProcessStartInfo>(),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
@@ -2466,8 +2486,9 @@ public sealed class GitServiceTests
         const string BRANCH_NAME = "main";
         const string ERROR_MESSAGE = "Git error";
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var (isTracked, upstream) = await _gitService.IsBranchTrackedAsync(REPO_PATH, BRANCH_NAME);
@@ -2503,7 +2524,8 @@ public sealed class GitServiceTests
         result.ShouldBeTrue();
         callCount.ShouldBe(2); // push branch + push --tags
 
-        await _processRunner.Received(1).RunAsync(
+        await _processRunner.Received(1).RunAsync
+        (
             Arg.Is<ProcessStartInfo>(psi =>
                 psi.FileName == "git" &&
                 psi.Arguments.Contains("push") &&
@@ -2512,7 +2534,8 @@ public sealed class GitServiceTests
             Arg.Any<DataReceivedEventHandler>()
         );
 
-        await _processRunner.Received(1).RunAsync(
+        await _processRunner.Received(1).RunAsync
+        (
             Arg.Is<ProcessStartInfo>(psi =>
                 psi.FileName == "git" &&
                 psi.Arguments.Contains("push --tags")),
@@ -2533,6 +2556,7 @@ public sealed class GitServiceTests
             .Returns(_ =>
             {
                 callCount++;
+
                 return 0;
             });
 
@@ -2543,7 +2567,8 @@ public sealed class GitServiceTests
         result.ShouldBeTrue();
         callCount.ShouldBe(2); // push branch + push --tags
 
-        await _processRunner.Received(1).RunAsync(
+        await _processRunner.Received(1).RunAsync
+        (
             Arg.Is<ProcessStartInfo>(psi =>
                 psi.FileName == "git" &&
                 psi.Arguments.Contains("push --force") &&
@@ -2565,6 +2590,7 @@ public sealed class GitServiceTests
             .Returns(_ =>
             {
                 callCount++;
+
                 return 0;
             });
 
@@ -2575,7 +2601,8 @@ public sealed class GitServiceTests
         result.ShouldBeTrue();
         callCount.ShouldBe(1); // apenas push branch
 
-        await _processRunner.Received(1).RunAsync(
+        await _processRunner.Received(1).RunAsync
+        (
             Arg.Is<ProcessStartInfo>(psi =>
                 psi.FileName == "git" &&
                 psi.Arguments.Contains("push") &&
@@ -2615,7 +2642,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var result = await _gitService.PushAsync(REPO_PATH, BRANCH_NAME);
@@ -2634,6 +2661,7 @@ public sealed class GitServiceTests
         const string BRANCH_NAME = "feature/test";
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
         var called = false;
+
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
             .Returns(_ => { called = true; return 0; });
 
@@ -2642,7 +2670,9 @@ public sealed class GitServiceTests
 
         // Assert
         called.ShouldBeTrue();
-        await _processRunner.Received(1).RunAsync(
+
+        await _processRunner.Received(1).RunAsync
+        (
             Arg.Is<ProcessStartInfo>(psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == $"checkout {BRANCH_NAME}" &&
@@ -2697,8 +2727,9 @@ public sealed class GitServiceTests
         const string BRANCH_NAME = "feature/test";
         const string ERROR_MESSAGE = "Checkout failed";
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         await _gitService.CheckoutAsync(REPO_PATH, BRANCH_NAME);
@@ -2715,14 +2746,17 @@ public sealed class GitServiceTests
         // Arrange
         const string GIT_OUTPUT = "main\ndevelop\nfeature/test-1\n";
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
-        _processRunner.RunAsync(
+
+        _processRunner.RunAsync
+        (
             Arg.Any<ProcessStartInfo>(),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
-        ).Returns(callInfo =>
+        ).Returns(static callInfo =>
         {
             var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
             outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_OUTPUT));
+
             return 0;
         });
 
@@ -2748,10 +2782,11 @@ public sealed class GitServiceTests
             Arg.Any<ProcessStartInfo>(),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
-        ).Returns(callInfo =>
+        ).Returns(static callInfo =>
         {
             var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
             outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
+
             return 0;
         });
 
@@ -2775,10 +2810,11 @@ public sealed class GitServiceTests
             Arg.Any<ProcessStartInfo>(),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
-        ).Returns(callInfo =>
+        ).Returns(static callInfo =>
         {
             var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
             outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GIT_OUTPUT));
+
             return 0;
         });
 
@@ -2824,7 +2860,7 @@ public sealed class GitServiceTests
             Arg.Any<ProcessStartInfo>(),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
-        ).Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+        ).Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var result = await _gitService.GetLocalBranchesAsync(REPO_PATH);
@@ -2899,7 +2935,7 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == "stash pop" &&
                 psi.WorkingDirectory == REPO_PATH),
@@ -2920,7 +2956,7 @@ public sealed class GitServiceTests
             Arg.Any<ProcessStartInfo>(),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
-        ).Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+        ).Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
         var result = await _gitService.PopAsync(REPO_PATH);

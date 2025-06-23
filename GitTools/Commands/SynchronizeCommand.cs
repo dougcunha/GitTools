@@ -156,7 +156,16 @@ public sealed class SynchronizeCommand : Command
         foreach (var repo in toUpdate)
         {
             task.Description($"Updating {repo.HierarchicalName}...");
-            var ok = await _gitService.SynchronizeRepositoryAsync(repo, msg => _console.MarkupLineInterpolated(msg), withUncommited, pushUntrackedBranches);
+
+            var ok = await _gitService
+                .SynchronizeRepositoryAsync
+                (
+                    repo,
+                    msg => _console.MarkupLineInterpolated(msg),
+                    withUncommited,
+                    pushUntrackedBranches
+                )
+                .ConfigureAwait(false);
 
             if (ok)
                 success++;
@@ -192,6 +201,7 @@ public sealed class SynchronizeCommand : Command
         foreach (var repo in repoPaths)
         {
             task.Description($"Checking {_displayService.GetHierarchicalName(repo, rootDirectory)}...");
+
             try
             {
                 var repoStatus = await _gitService.GetRepositoryStatusAsync(repo, rootDirectory).ConfigureAwait(false);
