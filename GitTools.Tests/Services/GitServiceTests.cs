@@ -2085,7 +2085,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(NON_EXISTENT_REPO_PATH).Returns(false);
 
         // Act
-        var result = await _gitService.GetRepositoryStatusAsync(NON_EXISTENT_REPO_PATH, ROOT_DIR);
+        var result = await _gitService.GetRepositoryStatusAsync(NON_EXISTENT_REPO_PATH, ROOT_DIR, true);
 
         // Assert
         result.ShouldNotBeNull();
@@ -2109,7 +2109,7 @@ public sealed class GitServiceTests
 
         // Act
 
-        var result = await _gitService.GetRepositoryStatusAsync(NULL_REPO_PATH!, ROOT_DIR);
+        var result = await _gitService.GetRepositoryStatusAsync(NULL_REPO_PATH!, ROOT_DIR, true);
 
         // Assert
         result.ShouldNotBeNull();
@@ -2151,7 +2151,7 @@ public sealed class GitServiceTests
             });
 
         // Act
-        var result = await _gitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIR);
+        var result = await _gitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIR, true);
 
         // Assert
         result.ShouldNotBeNull();
@@ -2177,7 +2177,7 @@ public sealed class GitServiceTests
             .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
-        var result = await _gitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIR);        // Assert
+        var result = await _gitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIR, true);        // Assert
         result.ShouldNotBeNull();
         result.Name.ShouldBe("repo");
         result.RepoPath.ShouldBe(REPO_PATH);
@@ -2262,7 +2262,7 @@ public sealed class GitServiceTests
             });
 
         // Act
-        var result = await _gitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIR);        // Assert
+        var result = await _gitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIR, true);        // Assert
         result.ShouldNotBeNull();
         result.Name.ShouldBe("repo");
         result.HierarchicalName.ShouldBe("../test/repo");

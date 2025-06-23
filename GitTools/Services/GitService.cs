@@ -472,7 +472,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     }
 
     /// <inheritdoc/>
-    public async Task<GitRepositoryStatus> GetRepositoryStatusAsync(string repositoryPath, string rootDir)
+    public async Task<GitRepositoryStatus> GetRepositoryStatusAsync(string repositoryPath, string rootDir, bool fetch = true)
     {
         if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
         {
@@ -494,7 +494,8 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
                 return new GitRepositoryStatus(Path.GetFileName(repositoryPath), hierarchicalName, repositoryPath, remoteUrl, false, [], "No local branches found.");
 
             List<BranchStatus> branchStatuses = [];
-            await FetchAsync(repositoryPath, true).ConfigureAwait(false);
+            if (fetch)
+                await FetchAsync(repositoryPath, true).ConfigureAwait(false);
 
             foreach (var branch in branches
                 .Where(static b => !b.Contains("HEAD", StringComparison.OrdinalIgnoreCase) && !b.Contains("detached", StringComparison.OrdinalIgnoreCase)))

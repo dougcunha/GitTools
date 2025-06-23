@@ -189,12 +189,14 @@ GitTools restore repos.json <target-directory> --force-ssh
 Detect repositories that are behind the specified branch and optionally update them.
 
 ```sh
-GitTools sync <root-directory> [--show-only] [--with-uncommitted]
+GitTools sync <root-directory> [--show-only] [--with-uncommitted] [--no-fetch]
 ```
 
 By default repositories with uncommitted changes are skipped. Use `--with-uncommitted` to include them; any changes are stashed before updating.
 
 Use `--show-only` if you want to see what is new without changing anything on local repository.
+
+Use `--no-fetch` to skip fetching updates from the remote server before checking each repository.
 
 ## Build
 

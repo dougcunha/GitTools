@@ -194,10 +194,11 @@ public interface IGitService
     ///     The path to the git repository to get the status of.
     /// </param>
     /// <param name="rootDir"></param>
+    /// <param name="fetch">true to fetch updates before gathering status; otherwise, false.</param>
     /// <returns>
     /// A instance of <see cref="GitRepositoryStatus"/> containing the repository's status information.
     /// </returns>
-    Task<GitRepositoryStatus> GetRepositoryStatusAsync(string repositoryPath, string rootDir);
+    Task<GitRepositoryStatus> GetRepositoryStatusAsync(string repositoryPath, string rootDir, bool fetch = true);
 
     /// <summary>
     /// Checks if a specific branch is tracked by the remote repository.

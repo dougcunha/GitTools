@@ -28,12 +28,14 @@ public sealed class SynchronizeCommand : Command
         var withUncommitedOption = new Option<bool>("--with-uncommitted", "Try to update repositories with uncommitted changes");
         var pushUntrackedBranchesOption = new Option<bool>("--push-untracked", "Push untracked branches to the remote repository");
         var automaticOption = new Option<bool>("--automatic", "Run the command without user interaction (useful for scripts)");
+        var noFetchOption = new Option<bool>("--no-fetch", "Do not fetch from remote before checking repositories");
 
         AddArgument(rootArg);
         AddOption(showOnlyOption);
         AddOption(withUncommitedOption);
         AddOption(pushUntrackedBranchesOption);
         AddOption(automaticOption);
+        AddOption(noFetchOption);
 
         this.SetHandler
         (
@@ -42,11 +44,12 @@ public sealed class SynchronizeCommand : Command
             showOnlyOption,
             withUncommitedOption,
             pushUntrackedBranchesOption,
-            automaticOption
+            automaticOption,
+            noFetchOption
         );
     }
 
-    private async Task ExecuteAsync(string rootDirectory, bool showOnly, bool withUncommited, bool pushUntrackedBranches, bool automatic)
+    private async Task ExecuteAsync(string rootDirectory, bool showOnly, bool withUncommited, bool pushUntrackedBranches, bool automatic, bool noFetch)
     {
         var repoPaths = _console.Status()
             .Start
@@ -73,7 +76,7 @@ public sealed class SynchronizeCommand : Command
                 new PercentageColumn(),
                 new SpinnerColumn(),
                 new TaskDescriptionColumn())
-            .StartAsync(ctx => GetRepositoriesStatusAsync(ctx, repoPaths, rootDirectory))
+            .StartAsync(ctx => GetRepositoriesStatusAsync(ctx, repoPaths, rootDirectory, !noFetch))
             .ConfigureAwait(false);
 
         var outdatedRepos = reposStatus
@@ -199,7 +202,8 @@ public sealed class SynchronizeCommand : Command
     (
         ProgressContext ctx,
         List<string> repoPaths,
-        string rootDirectory
+        string rootDirectory,
+        bool fetch
     )
     {
         var statuses = new List<GitRepositoryStatus>();
@@ -212,7 +216,7 @@ public sealed class SynchronizeCommand : Command
 
             try
             {
-                var repoStatus = await _gitService.GetRepositoryStatusAsync(repo, rootDirectory).ConfigureAwait(false);
+                var repoStatus = await _gitService.GetRepositoryStatusAsync(repo, rootDirectory, fetch).ConfigureAwait(false);
 
                 statuses.Add(repoStatus);
             }
