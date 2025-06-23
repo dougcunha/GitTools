@@ -494,6 +494,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
                 return new GitRepositoryStatus(Path.GetFileName(repositoryPath), hierarchicalName, repositoryPath, remoteUrl, false, [], "No local branches found.");
 
             List<BranchStatus> branchStatuses = [];
+
             if (fetch)
                 await FetchAsync(repositoryPath, true).ConfigureAwait(false);
 
