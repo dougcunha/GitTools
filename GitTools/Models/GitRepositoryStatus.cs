@@ -43,7 +43,7 @@ public sealed record GitRepositoryStatus
     /// Gets a value indicating whether the repository is valid.
     /// A repository is considered valid if it has no errors and has a remote URL.
     /// </summary>
-    public bool HasErros
+    public bool HasErrors
         => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     /// <summary>

@@ -25,7 +25,7 @@ public sealed class SynchronizeCommand : Command
 
         var rootArg = new Argument<string>("root-directory", "Root directory of git repositories");
         var showOnlyOption = new Option<bool>("--show-only", "Do not update repositories, just show which ones are outdated");
-        var withUncommitedOption = new Option<bool>("--with-uncommited", "Try to update repositories with uncommitted changes");
+        var withUncommitedOption = new Option<bool>("--with-uncommitted", "Try to update repositories with uncommitted changes");
         var pushUntrackedBranchesOption = new Option<bool>("--push-untracked", "Push untracked branches to the remote repository");
         var automaticOption = new Option<bool>("--automatic", "Run the command without user interaction (useful for scripts)");
 
@@ -35,7 +35,15 @@ public sealed class SynchronizeCommand : Command
         AddOption(pushUntrackedBranchesOption);
         AddOption(automaticOption);
 
-        this.SetHandler(ExecuteAsync, rootArg, showOnlyOption, withUncommitedOption, pushUntrackedBranchesOption, automaticOption);
+        this.SetHandler
+        (
+            ExecuteAsync,
+            rootArg,
+            showOnlyOption,
+            withUncommitedOption,
+            pushUntrackedBranchesOption,
+            automaticOption
+        );
     }
 
     private async Task ExecuteAsync(string rootDirectory, bool showOnly, bool withUncommited, bool pushUntrackedBranches, bool automatic)

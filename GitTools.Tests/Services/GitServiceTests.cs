@@ -2096,7 +2096,7 @@ public sealed class GitServiceTests
         result.HasUncommitedChanges.ShouldBeFalse();
         result.LocalBranches.ShouldBeEmpty();
         result.ErrorMessage.ShouldBe(EXPECTED_ERROR);
-        result.HasErros.ShouldBeTrue();
+        result.HasErrors.ShouldBeTrue();
     }
 
     [Fact]
@@ -2119,7 +2119,7 @@ public sealed class GitServiceTests
         result.HasUncommitedChanges.ShouldBeFalse();
         result.LocalBranches.ShouldBeEmpty();
         result.ErrorMessage.ShouldBe(EXPECTED_ERROR);
-        result.HasErros.ShouldBeTrue();
+        result.HasErrors.ShouldBeTrue();
     }
 
     [Fact]
@@ -2161,7 +2161,7 @@ public sealed class GitServiceTests
         result.HasUncommitedChanges.ShouldBeFalse();
         result.LocalBranches.ShouldBeEmpty();
         result.ErrorMessage.ShouldBe(EXPECTED_ERROR);
-        result.HasErros.ShouldBeTrue();
+        result.HasErrors.ShouldBeTrue();
     }
 
     [Fact]
@@ -2185,7 +2185,7 @@ public sealed class GitServiceTests
         result.HasUncommitedChanges.ShouldBeFalse();
         result.LocalBranches.ShouldBeEmpty();
         result.ErrorMessage.ShouldBe(ERROR_MESSAGE);
-        result.HasErros.ShouldBeTrue();
+        result.HasErrors.ShouldBeTrue();
     }
 
     [Fact]
@@ -2272,7 +2272,7 @@ public sealed class GitServiceTests
         result.LocalBranches.ShouldNotBeEmpty();
         result.LocalBranches.Count.ShouldBe(3);
         result.ErrorMessage.ShouldBeNull();
-        result.HasErros.ShouldBeFalse();
+        result.HasErrors.ShouldBeFalse();
 
         // Verify main branch details
         var mainBranch = result.LocalBranches.FirstOrDefault(static b => b.Name == MAIN_BRANCH);

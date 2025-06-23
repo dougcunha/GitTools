@@ -69,7 +69,7 @@ public sealed class ConsoleDisplayService(IAnsiConsole console) : IConsoleDispla
             var commitsAhead = repo.LocalBranches.Sum(static b => b.RemoteAheadCount);
             var commitsBehind = repo.LocalBranches.Sum(static b => b.RemoteBehindCount);
 
-            var errorIndicator = repo.HasErros
+            var errorIndicator = repo.HasErrors
                 ? "[red]x[/]"
                 : string.Empty;
 
