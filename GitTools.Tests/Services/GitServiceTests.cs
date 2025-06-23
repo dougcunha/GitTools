@@ -177,6 +177,44 @@ public sealed class GitServiceTests
     }
 
     [Fact]
+    public async Task RunGitCommandAsync_WithLogGitCommandsOption_ShouldWriteGitCommandsToConsole()
+    {
+        // Arrange
+        const string GIT_ARGUMENTS = "status";
+        var gitPath = Path.Combine(REPO_PATH, GIT_DIR);
+        _fileSystem.Directory.Exists(gitPath).Returns(true);
+        _options.LogAllGitCommands = true;
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(0);
+
+        // Act
+        _ = await _gitService.RunGitCommandAsync(REPO_PATH, GIT_ARGUMENTS);
+
+        // Assert
+        _console.Output.ShouldContain($"{REPO_PATH}> git {GIT_ARGUMENTS}");
+    }
+
+    [Fact]
+    public async Task RunGitCommandAsync_WithNoLogGitCommandsOption_ShouldNotWriteGitCommandsToConsole()
+    {
+        // Arrange
+        const string GIT_ARGUMENTS = "status";
+        var gitPath = Path.Combine(REPO_PATH, GIT_DIR);
+        _fileSystem.Directory.Exists(gitPath).Returns(true);
+        _options.LogAllGitCommands = false;
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(0);
+
+        // Act
+        _ = await _gitService.RunGitCommandAsync(REPO_PATH, GIT_ARGUMENTS);
+
+        // Assert
+        _console.Output.ShouldNotContain($"{REPO_PATH}> git {GIT_ARGUMENTS}");
+    }
+
+    [Fact]
     public async Task RunGitCommandAsync_WhenGitWorktree_ShouldUseMainRepoPath()
     {
         // Arrange

@@ -5,6 +5,9 @@ using GitTools.Services;
 using GitTools.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
+using System.CommandLine.Builder;
+using System.CommandLine.Parsing;
+using System.CommandLine.Invocation;
 
 namespace GitTools;
 
@@ -54,16 +57,18 @@ public static class Startup
     /// <returns>
     /// The root command for the GitTools application.
     /// </returns>
-    public static RootCommand CreateRootCommand(this IServiceProvider serviceProvider)
+    public static (Parser parser, RootCommand rootCommand, InvocationMiddleware parseOptionsMiddleware) BuildCommand(this IServiceProvider serviceProvider)
     {
         var rootCommand = new RootCommand("GitTools - A tool for searching and removing tags in Git repositories.");
-
+        var logAllGitCommandsOption = new Option<bool>(["--log-all-git-commands", "-lg"], "Log all git commands to the console");
+        rootCommand.AddGlobalOption(logAllGitCommandsOption);
         var tagRemoveCommand = serviceProvider.GetRequiredService<TagRemoveCommand>();
         var tagListCommand = serviceProvider.GetRequiredService<TagListCommand>();
         var recloneCommand = serviceProvider.GetRequiredService<ReCloneCommand>();
         var bulkBackupCommand = serviceProvider.GetRequiredService<BulkBackupCommand>();
         var bulkRestoreCommand = serviceProvider.GetRequiredService<BulkRestoreCommand>();
         var outdatedCommand = serviceProvider.GetRequiredService<SynchronizeCommand>();
+        var gitToolsOptions = serviceProvider.GetRequiredService<GitToolsOptions>();
         rootCommand.AddCommand(tagRemoveCommand);
         rootCommand.AddCommand(tagListCommand);
         rootCommand.AddCommand(recloneCommand);
@@ -71,6 +76,19 @@ public static class Startup
         rootCommand.AddCommand(bulkRestoreCommand);
         rootCommand.AddCommand(outdatedCommand);
 
-        return rootCommand;
+        var builder = new CommandLineBuilder(rootCommand);
+
+        var parser = builder
+            .UseDefaults()
+            .AddMiddleware(ParseGlobalOptions).Build();
+
+        return (parser, rootCommand, ParseGlobalOptions);
+
+        Task ParseGlobalOptions(InvocationContext context, Func<InvocationContext, Task> next)
+        {
+            gitToolsOptions.LogAllGitCommands = context.ParseResult.GetValueForOption(logAllGitCommandsOption);
+
+            return next(context);
+        }
     }
 }

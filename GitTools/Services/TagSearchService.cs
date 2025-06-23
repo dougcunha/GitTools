@@ -9,6 +9,7 @@ public sealed class TagSearchService(IGitRepositoryScanner gitScanner, IGitServi
 {
     private static string GetRepositoryName(string path)
         => Path.GetFileName(path.Replace('\\', Path.DirectorySeparatorChar));
+
     /// <inheritdoc />
     public async Task<TagSearchResult> SearchRepositoriesWithTagsAsync
     (
@@ -30,7 +31,7 @@ public sealed class TagSearchService(IGitRepositoryScanner gitScanner, IGitServi
             {
                 var foundTags = await SearchTagsInRepositoryAsync(repo, tagsToSearch).ConfigureAwait(false);
 
-                if (foundTags.Count <= 0)
+                if (foundTags.Count == 0)
                     continue;
 
                 repositoriesWithTags.Add(repo);

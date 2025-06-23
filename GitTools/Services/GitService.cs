@@ -60,7 +60,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         var realWorkingDirectory = GetRealGitDirectory(workingDirectory);
 
         if (options.LogAllGitCommands)
-            console.MarkupLineInterpolated($"[grey]> git {arguments}[/]");
+            console.MarkupLineInterpolated($"[grey]{workingDirectory}> git {arguments}[/]");
 
         var output = new StringBuilder();
         var error = new StringBuilder();

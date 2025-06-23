@@ -118,6 +118,7 @@ public sealed class ReCloneCommand : Command
     private void GenerateRepositoryBackup(string repoPath, string parentDir, string repoName)
     {
         var backupDir = GetDirectory(repoPath);
+
         if (string.IsNullOrWhiteSpace(backupDir))
             backupDir = parentDir;
 
@@ -133,6 +134,7 @@ public sealed class ReCloneCommand : Command
     {
         var separator = directory.Contains('\\') ? '\\' : Path.DirectorySeparatorChar;
         directory = directory.TrimEnd('\n', '\r', '\\', '/');
+
         return string.Concat(directory, separator, fileName);
     }
 
@@ -141,6 +143,7 @@ public sealed class ReCloneCommand : Command
         var containsBackslash = path.Contains('\\');
         path = path.Replace('\\', Path.DirectorySeparatorChar);
         var dir = Path.GetDirectoryName(path) ?? string.Empty;
+
         return containsBackslash ? dir.Replace(Path.DirectorySeparatorChar, '\\') : dir;
     }
 
