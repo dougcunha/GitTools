@@ -38,6 +38,7 @@ GitTools is a command-line tool for managing Git repositories, including searchi
 - **Backup Creation**: Automatic ZIP backup creation before destructive operations
 - **Modern Terminal UI**: Built with [Spectre.Console](https://spectreconsole.net/) for beautiful interfaces
 - **Modern CLI Parsing**: Uses [System.CommandLine](https://github.com/dotnet/command-line-api) for extensible command-line parsing
+- **Global Logging Option**: Use `--log-all-git-commands` (`-lg`) to output every executed git command
 
 ## Commands
 

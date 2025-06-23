@@ -27,6 +27,7 @@ public sealed class StartupTests
         serviceProvider.GetService<IGitRepositoryScanner>().ShouldNotBeNull();
         serviceProvider.GetService<IFileSystem>().ShouldNotBeNull();
         serviceProvider.GetService<IGitService>().ShouldNotBeNull();
+        serviceProvider.GetService<GitTools.Models.GitToolsOptions>().ShouldNotBeNull();
         serviceProvider.GetService<TagRemoveCommand>().ShouldNotBeNull();
         serviceProvider.GetService<TagListCommand>().ShouldNotBeNull();
         serviceProvider.GetService<BulkBackupCommand>().ShouldNotBeNull();
@@ -54,6 +55,7 @@ public sealed class StartupTests
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
         var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
         var outdatedDescriptor = services.First(static s => s.ServiceType == typeof(SynchronizeCommand));
+        var optionsDescriptor = services.First(static s => s.ServiceType == typeof(GitTools.Models.GitToolsOptions));
 
         ansiConsoleDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         processRunnerDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
@@ -65,6 +67,7 @@ public sealed class StartupTests
         bulkBackupDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         bulkRestoreDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         outdatedDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+        optionsDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
     }
 
     [Fact]
@@ -85,6 +88,7 @@ public sealed class StartupTests
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
         var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
         var outdatedDescriptor = services.First(static s => s.ServiceType == typeof(SynchronizeCommand));
+        var optionsDescriptor = services.First(static s => s.ServiceType == typeof(GitTools.Models.GitToolsOptions));
 
         processRunnerDescriptor.ImplementationType.ShouldBe(typeof(ProcessRunner));
         gitScannerDescriptor.ImplementationType.ShouldBe(typeof(GitRepositoryScanner));
@@ -94,6 +98,7 @@ public sealed class StartupTests
         bulkBackupDescriptor.ImplementationType.ShouldBe(typeof(BulkBackupCommand));
         bulkRestoreDescriptor.ImplementationType.ShouldBe(typeof(BulkRestoreCommand));
         outdatedDescriptor.ImplementationType.ShouldBe(typeof(SynchronizeCommand));
+        optionsDescriptor.ImplementationType.ShouldBe(typeof(GitTools.Models.GitToolsOptions));
     }
 
     [Fact]

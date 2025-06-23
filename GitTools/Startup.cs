@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.IO.Abstractions;
 using GitTools.Commands;
 using GitTools.Services;
+using GitTools.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
@@ -28,6 +29,7 @@ public static class Startup
         services.AddSingleton<IGitRepositoryScanner, GitRepositoryScanner>();
         services.AddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<IGitService, GitService>();
+        services.AddSingleton<GitToolsOptions>();
         services.AddSingleton<IBackupService, ZipBackupService>();
         services.AddSingleton<TagRemoveCommand>();
         services.AddSingleton<TagListCommand>();

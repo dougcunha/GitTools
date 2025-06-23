@@ -11,7 +11,7 @@ namespace GitTools.Services;
 /// <summary>
 /// Provides tag-related operations for git repositories.
 /// </summary>
-public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner processRunner, IAnsiConsole console) : IGitService
+public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner processRunner, IAnsiConsole console, GitToolsOptions options) : IGitService
 {
     [GeneratedRegex(@"^\s*url\s*=\s*(.+)$")]
     private static partial Regex RegexUrl();
@@ -58,6 +58,9 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     public async Task<string> RunGitCommandAsync(string workingDirectory, string arguments)
     {
         var realWorkingDirectory = GetRealGitDirectory(workingDirectory);
+
+        if (options.LogAllGitCommands)
+            console.MarkupLineInterpolated($"[grey]> git {arguments}[/]");
 
         var output = new StringBuilder();
         var error = new StringBuilder();
@@ -463,6 +466,9 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     /// </returns>
     public static string GetHierarchicalName(string repositoryPath, string baseFolder)
     {
+        repositoryPath = repositoryPath.Replace('\\', Path.DirectorySeparatorChar);
+        baseFolder = baseFolder.Replace('\\', Path.DirectorySeparatorChar);
+
         var relativePath = Path.GetRelativePath(baseFolder, repositoryPath)
             .Replace(Path.DirectorySeparatorChar, '/');
 
@@ -471,12 +477,15 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             : relativePath;
     }
 
+    private static string GetRepositoryName(string path)
+        => Path.GetFileName(path.Replace('\\', Path.DirectorySeparatorChar));
+
     /// <inheritdoc/>
     public async Task<GitRepositoryStatus> GetRepositoryStatusAsync(string repositoryPath, string rootDir, bool fetch = true)
     {
         if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
         {
-            var safeName = string.IsNullOrWhiteSpace(repositoryPath) ? string.Empty : Path.GetFileName(repositoryPath);
+            var safeName = string.IsNullOrWhiteSpace(repositoryPath) ? string.Empty : GetRepositoryName(repositoryPath);
             var safeHierarchicalName = string.IsNullOrWhiteSpace(repositoryPath) ? string.Empty : GetHierarchicalName(repositoryPath, rootDir);
 
             return new GitRepositoryStatus(safeName, safeHierarchicalName, repositoryPath, null, false, [], "Repository does not exist.");
@@ -491,7 +500,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             var hasUncommittedChanges = await HasUncommittedChangesAsync(repositoryPath).ConfigureAwait(false);
 
             if (branches.Count == 0)
-                return new GitRepositoryStatus(Path.GetFileName(repositoryPath), hierarchicalName, repositoryPath, remoteUrl, false, [], "No local branches found.");
+                return new GitRepositoryStatus(GetRepositoryName(repositoryPath), hierarchicalName, repositoryPath, remoteUrl, false, [], "No local branches found.");
 
             List<BranchStatus> branchStatuses = [];
 
@@ -511,11 +520,11 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
                 branchStatuses.Add(new BranchStatus(repositoryPath, branch, upstream, isCurrent, aheadCount, behindCount));
             }
 
-            return new GitRepositoryStatus(Path.GetFileName(repositoryPath), hierarchicalName, repositoryPath, remoteUrl, hasUncommittedChanges, branchStatuses);
+            return new GitRepositoryStatus(GetRepositoryName(repositoryPath), hierarchicalName, repositoryPath, remoteUrl, hasUncommittedChanges, branchStatuses);
         }
         catch (Exception ex)
         {
-            return new GitRepositoryStatus(Path.GetFileName(repositoryPath), hierarchicalName, repositoryPath, null, false, [], ex.Message);
+            return new GitRepositoryStatus(GetRepositoryName(repositoryPath), hierarchicalName, repositoryPath, null, false, [], ex.Message);
         }
     }
 

@@ -117,12 +117,31 @@ public sealed class ReCloneCommand : Command
 
     private void GenerateRepositoryBackup(string repoPath, string parentDir, string repoName)
     {
-        var backupFile = Path.Combine(parentDir, $"{repoName}-backup.zip");
+        var backupDir = GetDirectory(repoPath);
+        if (string.IsNullOrWhiteSpace(backupDir))
+            backupDir = parentDir;
+
+        var backupFile = CombinePath(backupDir, $"{repoName}-backup.zip");
 
         _console.Status()
             .Start("[yellow]Creating backup...[/]", _ => _backupService.CreateBackup(repoPath, backupFile));
 
         _console.MarkupLineInterpolated($"[green]✓[/] [grey]Backup created: {backupFile}[/]");
+    }
+
+    private static string CombinePath(string directory, string fileName)
+    {
+        var separator = directory.Contains('\\') ? '\\' : Path.DirectorySeparatorChar;
+        directory = directory.TrimEnd('\n', '\r', '\\', '/');
+        return string.Concat(directory, separator, fileName);
+    }
+
+    private static string GetDirectory(string path)
+    {
+        var containsBackslash = path.Contains('\\');
+        path = path.Replace('\\', Path.DirectorySeparatorChar);
+        var dir = Path.GetDirectoryName(path) ?? string.Empty;
+        return containsBackslash ? dir.Replace(Path.DirectorySeparatorChar, '\\') : dir;
     }
 
     private string? RenameRepositoryDirectory(string repoPath)

@@ -1,14 +1,29 @@
-﻿using System.CommandLine;
+using System.CommandLine;
+using System.CommandLine.Builder;
+using System.CommandLine.Parsing;
 using System.Diagnostics;
 using GitTools;
+using GitTools.Models;
 using Microsoft.Extensions.DependencyInjection;
 
-var rootCommand = new ServiceCollection()
+var serviceProvider = new ServiceCollection()
     .RegisterServices()
-    .BuildServiceProvider()
-    .CreateRootCommand();
+    .BuildServiceProvider();
 
-await rootCommand.InvokeAsync(args).ConfigureAwait(false);
+var rootCommand = serviceProvider.CreateRootCommand();
+var logAllGitCommandsOption = new Option<bool>(["--log-all-git-commands", "-lg"], "Log all git commands to the console");
+rootCommand.AddGlobalOption(logAllGitCommandsOption);
+var opts = serviceProvider.GetRequiredService<GitToolsOptions>();
+
+var builder = new CommandLineBuilder(rootCommand)
+    .UseDefaults()
+    .AddMiddleware(async (context, next) =>
+    {
+        opts.LogAllGitCommands = context.ParseResult.GetValueForOption(logAllGitCommandsOption);
+        await next(context);
+    });
+
+await builder.Build().InvokeAsync(args).ConfigureAwait(false);
 
 if (Debugger.IsAttached)
 {

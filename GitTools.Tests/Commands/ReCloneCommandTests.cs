@@ -1,5 +1,6 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
+using System.IO;
 using GitTools.Commands;
 using GitTools.Models;
 using GitTools.Services;
@@ -23,7 +24,7 @@ public sealed class ReCloneCommandTests
     private const string REPO_PATH = @"C:\current\test-repo";
     private const string PARENT_DIR = @"C:\current";
     private const string REMOTE_URL = "https://github.com/user/test-repo.git";
-    private const string BACKUP_FILE = @"C:\current\test-repo-backup.zip";
+    private static readonly string BACKUP_FILE = Path.Combine(PARENT_DIR, $"{REPO_NAME}-backup.zip");
 
     public ReCloneCommandTests()
     {

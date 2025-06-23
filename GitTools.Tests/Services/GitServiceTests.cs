@@ -15,6 +15,7 @@ public sealed class GitServiceTests
     private readonly IFileSystem _fileSystem = Substitute.For<IFileSystem>();
     private readonly IProcessRunner _processRunner = Substitute.For<IProcessRunner>();
     private readonly TestConsole _console = new();
+    private readonly GitToolsOptions _options = new();
     private readonly GitService _gitService;
 
     private const string REPO_PATH = @"C:\test\repo";
@@ -25,7 +26,7 @@ public sealed class GitServiceTests
     private const string CURRENT_DIRECTORY = @"C:\current";
 
     public GitServiceTests()
-        => _gitService = new GitService(_fileSystem, _processRunner, _console);
+        => _gitService = new GitService(_fileSystem, _processRunner, _console, _options);
 
     private static DataReceivedEventArgs CreateDataReceivedEventArgs(string data)
     {
@@ -270,7 +271,7 @@ public sealed class GitServiceTests
         var fileSystem = new MockFileSystem();
         var processRunner = Substitute.For<IProcessRunner>();
         var console = Substitute.For<IAnsiConsole>();
-        var gitService = new GitService(fileSystem, processRunner, console);
+        var gitService = new GitService(fileSystem, processRunner, console, new GitToolsOptions());
         fileSystem.Directory.CreateDirectory(REPO_PATH);
         fileSystem.Directory.CreateDirectory(Path.Combine(REPO_PATH, GIT_DIR));
 
@@ -690,7 +691,7 @@ public sealed class GitServiceTests
         var fileSystem = new MockFileSystem();
         var processRunner = Substitute.For<IProcessRunner>();
         var console = Substitute.For<IAnsiConsole>();
-        var gitService = new GitService(fileSystem, processRunner, console);
+        var gitService = new GitService(fileSystem, processRunner, console, new GitToolsOptions());
 
         var gitPath = Path.Combine(REPO_NAME, GIT_DIR);
 
@@ -1032,7 +1033,7 @@ public sealed class GitServiceTests
         var fileSystem = new MockFileSystem();
         var processRunner = Substitute.For<IProcessRunner>();
         var console = new TestConsole();
-        var gitService = new GitService(fileSystem, processRunner, console);
+        var gitService = new GitService(fileSystem, processRunner, console, new GitToolsOptions());
         fileSystem.Directory.CreateDirectory(REPOSITORY_PATH);
 
         processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
@@ -1057,7 +1058,7 @@ public sealed class GitServiceTests
         fileSystem.Directory.CreateDirectory(REPOSITORY_PATH);
         var processRunner = Substitute.For<IProcessRunner>();
         var console = new TestConsole();
-        var gitService = new GitService(fileSystem, processRunner, console);
+        var gitService = new GitService(fileSystem, processRunner, console, new GitToolsOptions());
 
         processRunner.When(static x => x.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>()))
             .Do(static _ => throw new Exception(ERROR_MESSAGE));
