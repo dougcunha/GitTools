@@ -69,7 +69,7 @@ public sealed class SynchronizeCommand : Command
             .ConfigureAwait(false);
 
         var outdatedRepos = reposStatus
-            .Where(r => !r.AreBranchesSynced)
+            .Where(static r => !r.AreBranchesSynced)
             .ToList();
 
         if (outdatedRepos.Count == 0)

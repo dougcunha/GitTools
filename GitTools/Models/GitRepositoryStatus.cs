@@ -28,7 +28,7 @@ namespace GitTools.Models;
 /// An optional error message if there was an issue retrieving the repository status.
 /// If there are no errors, this can be null.
 /// </param>
-public record GitRepositoryStatus
+public sealed record GitRepositoryStatus
 (
     string Name,
     string HierarchicalName,
@@ -39,13 +39,6 @@ public record GitRepositoryStatus
     string? ErrorMessage = null
 )
 {
-    /// <summary>
-    /// Gets the parent directory of the repository path.
-    /// This is the directory that contains the repository folder.
-    /// </summary>
-    public string ParentDir
-        => Path.GetDirectoryName(RepoPath) ?? string.Empty;
-
     /// <summary>
     /// Gets a value indicating whether the repository is valid.
     /// A repository is considered valid if it has no errors and has a remote URL.
@@ -58,25 +51,25 @@ public record GitRepositoryStatus
     /// A branch is considered synced if it has no commits ahead or behind the remote branch.
     /// </summary>
     public bool AreBranchesSynced
-        => LocalBranches.All(branch => branch.IsSynced);
+        => LocalBranches.All(static branch => branch.IsSynced);
 
     /// <summary>
     /// Gets the number of local branches that do not have an upstream branch configured.
     /// </summary>
     public int UntrackedBranchesCount
-        => LocalBranches.Count(branch => string.IsNullOrWhiteSpace(branch.Upstream));
+        => LocalBranches.Count(static branch => string.IsNullOrWhiteSpace(branch.Upstream));
 
     /// <summary>
     /// Gets the number of tracked branches in the repository.
     /// </summary>
     public int TrackedBranchesCount
-        => LocalBranches.Count(branch => !string.IsNullOrWhiteSpace(branch.Upstream));
+        => LocalBranches.Count(static branch => !string.IsNullOrWhiteSpace(branch.Upstream));
 
     /// <summary>
     /// Gets the name of the current branch in the repository.
     /// </summary>
     public string? CurrentBranch
-        => LocalBranches.FirstOrDefault(branch => branch.IsCurrent)?.Name;
+        => LocalBranches.FirstOrDefault(static branch => branch.IsCurrent)?.Name;
 };
 
 /// <summary>
