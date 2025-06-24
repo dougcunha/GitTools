@@ -14,7 +14,7 @@
   - [Reclone Repository (reclone)](#reclone-repository-reclone)
   - [Bulk Backup (bkp)](#bulk-backup-bkp)
   - [Bulk Restore (restore)](#bulk-restore-restore)
-  - [Check Outdated (outdated)](#check-outdated-outdated)
+  - [Synchronize (sync)](#synchronize-sync)
   - [Build](#build)
 - [Code Coverage](#code-coverage)
 - [Publish as Single File](#publish-as-single-file)
@@ -38,11 +38,35 @@ GitTools is a command-line tool for managing Git repositories, including searchi
 - **Backup Creation**: Automatic ZIP backup creation before destructive operations
 - **Modern Terminal UI**: Built with [Spectre.Console](https://spectreconsole.net/) for beautiful interfaces
 - **Modern CLI Parsing**: Uses [System.CommandLine](https://github.com/dotnet/command-line-api) for extensible command-line parsing
-- **Global Logging Option**: Use `--log-all-git-commands` (`-lg`) to output every executed git command
+- **Global Options**: Configure output behavior with global options available across all commands
 
 ## Commands
 
-GitTools provides five main commands for repository management:
+GitTools provides several commands for repository management, all supporting global options for customizing output and behavior.
+
+### Global Options
+
+These options are available for all commands:
+
+- `--log-all-git-commands`, `-lg`: Log all git commands executed to the console (useful for debugging)
+- `--disable-ansi`, `-da`: Disable ANSI color codes in console output (useful for plain text output or incompatible terminals)
+- `--quiet`, `-q`: Suppress all console output (useful for automated scripts or silent operation)
+
+**Examples:**
+
+```sh
+# Enable git command logging for any command
+GitTools ls C:/Projects "v1.*" --log-all-git-commands
+
+# Disable colors for plain text output
+GitTools rm C:/Projects NET8 --disable-ansi
+
+# Run silently without any output
+GitTools sync C:/Projects --quiet
+
+# Combine multiple global options
+GitTools reclone ./my-project --log-all-git-commands --disable-ansi
+```
 
 ### Remove Tags (rm)
 
@@ -102,7 +126,7 @@ GitTools ls <root-directory> <tag1,tag2,...>
 
 Example output:
 
-```
+```text
 Repo1: v1.0, v2.0
 ```
 
