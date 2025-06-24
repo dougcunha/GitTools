@@ -25,14 +25,14 @@ public sealed class SynchronizeCommand : Command
 
         var rootArg = new Argument<string>("root-directory", "Root directory of git repositories");
         var showOnlyOption = new Option<bool>(["--show-only", "-so"], "Do not update repositories, just show which ones are outdated");
-        var withUncommitedOption = new Option<bool>(["--with-uncommitted", "-wu"], "Try to update repositories with uncommitted changes");
+        var withUncommittedOption = new Option<bool>(["--with-uncommitted", "-wu"], "Try to update repositories with uncommitted changes");
         var pushUntrackedBranchesOption = new Option<bool>(["--push-untracked", "-pu"], "Push untracked branches to the remote repository");
         var automaticOption = new Option<bool>(["--automatic", "-a"], "Run the command without user interaction (useful for scripts)");
         var noFetchOption = new Option<bool>(["--no-fetch", "-nf"], "Do not fetch from remote before checking repositories");
 
         AddArgument(rootArg);
         AddOption(showOnlyOption);
-        AddOption(withUncommitedOption);
+        AddOption(withUncommittedOption);
         AddOption(pushUntrackedBranchesOption);
         AddOption(automaticOption);
         AddOption(noFetchOption);
@@ -42,7 +42,7 @@ public sealed class SynchronizeCommand : Command
             ExecuteAsync,
             rootArg,
             showOnlyOption,
-            withUncommitedOption,
+            withUncommittedOption,
             pushUntrackedBranchesOption,
             automaticOption,
             noFetchOption
