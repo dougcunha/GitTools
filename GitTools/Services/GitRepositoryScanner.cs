@@ -15,9 +15,15 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
     /// <inheritdoc/>
     public List<string> Scan(string rootFolder)
     {
+        return Scan(rootFolder, true);
+    }
+
+    /// <inheritdoc/>
+    public List<string> Scan(string rootFolder, bool includeSubmodules)
+    {
         var gitRepos = new List<string>();
         var processedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        SearchGitRepositories(rootFolder, gitRepos, processedPaths);
+        SearchGitRepositories(rootFolder, gitRepos, processedPaths, includeSubmodules);
 
         return [.. gitRepos.Distinct()];
     }
@@ -38,7 +44,8 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
     (
         string rootFolder,
         List<string> gitRepos,
-        HashSet<string> processedPaths
+        HashSet<string> processedPaths,
+        bool includeSubmodules = true
     )
     {
         var stack = new Stack<string>();
@@ -47,7 +54,7 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
         while (stack.Count > 0)
         {
             var currentDir = stack.Pop();
-            ProcessDirectory(currentDir, gitRepos, processedPaths, stack);
+            ProcessDirectory(currentDir, gitRepos, processedPaths, stack, includeSubmodules);
         }
     }
 
@@ -71,7 +78,8 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
         string currentDir,
         List<string> gitRepos,
         HashSet<string> processedPaths,
-        Stack<string> pendingDirs
+        Stack<string> pendingDirs,
+        bool includeSubmodules
     )
     {
         try
@@ -86,7 +94,10 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
                     gitRepos.Add(currentDir);
                 }
 
-                AddSubmodules(currentDir, processedPaths, pendingDirs);
+                if (includeSubmodules)
+                {
+                    AddSubmodules(currentDir, processedPaths, pendingDirs);
+                }
             }
             else
             {
