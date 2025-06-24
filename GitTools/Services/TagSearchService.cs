@@ -7,9 +7,6 @@ namespace GitTools.Services;
 /// </summary>
 public sealed class TagSearchService(IGitRepositoryScanner gitScanner, IGitService gitService) : ITagSearchService
 {
-    private static string GetRepositoryName(string path)
-        => Path.GetFileName(path.Replace('\\', Path.DirectorySeparatorChar));
-
     /// <inheritdoc />
     public async Task<TagSearchResult> SearchRepositoriesWithTagsAsync
     (
@@ -25,7 +22,7 @@ public sealed class TagSearchService(IGitRepositoryScanner gitScanner, IGitServi
 
         foreach (var repo in allGitFolders)
         {
-            progressCallback?.Invoke(GetRepositoryName(repo));
+            progressCallback?.Invoke(IGitService.GetRepositoryName(repo));
 
             try
             {

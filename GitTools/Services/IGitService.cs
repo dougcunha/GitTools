@@ -62,6 +62,14 @@ public interface IGitService
     Task<List<string>> GetTagsMatchingPatternAsync(string repoPath, string pattern);
 
     /// <summary>
+    /// Retrieves the name of the repository from the specified file path.
+    /// </summary>
+    /// <param name="path">The file path from which to extract the repository name. This path should be a valid file system path.</param>
+    /// <returns>The name of the repository extracted from the given path.</returns>
+    static string GetRepositoryName(string path)
+       => Path.GetFileName(path.Replace('\\', Path.DirectorySeparatorChar));
+
+    /// <summary>
     /// Runs a git command in the correct repository directory.
     /// This method executes a git command with the specified arguments in the given working directory.
     /// </summary>
