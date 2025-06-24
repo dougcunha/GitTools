@@ -23,27 +23,22 @@ public static class FileSystemUtils
     /// It trims any trailing directory separators and converts the path to its full
     /// absolute form, which is important for operations that require a valid file system path.
     /// </remarks>
-    /// <example>
-    /// <code>
-    /// string normalizedPath = FileSystemUtils.GetNormalizedPathForCurrentPlatform("some/path/to/file.txt");
-    /// Console.WriteLine(normalizedPath); // Outputs the full path in a normalized format
-    /// </code>
-    /// </example>
-    /// </remarks>
     [ExcludeFromCodeCoverage]
     public static string GetNormalizedPathForCurrentPlatform(string path)
     {
         var isWindows = Environment.OSVersion.Platform == PlatformID.Win32NT;
 
         // Normalize the path for the current platform
-        if (isWindows)
-            path = path.Replace('/', Path.DirectorySeparatorChar);
-        else
+        if (!isWindows)
         {
             path = path.Replace('\\', Path.AltDirectorySeparatorChar);
 
-            if (!path.StartsWith(Path.AltDirectorySeparatorChar.ToString()))
+            if (!path.StartsWith(Path.AltDirectorySeparatorChar.ToString(), StringComparison.Ordinal))
                 path = Path.AltDirectorySeparatorChar + path;
+        }
+        else
+        {
+            path = path.Replace('/', Path.DirectorySeparatorChar);
         }
 
         return path;

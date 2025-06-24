@@ -40,6 +40,9 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
     /// <param name="processedPaths">
     /// The set of already processed paths to avoid duplicates.
     /// </param>
+    /// <param name="includeSubmodules">
+    /// true to include submodules in the search, false to ignore them.
+    /// </param>
     private void SearchGitRepositories
     (
         string rootFolder,
@@ -72,6 +75,9 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
     /// </param>
     /// <param name="pendingDirs">
     /// The directories to keep track of directories to process.
+    /// </param>
+    /// <param name="includeSubmodules">
+    /// true to include submodules in the search, false to ignore them.
     /// </param>
     private void ProcessDirectory
     (

@@ -218,14 +218,32 @@ GitTools restore repos.json <target-directory> --force-ssh
 Detect repositories that are behind the specified branch and optionally update them.
 
 ```sh
-GitTools sync <root-directory> [--show-only] [--with-uncommitted] [--no-fetch]
+GitTools sync <root-directory> [--show-only] [--with-uncommitted] [--push-untracked] [--automatic] [--no-fetch] [--no-submodules]
 ```
+
+#### Sync Options
+
+- `root-directory` (required): Root directory to scan for Git repositories
+- `--show-only`, `-so`: Do not update repositories, just show which ones are outdated
+- `--with-uncommitted`, `-wu`: Try to update repositories with uncommitted changes (stashes changes before updating)
+- `--push-untracked`, `-pu`: Push untracked branches to the remote repository
+- `--automatic`, `-a`: Run the command without user interaction (useful for scripts)
+- `--no-fetch`, `-nf`: Do not fetch from remote before checking repositories
+- `--no-submodules`, `-ns`: Do not include submodules during repository scanning
+
+#### Behavior
 
 By default repositories with uncommitted changes are skipped. Use `--with-uncommitted` to include them; any changes are stashed before updating.
 
 Use `--show-only` if you want to see what is new without changing anything on local repository.
 
 Use `--no-fetch` to skip fetching updates from the remote server before checking each repository.
+
+Use `--automatic` to run without user interaction, automatically selecting all outdated repositories for update.
+
+Use `--push-untracked` to also push any new local branches to the remote repository during synchronization.
+
+Use `--no-submodules` to exclude Git submodules from the scanning process.
 
 ## Build
 
