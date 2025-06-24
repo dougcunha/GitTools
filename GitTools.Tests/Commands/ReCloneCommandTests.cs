@@ -23,7 +23,7 @@ public sealed class ReCloneCommandTests
     private const string REPO_PATH = @"C:\current\test-repo";
     private const string PARENT_DIR = @"C:\current";
     private const string REMOTE_URL = "https://github.com/user/test-repo.git";
-    private const string BACKUP_FILE = @"C:\current\test-repo-backup.zip";
+    private static readonly string _backupFile = Path.Combine(PARENT_DIR, $"{REPO_NAME}-backup.zip");
 
     public ReCloneCommandTests()
     {
@@ -119,7 +119,7 @@ public sealed class ReCloneCommandTests
 
         // Assert
         await _mockGitService.DidNotReceive().RunGitCommandAsync(REPO_PATH, "status --porcelain");
-        _mockBackupService.Received(1).CreateBackup(Arg.Any<string>(), BACKUP_FILE);
+        _mockBackupService.Received(1).CreateBackup(Arg.Any<string>(), _backupFile);
         await _mockGitService.Received(1).RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
         _testConsole.Output.ShouldContain("Repository recloned successfully");
     }
@@ -158,12 +158,12 @@ public sealed class ReCloneCommandTests
         await _command.ExecuteAsync(REPO_PATH, false, false);
 
         // Assert
-        _mockBackupService.Received(1).CreateBackup(REPO_PATH, BACKUP_FILE);
+        _mockBackupService.Received(1).CreateBackup(REPO_PATH, _backupFile);
         await _mockGitService.Received(1).RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
         await _mockGitService.Received(1).DeleteLocalGitRepositoryAsync(Arg.Is<string>(s => s.StartsWith(REPO_PATH) && s.Contains(REPO_NAME)));
 
         _testConsole.Output.ShouldContain($"Recloning repository: {REPO_NAME} at {REPO_PATH}");
-        _testConsole.Output.ShouldContain($"Backup created: {BACKUP_FILE}");
+        _testConsole.Output.ShouldContain($"Backup created: {_backupFile}");
         _testConsole.Output.ShouldContain("Repository recloned successfully");
     }
 
@@ -352,7 +352,7 @@ public sealed class ReCloneCommandTests
         _testConsole.Output.ShouldContain("Repository recloned successfully");
     }
 
-    private GitRepository CreateValidGitRepository(bool hasErrors = false)
+    private static GitRepository CreateValidGitRepository(bool hasErrors = false)
         => new()
         {
             Name = REPO_NAME,
@@ -371,4 +371,3 @@ public sealed class ReCloneCommandTests
             .Returns(true);
     }
 }
-

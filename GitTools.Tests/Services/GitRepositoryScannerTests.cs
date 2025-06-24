@@ -1,5 +1,6 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
+using System.Reflection;
 using GitTools.Services;
 using NSubstitute.ExceptionExtensions;
 using Spectre.Console.Testing;
@@ -309,6 +310,39 @@ public sealed class GitRepositoryScannerTests
         // Assert
         result.ShouldBeEmpty();
         _console.Output.ShouldContain("Test exception accessing");
+    }
+
+    [Fact]
+    public void ProcessDirectory_AlreadyProcessedPath_ShouldReturnEarly()
+    {
+        // Arrange
+        const string ALREADY_PROCESSED_DIR = @"C:\already-processed";
+        
+        var console = new TestConsole();
+        var fileSystem = Substitute.For<IFileSystem>();
+        var scanner = new GitRepositoryScanner(console, fileSystem);
+        
+        var gitRepos = new List<string>();
+        var processedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pendingDirs = new Stack<string>();
+        
+        // Pre-add the directory to processedPaths to simulate it was already processed
+        processedPaths.Add(ALREADY_PROCESSED_DIR);
+        
+        // Act
+        var processDirectoryMethod = typeof(GitRepositoryScanner)
+            .GetMethod("ProcessDirectory", BindingFlags.NonPublic | BindingFlags.Instance);
+        
+        processDirectoryMethod!.Invoke(
+            scanner,
+            [ALREADY_PROCESSED_DIR, gitRepos, processedPaths, pendingDirs]
+        );
+        
+        // Assert
+        gitRepos.ShouldBeEmpty();
+        pendingDirs.ShouldBeEmpty();
+        fileSystem.Directory.DidNotReceive().Exists(Arg.Any<string>());
+        fileSystem.File.DidNotReceive().Exists(Arg.Any<string>());
     }
 }
 

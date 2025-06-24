@@ -86,7 +86,7 @@ public sealed class ReCloneCommand : Command
         }
 
         if (!noBackup)
-            GenerateRepositoryBackup(safeRepoPath, safeParentDir, safeRepoName);
+            GenerateRepositoryBackup(safeRepoPath, safeRepoName);
 
         var tempPath = RenameRepositoryDirectory(safeRepoPath);
 
@@ -115,14 +115,27 @@ public sealed class ReCloneCommand : Command
             _console.MarkupLineInterpolated($"[green]✓[/] [grey]Old repository deleted: {tempPath}[/]");
     }
 
-    private void GenerateRepositoryBackup(string repoPath, string parentDir, string repoName)
+    private void GenerateRepositoryBackup(string repoPath, string repoName)
     {
-        var backupFile = Path.Combine(parentDir, $"{repoName}-backup.zip");
+        var backupDir = GetDirectory(repoPath);
+
+        var backupFile = Path.Combine(backupDir, $"{repoName}-backup.zip");
 
         _console.Status()
             .Start("[yellow]Creating backup...[/]", _ => _backupService.CreateBackup(repoPath, backupFile));
 
         _console.MarkupLineInterpolated($"[green]✓[/] [grey]Backup created: {backupFile}[/]");
+    }
+
+    private static string GetDirectory(string path)
+    {
+        var containsBackslash = path.Contains('\\');
+        path = path.Replace('\\', Path.DirectorySeparatorChar);
+        var dir = Path.GetDirectoryName(path) ?? string.Empty;
+
+        return containsBackslash
+            ? dir.Replace(Path.DirectorySeparatorChar, '\\')
+            : dir;
     }
 
     private string? RenameRepositoryDirectory(string repoPath)

@@ -1,17 +1,26 @@
-﻿using System.CommandLine;
+using System.CommandLine.Parsing;
 using System.Diagnostics;
-using GitTools;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 
-var rootCommand = new ServiceCollection()
-    .RegisterServices()
-    .BuildServiceProvider()
-    .CreateRootCommand();
+namespace GitTools;
 
-await rootCommand.InvokeAsync(args).ConfigureAwait(false);
-
-if (Debugger.IsAttached)
+[ExcludeFromCodeCoverage]
+file static class Program
 {
-    Console.WriteLine("Press any key to exit...");
-    Console.Read();
+    private static async Task Main(string[] args)
+    {
+        var (parser, _, _) = new ServiceCollection()
+            .RegisterServices()
+            .BuildServiceProvider()
+            .BuildCommand();
+
+        await parser.InvokeAsync(args).ConfigureAwait(false);
+
+        if (Debugger.IsAttached)
+        {
+            Console.WriteLine("Press any key to exit...");
+            Console.Read();
+        }
+    }
 }

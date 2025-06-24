@@ -1,5 +1,8 @@
+using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.IO.Abstractions;
 using GitTools.Commands;
+using GitTools.Models;
 using GitTools.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
@@ -27,6 +30,7 @@ public sealed class StartupTests
         serviceProvider.GetService<IGitRepositoryScanner>().ShouldNotBeNull();
         serviceProvider.GetService<IFileSystem>().ShouldNotBeNull();
         serviceProvider.GetService<IGitService>().ShouldNotBeNull();
+        serviceProvider.GetService<GitToolsOptions>().ShouldNotBeNull();
         serviceProvider.GetService<TagRemoveCommand>().ShouldNotBeNull();
         serviceProvider.GetService<TagListCommand>().ShouldNotBeNull();
         serviceProvider.GetService<BulkBackupCommand>().ShouldNotBeNull();
@@ -54,6 +58,7 @@ public sealed class StartupTests
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
         var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
         var outdatedDescriptor = services.First(static s => s.ServiceType == typeof(SynchronizeCommand));
+        var optionsDescriptor = services.First(static s => s.ServiceType == typeof(GitToolsOptions));
 
         ansiConsoleDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         processRunnerDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
@@ -65,6 +70,7 @@ public sealed class StartupTests
         bulkBackupDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         bulkRestoreDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         outdatedDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+        optionsDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
     }
 
     [Fact]
@@ -85,6 +91,7 @@ public sealed class StartupTests
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
         var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
         var outdatedDescriptor = services.First(static s => s.ServiceType == typeof(SynchronizeCommand));
+        var optionsDescriptor = services.First(static s => s.ServiceType == typeof(GitToolsOptions));
 
         processRunnerDescriptor.ImplementationType.ShouldBe(typeof(ProcessRunner));
         gitScannerDescriptor.ImplementationType.ShouldBe(typeof(GitRepositoryScanner));
@@ -94,6 +101,7 @@ public sealed class StartupTests
         bulkBackupDescriptor.ImplementationType.ShouldBe(typeof(BulkBackupCommand));
         bulkRestoreDescriptor.ImplementationType.ShouldBe(typeof(BulkRestoreCommand));
         outdatedDescriptor.ImplementationType.ShouldBe(typeof(SynchronizeCommand));
+        optionsDescriptor.ImplementationType.ShouldBe(typeof(GitToolsOptions));
     }
 
     [Fact]
@@ -109,9 +117,10 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
         var console1 = serviceProvider.GetService<IAnsiConsole>();
         var console2 = serviceProvider.GetService<IAnsiConsole>();
+        var consoleWrapper = serviceProvider.GetService<AnsiConsoleWrapper>();
 
         console1.ShouldBeSameAs(console2);
-        console1.ShouldBeSameAs(AnsiConsole.Console);
+        console1.ShouldBeSameAs(consoleWrapper);
     }
 
     [Fact]
@@ -128,7 +137,7 @@ public sealed class StartupTests
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldCreateRootCommandWithCorrectDescription()
+    public void BuildCommand_ShouldCreateRootCommandWithCorrectDescription()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -136,15 +145,16 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act
-        var rootCommand = serviceProvider.CreateRootCommand();
+        var (_, rootCommand, _) = serviceProvider.BuildCommand();
 
         // Assert
         rootCommand.ShouldNotBeNull();
-        rootCommand.Description.ShouldBe("GitTools - A tool for searching and removing tags in Git repositories.");
+        rootCommand.Description.ShouldBe("GitTools - A tool for managing your Git repositories.");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "log-all-git-commands");
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldAddTagRemoveCommand()
+    public void BuildCommand_ShouldReturnInvocationMiddleware()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -152,7 +162,24 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act
-        var rootCommand = serviceProvider.CreateRootCommand();
+        var (_, rootCommand, invocationMiddleware) = serviceProvider.BuildCommand();
+
+        // Assert
+        invocationMiddleware.ShouldNotBeNull();
+        var parse = rootCommand.Parse("--log-all-git-commands");
+        invocationMiddleware.Invoke(new InvocationContext(parse), static _ => Task.CompletedTask);
+    }
+
+    [Fact]
+    public void BuildCommand_ShouldAddTagRemoveCommand()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Act
+        var (_, rootCommand, _) = serviceProvider.BuildCommand();
 
         // Assert
         rootCommand.Subcommands.ShouldContain(static cmd => cmd.Name == "rm");
@@ -161,7 +188,7 @@ public sealed class StartupTests
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldAddTagListCommand()
+    public void BuildCommand_ShouldAddTagListCommand()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -169,7 +196,7 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act
-        var rootCommand = serviceProvider.CreateRootCommand();
+        var (_, rootCommand, _) = serviceProvider.BuildCommand();
 
         // Assert
         rootCommand.Subcommands.ShouldContain(static cmd => cmd.Name == "ls");
@@ -178,7 +205,7 @@ public sealed class StartupTests
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldAddRecloneCommand()
+    public void BuildCommand_ShouldAddRecloneCommand()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -186,7 +213,7 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act
-        var rootCommand = serviceProvider.CreateRootCommand();
+        var (_, rootCommand, _) = serviceProvider.BuildCommand();
 
         // Assert
         rootCommand.Subcommands.ShouldContain(static cmd => cmd.Name == "reclone");
@@ -195,49 +222,49 @@ public sealed class StartupTests
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldAddBulkBackupCommand()
+    public void BuildCommand_ShouldAddBulkBackupCommand()
     {
         var services = new ServiceCollection();
         services.RegisterServices();
         var provider = services.BuildServiceProvider();
 
-        var root = provider.CreateRootCommand();
+        var (_, rootCommand, _) = provider.BuildCommand();
 
-        root.Subcommands.ShouldContain(static c => c.Name == "bkp");
-        var cmd = root.Subcommands.First(static c => c.Name == "bkp");
+        rootCommand.Subcommands.ShouldContain(static c => c.Name == "bkp");
+        var cmd = rootCommand.Subcommands.First(static c => c.Name == "bkp");
         cmd.ShouldBeOfType<BulkBackupCommand>();
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldAddBulkRestoreCommand()
+    public void BuildCommand_ShouldAddBulkRestoreCommand()
     {
         var services = new ServiceCollection();
         services.RegisterServices();
         var provider = services.BuildServiceProvider();
 
-        var root = provider.CreateRootCommand();
+        var (_, rootCommand, _) = provider.BuildCommand();
 
-        root.Subcommands.ShouldContain(static c => c.Name == "restore");
-        var cmd = root.Subcommands.First(static c => c.Name == "restore");
+        rootCommand.Subcommands.ShouldContain(static c => c.Name == "restore");
+        var cmd = rootCommand.Subcommands.First(static c => c.Name == "restore");
         cmd.ShouldBeOfType<BulkRestoreCommand>();
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldAddOutdatedCommand()
+    public void BuildCommand_ShouldAddOutdatedCommand()
     {
         var services = new ServiceCollection();
         services.RegisterServices();
         var provider = services.BuildServiceProvider();
 
-        var root = provider.CreateRootCommand();
+        var (_, rootCommand, _) = provider.BuildCommand();
 
-        root.Subcommands.ShouldContain(static c => c.Name == "sync");
-        var cmd = root.Subcommands.First(static c => c.Name == "sync");
+        rootCommand.Subcommands.ShouldContain(static c => c.Name == "sync");
+        var cmd = rootCommand.Subcommands.First(static c => c.Name == "sync");
         cmd.ShouldBeOfType<SynchronizeCommand>();
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldResolveTagRemoveCommandFromServiceProvider()
+    public void BuildCommand_ShouldResolveTagRemoveCommandFromServiceProvider()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -245,7 +272,7 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act
-        var rootCommand = serviceProvider.CreateRootCommand();
+        var (_, rootCommand, _) = serviceProvider.BuildCommand();
         var tagRemoveCommand = rootCommand.Subcommands.OfType<TagRemoveCommand>().First();
 
         // Assert
@@ -254,7 +281,7 @@ public sealed class StartupTests
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldResolveTagListCommandFromServiceProvider()
+    public void BuildCommand_ShouldResolveTagListCommandFromServiceProvider()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -262,7 +289,7 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act
-        var rootCommand = serviceProvider.CreateRootCommand();
+        var (_, rootCommand, _) = serviceProvider.BuildCommand();
         var tagListCommand = rootCommand.Subcommands.OfType<TagListCommand>().First();
 
         // Assert
@@ -271,49 +298,49 @@ public sealed class StartupTests
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldResolveBulkBackupCommandFromServiceProvider()
+    public void BuildCommand_ShouldResolveBulkBackupCommandFromServiceProvider()
     {
         var services = new ServiceCollection();
         services.RegisterServices();
         var provider = services.BuildServiceProvider();
 
-        var root = provider.CreateRootCommand();
-        var cmd = root.Subcommands.OfType<BulkBackupCommand>().First();
+        var (_, rootCommand, _) = provider.BuildCommand();
+        var cmd = rootCommand.Subcommands.OfType<BulkBackupCommand>().First();
 
         cmd.ShouldNotBeNull();
         cmd.ShouldBeOfType<BulkBackupCommand>();
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldResolveBulkRestoreCommandFromServiceProvider()
+    public void BuildCommand_ShouldResolveBulkRestoreCommandFromServiceProvider()
     {
         var services = new ServiceCollection();
         services.RegisterServices();
         var provider = services.BuildServiceProvider();
 
-        var root = provider.CreateRootCommand();
-        var cmd = root.Subcommands.OfType<BulkRestoreCommand>().First();
+        var (_, rootCommand, _) = provider.BuildCommand();
+        var cmd = rootCommand.Subcommands.OfType<BulkRestoreCommand>().First();
 
         cmd.ShouldNotBeNull();
         cmd.ShouldBeOfType<BulkRestoreCommand>();
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldResolveOutdatedCommandFromServiceProvider()
+    public void BuildCommand_ShouldResolveOutdatedCommandFromServiceProvider()
     {
         var services = new ServiceCollection();
         services.RegisterServices();
         var provider = services.BuildServiceProvider();
 
-        var root = provider.CreateRootCommand();
-        var cmd = root.Subcommands.OfType<SynchronizeCommand>().First();
+        var (_, rootCommand, _) = provider.BuildCommand();
+        var cmd = rootCommand.Subcommands.OfType<SynchronizeCommand>().First();
 
         cmd.ShouldNotBeNull();
         cmd.ShouldBeOfType<SynchronizeCommand>();
     }
 
     [Fact]
-    public void CreateRootCommand_WithMissingTagRemoveCommand_ShouldThrowException()
+    public void BuildCommand_WithMissingTagRemoveCommand_ShouldThrowException()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -327,11 +354,11 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act & Assert
-        Should.Throw<InvalidOperationException>(() => serviceProvider.CreateRootCommand());
+        Should.Throw<InvalidOperationException>(() => serviceProvider.BuildCommand());
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldCreateNewInstanceEachTime()
+    public void BuildCommand_ShouldCreateNewInstanceEachTime()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -339,15 +366,15 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act
-        var rootCommand1 = serviceProvider.CreateRootCommand();
-        var rootCommand2 = serviceProvider.CreateRootCommand();
+        var (_, rootCommand1, _) = serviceProvider.BuildCommand();
+        var (_, rootCommand2, _) = serviceProvider.BuildCommand();
 
         // Assert
         rootCommand1.ShouldNotBeSameAs(rootCommand2);
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldReuseTagRemoveCommandInstance()
+    public void BuildCommand_ShouldReuseTagRemoveCommandInstance()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -355,8 +382,8 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act
-        var rootCommand1 = serviceProvider.CreateRootCommand();
-        var rootCommand2 = serviceProvider.CreateRootCommand();
+        var (_, rootCommand1, _) = serviceProvider.BuildCommand();
+        var (_, rootCommand2, _) = serviceProvider.BuildCommand();
 
         var tagRemoveCommand1 = rootCommand1.Subcommands.OfType<TagRemoveCommand>().First();
         var tagRemoveCommand2 = rootCommand2.Subcommands.OfType<TagRemoveCommand>().First();
@@ -366,7 +393,7 @@ public sealed class StartupTests
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldReuseTagListCommandInstance()
+    public void BuildCommand_ShouldReuseTagListCommandInstance()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -374,8 +401,8 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Act
-        var rootCommand1 = serviceProvider.CreateRootCommand();
-        var rootCommand2 = serviceProvider.CreateRootCommand();
+        var (_, rootCommand1, _) = serviceProvider.BuildCommand();
+        var (_, rootCommand2, _) = serviceProvider.BuildCommand();
 
         var tagListCommand1 = rootCommand1.Subcommands.OfType<TagListCommand>().First();
         var tagListCommand2 = rootCommand2.Subcommands.OfType<TagListCommand>().First();
@@ -385,50 +412,78 @@ public sealed class StartupTests
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldReuseBulkBackupCommandInstance()
+    public void BuildCommand_ShouldReuseBulkBackupCommandInstance()
     {
+        // Arrange
         var services = new ServiceCollection();
         services.RegisterServices();
         var provider = services.BuildServiceProvider();
 
-        var root1 = provider.CreateRootCommand();
-        var root2 = provider.CreateRootCommand();
+        // Act
+        var (_, rootCommand1, _) = provider.BuildCommand();
+        var (_, rootCommand2, _) = provider.BuildCommand();
 
-        var c1 = root1.Subcommands.OfType<BulkBackupCommand>().First();
-        var c2 = root2.Subcommands.OfType<BulkBackupCommand>().First();
+        var c1 = rootCommand1.Subcommands.OfType<BulkBackupCommand>().First();
+        var c2 = rootCommand2.Subcommands.OfType<BulkBackupCommand>().First();
 
+        // Assert
         c1.ShouldBeSameAs(c2);
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldReuseBulkRestoreCommandInstance()
+    public void BuildCommand_ShouldReuseBulkRestoreCommandInstance()
     {
+        // Arrange
         var services = new ServiceCollection();
         services.RegisterServices();
         var provider = services.BuildServiceProvider();
 
-        var root1 = provider.CreateRootCommand();
-        var root2 = provider.CreateRootCommand();
+        // Act
+        var (_, rootCommand1, _) = provider.BuildCommand();
+        var (_, rootCommand2, _) = provider.BuildCommand();
 
-        var c1 = root1.Subcommands.OfType<BulkRestoreCommand>().First();
-        var c2 = root2.Subcommands.OfType<BulkRestoreCommand>().First();
+        var c1 = rootCommand1.Subcommands.OfType<BulkRestoreCommand>().First();
+        var c2 = rootCommand2.Subcommands.OfType<BulkRestoreCommand>().First();
 
+        // Assert
         c1.ShouldBeSameAs(c2);
     }
 
     [Fact]
-    public void CreateRootCommand_ShouldReuseOutdatedCommandInstance()
+    public void BuildCommand_ShouldReuseOutdatedCommandInstance()
     {
+        // Arrange
         var services = new ServiceCollection();
         services.RegisterServices();
         var provider = services.BuildServiceProvider();
 
-        var root1 = provider.CreateRootCommand();
-        var root2 = provider.CreateRootCommand();
+        // Act
+        var (_, rootCommand1, _) = provider.BuildCommand();
+        var (_, rootCommand2, _) = provider.BuildCommand();
 
-        var c1 = root1.Subcommands.OfType<SynchronizeCommand>().First();
-        var c2 = root2.Subcommands.OfType<SynchronizeCommand>().First();
+        var c1 = rootCommand1.Subcommands.OfType<SynchronizeCommand>().First();
+        var c2 = rootCommand2.Subcommands.OfType<SynchronizeCommand>().First();
 
+        // Assert
         c1.ShouldBeSameAs(c2);
+    }
+
+    [Fact]
+    public void BuildCommand_ShouldRegisterGlobalOptions()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Act
+        var (_, rootCommand, _) = serviceProvider.BuildCommand();
+
+        // Assert
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "log-all-git-commands");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "disable-ansi");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "quiet");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "help");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "version");
     }
 }

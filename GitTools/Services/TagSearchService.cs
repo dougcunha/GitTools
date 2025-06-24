@@ -22,13 +22,13 @@ public sealed class TagSearchService(IGitRepositoryScanner gitScanner, IGitServi
 
         foreach (var repo in allGitFolders)
         {
-            progressCallback?.Invoke(Path.GetFileName(repo));
+            progressCallback?.Invoke(IGitService.GetRepositoryName(repo));
 
             try
             {
                 var foundTags = await SearchTagsInRepositoryAsync(repo, tagsToSearch).ConfigureAwait(false);
 
-                if (foundTags.Count <= 0)
+                if (foundTags.Count == 0)
                     continue;
 
                 repositoriesWithTags.Add(repo);

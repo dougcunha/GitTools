@@ -18,7 +18,11 @@
     },
     "Sync show": {
       "commandName": "Project",
-      "commandLineArgs": "sync d:\\projs --show-only"
+      "commandLineArgs": "sync d:\\projetos --show-only --no-fetch -lg"
+    },
+    "Help": {
+      "commandName": "Project",
+      "commandLineArgs": "--help"
     }
   }
 }
