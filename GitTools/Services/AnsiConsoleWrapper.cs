@@ -1,4 +1,5 @@
-﻿using Spectre.Console;
+﻿using Serilog;
+using Spectre.Console;
 using Spectre.Console.Rendering;
 
 namespace GitTools.Services;
@@ -14,7 +15,21 @@ namespace GitTools.Services;
 /// </param>
 public sealed class AnsiConsoleWrapper(IAnsiConsole ansiConsole) : IAnsiConsole
 {
+    private ILogger? _logger;
+
+    /// <summary>
+    /// Allows enabling or disabling the console operations.
+    /// </summary>
     public bool Enabled { get; set; }
+
+    /// <summary>
+    /// Gets whether logging is enabled.
+    /// </summary>
+    public bool IsLogging
+        => _logger is not null;
+
+    public void SetLogger(ILogger logger)
+        => _logger = logger;
 
     /// <inheritdoc />
     public void Clear(bool home)
@@ -28,10 +43,17 @@ public sealed class AnsiConsoleWrapper(IAnsiConsole ansiConsole) : IAnsiConsole
     /// <inheritdoc />
     public void Write(IRenderable renderable)
     {
-        if (!Enabled)
+        if (Enabled)
+            ansiConsole.Write(renderable);
+
+        if (_logger is null || renderable is not Paragraph paragraph)
             return;
 
-        ansiConsole.Write(renderable);
+        var msg = string.Concat(paragraph.GetSegments(ansiConsole)
+            .Where(static s => s is { IsControlCode: false } )
+            .Select(static s => s.Text));
+
+        _logger.Information("{@Msg}", msg);
     }
 
     /// <inheritdoc />

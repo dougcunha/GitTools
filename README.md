@@ -49,6 +49,7 @@ GitTools provides several commands for repository management, all supporting glo
 These options are available for all commands:
 
 - `--log-all-git-commands`, `-lg`: Log all git commands executed to the console (useful for debugging)
+- `--log-file`, `-lf`: Replicate all console output to the specified log file
 - `--disable-ansi`, `-da`: Disable ANSI color codes in console output (useful for plain text output or incompatible terminals)
 - `--quiet`, `-q`: Suppress all console output (useful for automated scripts or silent operation)
 
@@ -66,6 +67,9 @@ GitTools sync C:/Projects --quiet
 
 # Combine multiple global options
 GitTools reclone ./my-project --log-all-git-commands --disable-ansi
+
+# Write output to a log file
+GitTools ls ./projects --log-file gittools.log
 ```
 
 ### Remove Tags (rm)

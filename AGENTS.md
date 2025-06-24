@@ -81,6 +81,8 @@ This Agents.md file provides comprehensive guidance for AI agents working with t
 
 For Linux environments (like Codex), use the setup script to install .NET SDK and required tools:
 
+Do not run as root.
+
 ```bash
 # Make the setup script executable
 chmod +x setup-environment.sh

@@ -2,6 +2,7 @@ using Spectre.Console;
 using Spectre.Console.Rendering;
 using GitTools.Services;
 using Spectre.Console.Testing;
+using Serilog;
 
 namespace GitTools.Tests.Services;
 
@@ -15,11 +16,13 @@ public sealed class AnsiConsoleWrapperTests
     private const bool DISABLED = false;
 
     private readonly IAnsiConsole _mockConsole = Substitute.For<IAnsiConsole>();
+    private readonly ILogger _logger = Substitute.For<ILogger>();
     private readonly AnsiConsoleWrapper _wrapper;
 
     public AnsiConsoleWrapperTests()
     {
         _wrapper = new AnsiConsoleWrapper(_mockConsole);
+        _wrapper.SetLogger(_logger);
     }
 
     [Fact]
@@ -60,6 +63,23 @@ public sealed class AnsiConsoleWrapperTests
 
         // Assert
         _mockConsole.Received(1).Write(renderable);
+    }
+
+    [Fact]
+    public void Write_WhenLoggerConfigured_WritesToLogger()
+    {
+        // Arrange
+        AnsiConsoleWrapper wrapper = new(new TestConsole());
+        wrapper.SetLogger(_logger);
+        wrapper.Enabled = ENABLED;
+        const string MSG = "test";
+        var renderable = new Paragraph(MSG);
+
+        // Act
+        wrapper.Write(renderable);
+
+        // Assert
+        _logger.Received(1).Information("{@Msg}", MSG);
     }
 
     [Fact]

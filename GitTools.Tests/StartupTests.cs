@@ -151,6 +151,7 @@ public sealed class StartupTests
         rootCommand.ShouldNotBeNull();
         rootCommand.Description.ShouldBe("GitTools - A tool for managing your Git repositories.");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "log-all-git-commands");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "log-file");
     }
 
     [Fact]
@@ -168,6 +169,28 @@ public sealed class StartupTests
         invocationMiddleware.ShouldNotBeNull();
         var parse = rootCommand.Parse("--log-all-git-commands");
         invocationMiddleware.Invoke(new InvocationContext(parse), static _ => Task.CompletedTask);
+    }
+
+    [Fact]
+    public void BuildCommand_WithLogFile_ShouldConfigureLogger()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Act
+        var (_, rootCommand, invocationMiddleware) = serviceProvider.BuildCommand();
+        var parseResult = rootCommand.Parse("--log-file log.txt");
+        invocationMiddleware.Invoke(new InvocationContext(parseResult), static _ => Task.CompletedTask);
+
+        // Assert
+        var console = serviceProvider.GetService<AnsiConsoleWrapper>();
+        console.ShouldNotBeNull();
+        console.IsLogging.ShouldBeTrue();
+        var gitToolsOptions = serviceProvider.GetService<GitToolsOptions>();
+        gitToolsOptions.ShouldNotBeNull();
+        gitToolsOptions.LogFilePath.ShouldBe("log.txt");
     }
 
     [Fact]
@@ -481,6 +504,7 @@ public sealed class StartupTests
 
         // Assert
         rootCommand.Options.ShouldContain(static opt => opt.Name == "log-all-git-commands");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "log-file");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "disable-ansi");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "quiet");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "help");
