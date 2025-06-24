@@ -27,7 +27,9 @@ public static class Startup
     /// </returns>
     public static IServiceCollection RegisterServices(this IServiceCollection services)
     {
-        services.AddSingleton(AnsiConsole.Console);
+        var console = new AnsiConsoleWrapper(AnsiConsole.Console);
+        services.AddSingleton(console);
+        services.AddSingleton<IAnsiConsole>(console);
         services.AddSingleton<IProcessRunner, ProcessRunner>();
         services.AddSingleton<IGitRepositoryScanner, GitRepositoryScanner>();
         services.AddSingleton<IFileSystem, FileSystem>();
@@ -59,9 +61,13 @@ public static class Startup
     /// </returns>
     public static (Parser parser, RootCommand rootCommand, InvocationMiddleware parseOptionsMiddleware) BuildCommand(this IServiceProvider serviceProvider)
     {
-        var rootCommand = new RootCommand("GitTools - A tool for searching and removing tags in Git repositories.");
+        var rootCommand = new RootCommand("GitTools - A tool for managing your Git repositories.");
         var logAllGitCommandsOption = new Option<bool>(["--log-all-git-commands", "-lg"], "Log all git commands to the console");
+        var disableAnsiOption = new Option<bool>(["--disable-ansi", "-da"], "Disable ANSI color codes in the console output");
+        var quietOption = new Option<bool>(["--quiet", "-q"], "Suppress all console output");
         rootCommand.AddGlobalOption(logAllGitCommandsOption);
+        rootCommand.AddGlobalOption(disableAnsiOption);
+        rootCommand.AddGlobalOption(quietOption);
         var tagRemoveCommand = serviceProvider.GetRequiredService<TagRemoveCommand>();
         var tagListCommand = serviceProvider.GetRequiredService<TagListCommand>();
         var recloneCommand = serviceProvider.GetRequiredService<ReCloneCommand>();
@@ -69,6 +75,8 @@ public static class Startup
         var bulkRestoreCommand = serviceProvider.GetRequiredService<BulkRestoreCommand>();
         var outdatedCommand = serviceProvider.GetRequiredService<SynchronizeCommand>();
         var gitToolsOptions = serviceProvider.GetRequiredService<GitToolsOptions>();
+        var console = serviceProvider.GetRequiredService<AnsiConsoleWrapper>();
+
         rootCommand.AddCommand(tagRemoveCommand);
         rootCommand.AddCommand(tagListCommand);
         rootCommand.AddCommand(recloneCommand);
@@ -87,6 +95,10 @@ public static class Startup
         Task ParseGlobalOptions(InvocationContext context, Func<InvocationContext, Task> next)
         {
             gitToolsOptions.LogAllGitCommands = context.ParseResult.GetValueForOption(logAllGitCommandsOption);
+            var disableAnsi = context.ParseResult.GetValueForOption(disableAnsiOption);
+            var quiet = context.ParseResult.GetValueForOption(quietOption);
+            console.Profile.Capabilities.Ansi = !disableAnsi;
+            console.Enabled = !quiet;
 
             return next(context);
         }

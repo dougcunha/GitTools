@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.IO.Abstractions;
 using GitTools.Commands;
+using GitTools.Models;
 using GitTools.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
@@ -29,7 +30,7 @@ public sealed class StartupTests
         serviceProvider.GetService<IGitRepositoryScanner>().ShouldNotBeNull();
         serviceProvider.GetService<IFileSystem>().ShouldNotBeNull();
         serviceProvider.GetService<IGitService>().ShouldNotBeNull();
-        serviceProvider.GetService<GitTools.Models.GitToolsOptions>().ShouldNotBeNull();
+        serviceProvider.GetService<GitToolsOptions>().ShouldNotBeNull();
         serviceProvider.GetService<TagRemoveCommand>().ShouldNotBeNull();
         serviceProvider.GetService<TagListCommand>().ShouldNotBeNull();
         serviceProvider.GetService<BulkBackupCommand>().ShouldNotBeNull();
@@ -57,7 +58,7 @@ public sealed class StartupTests
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
         var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
         var outdatedDescriptor = services.First(static s => s.ServiceType == typeof(SynchronizeCommand));
-        var optionsDescriptor = services.First(static s => s.ServiceType == typeof(GitTools.Models.GitToolsOptions));
+        var optionsDescriptor = services.First(static s => s.ServiceType == typeof(GitToolsOptions));
 
         ansiConsoleDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
         processRunnerDescriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
@@ -90,7 +91,7 @@ public sealed class StartupTests
         var bulkBackupDescriptor = services.First(static s => s.ServiceType == typeof(BulkBackupCommand));
         var bulkRestoreDescriptor = services.First(static s => s.ServiceType == typeof(BulkRestoreCommand));
         var outdatedDescriptor = services.First(static s => s.ServiceType == typeof(SynchronizeCommand));
-        var optionsDescriptor = services.First(static s => s.ServiceType == typeof(GitTools.Models.GitToolsOptions));
+        var optionsDescriptor = services.First(static s => s.ServiceType == typeof(GitToolsOptions));
 
         processRunnerDescriptor.ImplementationType.ShouldBe(typeof(ProcessRunner));
         gitScannerDescriptor.ImplementationType.ShouldBe(typeof(GitRepositoryScanner));
@@ -100,7 +101,7 @@ public sealed class StartupTests
         bulkBackupDescriptor.ImplementationType.ShouldBe(typeof(BulkBackupCommand));
         bulkRestoreDescriptor.ImplementationType.ShouldBe(typeof(BulkRestoreCommand));
         outdatedDescriptor.ImplementationType.ShouldBe(typeof(SynchronizeCommand));
-        optionsDescriptor.ImplementationType.ShouldBe(typeof(GitTools.Models.GitToolsOptions));
+        optionsDescriptor.ImplementationType.ShouldBe(typeof(GitToolsOptions));
     }
 
     [Fact]
@@ -116,9 +117,10 @@ public sealed class StartupTests
         var serviceProvider = services.BuildServiceProvider();
         var console1 = serviceProvider.GetService<IAnsiConsole>();
         var console2 = serviceProvider.GetService<IAnsiConsole>();
+        var consoleWrapper = serviceProvider.GetService<AnsiConsoleWrapper>();
 
         console1.ShouldBeSameAs(console2);
-        console1.ShouldBeSameAs(AnsiConsole.Console);
+        console1.ShouldBeSameAs(consoleWrapper);
     }
 
     [Fact]
@@ -147,7 +149,7 @@ public sealed class StartupTests
 
         // Assert
         rootCommand.ShouldNotBeNull();
-        rootCommand.Description.ShouldBe("GitTools - A tool for searching and removing tags in Git repositories.");
+        rootCommand.Description.ShouldBe("GitTools - A tool for managing your Git repositories.");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "log-all-git-commands");
     }
 
@@ -464,5 +466,24 @@ public sealed class StartupTests
 
         // Assert
         c1.ShouldBeSameAs(c2);
+    }
+
+    [Fact]
+    public void BuildCommand_ShouldRegisterGlobalOptions()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Act
+        var (_, rootCommand, _) = serviceProvider.BuildCommand();
+
+        // Assert
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "log-all-git-commands");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "disable-ansi");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "quiet");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "help");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "version");
     }
 }

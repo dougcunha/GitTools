@@ -86,7 +86,7 @@ public sealed class ReCloneCommand : Command
         }
 
         if (!noBackup)
-            GenerateRepositoryBackup(safeRepoPath, safeParentDir, safeRepoName);
+            GenerateRepositoryBackup(safeRepoPath, safeRepoName);
 
         var tempPath = RenameRepositoryDirectory(safeRepoPath);
 
@@ -115,12 +115,9 @@ public sealed class ReCloneCommand : Command
             _console.MarkupLineInterpolated($"[green]✓[/] [grey]Old repository deleted: {tempPath}[/]");
     }
 
-    private void GenerateRepositoryBackup(string repoPath, string parentDir, string repoName)
+    private void GenerateRepositoryBackup(string repoPath, string repoName)
     {
         var backupDir = GetDirectory(repoPath);
-
-        if (string.IsNullOrWhiteSpace(backupDir))
-            backupDir = parentDir;
 
         var backupFile = CombinePath(backupDir, $"{repoName}-backup.zip");
 
@@ -132,7 +129,10 @@ public sealed class ReCloneCommand : Command
 
     private static string CombinePath(string directory, string fileName)
     {
-        var separator = directory.Contains('\\') ? '\\' : Path.DirectorySeparatorChar;
+        var separator = directory.Contains('\\')
+            ? '\\'
+            : Path.DirectorySeparatorChar;
+
         directory = directory.TrimEnd('\n', '\r', '\\', '/');
 
         return string.Concat(directory, separator, fileName);
@@ -144,7 +144,9 @@ public sealed class ReCloneCommand : Command
         path = path.Replace('\\', Path.DirectorySeparatorChar);
         var dir = Path.GetDirectoryName(path) ?? string.Empty;
 
-        return containsBackslash ? dir.Replace(Path.DirectorySeparatorChar, '\\') : dir;
+        return containsBackslash
+            ? dir.Replace(Path.DirectorySeparatorChar, '\\')
+            : dir;
     }
 
     private string? RenameRepositoryDirectory(string repoPath)
