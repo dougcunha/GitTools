@@ -75,6 +75,42 @@ This Agents.md file provides comprehensive guidance for AI agents working with t
 - Keep services testable and loosely coupled
 - Use System.IO.Abstractions for testable file system operations
 
+## Environment Setup for AI Agents
+
+### Linux Environment Setup
+
+For Linux environments (like Codex), use the setup script to install .NET SDK and required tools:
+
+```bash
+# Make the setup script executable
+chmod +x setup-environment.sh
+
+# Run the setup script (installs .NET SDK and ReportGenerator)
+./setup-environment.sh
+
+# Run setup without ReportGenerator (minimal installation)
+./setup-environment.sh --no-reportgenerator
+
+# Get help
+./setup-environment.sh --help
+```
+
+The setup script will:
+
+- Detect your Linux distribution automatically
+- Install .NET 9.0 SDK using the appropriate package manager
+- Install ReportGenerator tool for code coverage reports
+- Configure PATH for .NET tools
+- Verify the installation
+
+Supported distributions:
+
+- Ubuntu/Debian (using apt)
+- RHEL/CentOS/Rocky/AlmaLinux (using yum/dnf)
+- Fedora (using dnf)
+- Arch Linux/Manjaro (using pacman)
+- Fallback: Any distribution with snap support
+
 ## Testing Requirements for AI Agents
 
 Agents should run tests with the following commands:
@@ -89,8 +125,17 @@ dotnet test GitTools.Tests/GitTools.Tests.csproj
 # Run tests with code coverage
 dotnet test --collect:"XPlat Code Coverage"
 
-# Generate coverage report using PowerShell script
+# Generate coverage report using PowerShell script (Windows)
 ./generate-coverage.ps1
+
+# Generate coverage report using Bash script (Linux/macOS)
+./generate-coverage.sh
+
+# Open report automatically (Windows)
+./generate-coverage.ps1 -OpenReport
+
+# Open report automatically (Linux/macOS)
+./generate-coverage.sh --open-report
 ```
 
 ## Pull Request Guidelines for AI Agents
@@ -115,8 +160,11 @@ dotnet build
 # Run all tests
 dotnet test
 
-# Check code coverage
+# Check code coverage (Windows)
 ./generate-coverage.ps1
+
+# Check code coverage (Linux)
+./generate-coverage.sh
 
 # Publish application (verify it compiles correctly)
 dotnet publish GitTools/GitTools.csproj -c Release
