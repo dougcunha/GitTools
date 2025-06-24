@@ -1,6 +1,5 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
-using System.Runtime.InteropServices;
 using GitTools.Commands;
 using GitTools.Models;
 using GitTools.Services;
@@ -19,12 +18,10 @@ public sealed class ReCloneCommandTests
     private readonly IGitService _mockGitService = Substitute.For<IGitService>();
     private readonly TestConsole _testConsole = new();
     private readonly ReCloneCommand _command;
-    private static bool IsWindows
-        => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
     private const string REPO_NAME = "test-repo";
-    private static string _repoPath = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/current/test-repo");
-    private static string _parentDir = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/current");
+    private static readonly string _repoPath = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/current/test-repo");
+    private static readonly string _parentDir = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/current");
     private const string REMOTE_URL = "https://github.com/user/test-repo.git";
     private static readonly string _backupFile = Path.Combine(_parentDir, $"{REPO_NAME}-backup.zip");
 

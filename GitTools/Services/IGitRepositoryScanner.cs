@@ -10,4 +10,11 @@ public interface IGitRepositoryScanner
     /// </summary>
     /// <param name="rootFolder">Root directory to scan.</param>
     List<string> Scan(string rootFolder);
+
+    /// <summary>
+    /// Finds Git repositories from the root folder with optional submodule inclusion.
+    /// </summary>
+    /// <param name="rootFolder">Root directory to scan.</param>
+    /// <param name="includeSubmodules">Whether to include submodules in the scan.</param>
+    List<string> Scan(string rootFolder, bool includeSubmodules);
 }

@@ -1,12 +1,18 @@
 #!/bin/bash
 # Script to setup development environment for GitTools on Linux systems
 # Installs .NET SDK and required tools for code coverage
-# Do not run as root
+# Can be run as root (e.g., in containerized environments like Codex)
 
 set -e  # Exit on any error
 
 DOTNET_VERSION="9.0"
 INSTALL_REPORTGENERATOR=true
+IS_ROOT=false
+
+# Check if running as root
+if [ "$EUID" -eq 0 ]; then
+    IS_ROOT=true
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -85,14 +91,18 @@ install_dotnet_ubuntu_debian() {
     
     # Download and install Microsoft package signing key
     wget https://packages.microsoft.com/config/ubuntu/$UBUNTU_VERSION/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
-    sudo dpkg -i packages-microsoft-prod.deb
+    
+    if [ "$IS_ROOT" = true ]; then
+        dpkg -i packages-microsoft-prod.deb
+        apt-get update
+        apt-get install -y dotnet-sdk-9.0
+    else
+        sudo dpkg -i packages-microsoft-prod.deb
+        sudo apt-get update
+        sudo apt-get install -y dotnet-sdk-9.0
+    fi
+    
     rm packages-microsoft-prod.deb
-    
-    # Update package index
-    sudo apt-get update
-    
-    # Install .NET SDK
-    sudo apt-get install -y dotnet-sdk-9.0
 }
 
 # Function to install .NET SDK on CentOS/RHEL/Fedora
@@ -101,12 +111,22 @@ install_dotnet_rhel() {
     
     # Add Microsoft repository
     if [ "$DISTRO" = "fedora" ]; then
-        sudo dnf install -y https://packages.microsoft.com/config/fedora/$(rpm -E %fedora)/packages-microsoft-prod.rpm
-        sudo dnf install -y dotnet-sdk-9.0
+        if [ "$IS_ROOT" = true ]; then
+            dnf install -y https://packages.microsoft.com/config/fedora/$(rpm -E %fedora)/packages-microsoft-prod.rpm
+            dnf install -y dotnet-sdk-9.0
+        else
+            sudo dnf install -y https://packages.microsoft.com/config/fedora/$(rpm -E %fedora)/packages-microsoft-prod.rpm
+            sudo dnf install -y dotnet-sdk-9.0
+        fi
     else
         # For RHEL/CentOS
-        sudo yum install -y https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm
-        sudo yum install -y dotnet-sdk-9.0
+        if [ "$IS_ROOT" = true ]; then
+            yum install -y https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm
+            yum install -y dotnet-sdk-9.0
+        else
+            sudo yum install -y https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm
+            sudo yum install -y dotnet-sdk-9.0
+        fi
     fi
 }
 
@@ -114,11 +134,14 @@ install_dotnet_rhel() {
 install_dotnet_arch() {
     print_info "Installing .NET SDK on Arch Linux..."
     
-    # Update package database
-    sudo pacman -Sy
-    
-    # Install .NET SDK from official repositories
-    sudo pacman -S --noconfirm dotnet-sdk
+    # Update package database and install .NET SDK
+    if [ "$IS_ROOT" = true ]; then
+        pacman -Sy
+        pacman -S --noconfirm dotnet-sdk
+    else
+        sudo pacman -Sy
+        sudo pacman -S --noconfirm dotnet-sdk
+    fi
 }
 
 # Function to install .NET SDK using snap (fallback)
@@ -131,7 +154,11 @@ install_dotnet_snap() {
         exit 1
     fi
     
-    sudo snap install dotnet-sdk --classic --channel=9.0
+    if [ "$IS_ROOT" = true ]; then
+        snap install dotnet-sdk --classic --channel=9.0
+    else
+        sudo snap install dotnet-sdk --classic --channel=9.0
+    fi
 }
 
 # Function to install ReportGenerator tool
@@ -180,18 +207,32 @@ verify_installation() {
 # Function to setup PATH for .NET tools
 setup_path() {
     DOTNET_TOOLS_PATH="$HOME/.dotnet/tools"
-    PROFILE_FILE="$HOME/.bashrc"
     
-    # Check if using zsh
-    if [ -n "$ZSH_VERSION" ]; then
-        PROFILE_FILE="$HOME/.zshrc"
-    fi
-    
-    # Add .NET tools to PATH if not already present
-    if ! echo "$PATH" | grep -q "$DOTNET_TOOLS_PATH"; then
-        echo "export PATH=\"\$PATH:$DOTNET_TOOLS_PATH\"" >> "$PROFILE_FILE"
-        print_info "Added .NET tools to PATH in $PROFILE_FILE"
-        print_warning "Please restart your shell or run: source $PROFILE_FILE"
+    if [ "$IS_ROOT" = true ]; then
+        # When running as root, add to system-wide PATH
+        PROFILE_FILE="/etc/profile.d/dotnet-tools.sh"
+        if [ ! -f "$PROFILE_FILE" ]; then
+            echo "export PATH=\"\$PATH:$DOTNET_TOOLS_PATH\"" > "$PROFILE_FILE"
+            chmod +x "$PROFILE_FILE"
+            print_info "Added .NET tools to system PATH in $PROFILE_FILE"
+        fi
+        # Also export for current session
+        export PATH="$PATH:$DOTNET_TOOLS_PATH"
+    else
+        # When running as regular user, add to user profile
+        PROFILE_FILE="$HOME/.bashrc"
+        
+        # Check if using zsh
+        if [ -n "$ZSH_VERSION" ]; then
+            PROFILE_FILE="$HOME/.zshrc"
+        fi
+        
+        # Add .NET tools to PATH if not already present
+        if ! echo "$PATH" | grep -q "$DOTNET_TOOLS_PATH"; then
+            echo "export PATH=\"\$PATH:$DOTNET_TOOLS_PATH\"" >> "$PROFILE_FILE"
+            print_info "Added .NET tools to PATH in $PROFILE_FILE"
+            print_warning "Please restart your shell or run: source $PROFILE_FILE"
+        fi
     fi
 }
 
@@ -199,6 +240,10 @@ setup_path() {
 main() {
     print_info "GitTools Development Environment Setup"
     print_info "======================================"
+    
+    if [ "$IS_ROOT" = true ]; then
+        print_warning "Running as root - adapting behavior for containerized environments"
+    fi
     
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
@@ -220,12 +265,6 @@ main() {
                 ;;
         esac
     done
-    
-    # Check if running as root
-    if [ "$EUID" -eq 0 ]; then
-        print_error "Please do not run this script as root"
-        exit 1
-    fi
     
     # Detect distribution
     detect_distro

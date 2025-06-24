@@ -29,6 +29,7 @@ public sealed class SynchronizeCommand : Command
         var pushUntrackedBranchesOption = new Option<bool>(["--push-untracked", "-pu"], "Push untracked branches to the remote repository");
         var automaticOption = new Option<bool>(["--automatic", "-a"], "Run the command without user interaction (useful for scripts)");
         var noFetchOption = new Option<bool>(["--no-fetch", "-nf"], "Do not fetch from remote before checking repositories");
+        var noSubmodulesOption = new Option<bool>(["--no-submodules", "-ns"], "Do not include submodules during repository scanning");
 
         AddArgument(rootArg);
         AddOption(showOnlyOption);
@@ -36,6 +37,7 @@ public sealed class SynchronizeCommand : Command
         AddOption(pushUntrackedBranchesOption);
         AddOption(automaticOption);
         AddOption(noFetchOption);
+        AddOption(noSubmodulesOption);
 
         this.SetHandler
         (
@@ -45,17 +47,18 @@ public sealed class SynchronizeCommand : Command
             withUncommittedOption,
             pushUntrackedBranchesOption,
             automaticOption,
-            noFetchOption
+            noFetchOption,
+            noSubmodulesOption
         );
     }
 
-    private async Task ExecuteAsync(string rootDirectory, bool showOnly, bool withUncommited, bool pushUntrackedBranches, bool automatic, bool noFetch)
+    private async Task ExecuteAsync(string rootDirectory, bool showOnly, bool withUncommited, bool pushUntrackedBranches, bool automatic, bool noFetch, bool noSubmodules)
     {
         var repoPaths = _console.Status()
             .Start
             (
                 $"[yellow]Scanning for Git repositories in {rootDirectory}...[/]",
-                _ => _scanner.Scan(rootDirectory)
+                _ => _scanner.Scan(rootDirectory, !noSubmodules)
             );
 
         if (repoPaths.Count == 0)
