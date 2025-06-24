@@ -140,6 +140,68 @@ public sealed class GitRepositoryScannerTests
     }
 
     [Fact]
+    public void Scan_WithIncludeSubmodulesFalse_ShouldNotIncludeSubmodules()
+    {
+        // Arrange
+        var mainRepoPath = Path.Combine(_rootFolder, "main");
+        var submodulePath = Path.Combine(mainRepoPath, "submodule");
+
+        var mainGitPath = Path.Combine(mainRepoPath, GIT_DIR);
+        var subGitPath = Path.Combine(submodulePath, GIT_DIR);
+        var gitmodulesPath = Path.Combine(mainRepoPath, GIT_MODULES_FILE);
+
+        _fileSystem.AddDirectory(mainGitPath);
+        _fileSystem.AddDirectory(subGitPath);
+
+        const string GITMODULES_CONTENT = """
+            [submodule "submodule"]
+                path = submodule
+                url = https://github.com/user/submodule.git
+            """;
+
+        _fileSystem.AddFile(gitmodulesPath, new MockFileData(GITMODULES_CONTENT));
+
+        // Act
+        var result = _scanner.Scan(_rootFolder, false);
+
+        // Assert
+        result.ShouldContain(mainRepoPath);
+        result.ShouldNotContain(submodulePath);
+        result.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Scan_WithIncludeSubmodulesTrue_ShouldIncludeSubmodules()
+    {
+        // Arrange
+        var mainRepoPath = Path.Combine(_rootFolder, "main");
+        var submodulePath = Path.Combine(mainRepoPath, "submodule");
+
+        var mainGitPath = Path.Combine(mainRepoPath, GIT_DIR);
+        var subGitPath = Path.Combine(submodulePath, GIT_DIR);
+        var gitmodulesPath = Path.Combine(mainRepoPath, GIT_MODULES_FILE);
+
+        _fileSystem.AddDirectory(mainGitPath);
+        _fileSystem.AddDirectory(subGitPath);
+
+        const string GITMODULES_CONTENT = """
+            [submodule "submodule"]
+                path = submodule
+                url = https://github.com/user/submodule.git
+            """;
+
+        _fileSystem.AddFile(gitmodulesPath, new MockFileData(GITMODULES_CONTENT));
+
+        // Act
+        var result = _scanner.Scan(_rootFolder, true);
+
+        // Assert
+        result.ShouldContain(mainRepoPath);
+        result.ShouldContain(submodulePath);
+        result.Count.ShouldBe(2);
+    }
+
+    [Fact]
     public void Scan_WithInvalidSubmodulePath_ShouldIgnoreInvalidSubmodule()
     {
         // Arrange
@@ -335,7 +397,7 @@ public sealed class GitRepositoryScannerTests
         
         processDirectoryMethod!.Invoke(
             scanner,
-            [ALREADY_PROCESSED_DIR, gitRepos, processedPaths, pendingDirs]
+            [ALREADY_PROCESSED_DIR, gitRepos, processedPaths, pendingDirs, true]
         );
         
         // Assert
