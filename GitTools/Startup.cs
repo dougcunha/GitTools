@@ -4,6 +4,7 @@ using GitTools.Commands;
 using GitTools.Services;
 using GitTools.Models;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 using Spectre.Console;
 using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
@@ -63,9 +64,11 @@ public static class Startup
     {
         var rootCommand = new RootCommand("GitTools - A tool for managing your Git repositories.");
         var logAllGitCommandsOption = new Option<bool>(["--log-all-git-commands", "-lg"], "Log all git commands to the console");
+        var logFileOption = new Option<string?>(["--log-file", "-lf"], "Path to a log file where console output will be replicated");
         var disableAnsiOption = new Option<bool>(["--disable-ansi", "-da"], "Disable ANSI color codes in the console output");
         var quietOption = new Option<bool>(["--quiet", "-q"], "Suppress all console output");
         rootCommand.AddGlobalOption(logAllGitCommandsOption);
+        rootCommand.AddGlobalOption(logFileOption);
         rootCommand.AddGlobalOption(disableAnsiOption);
         rootCommand.AddGlobalOption(quietOption);
         var tagRemoveCommand = serviceProvider.GetRequiredService<TagRemoveCommand>();
@@ -95,10 +98,19 @@ public static class Startup
         Task ParseGlobalOptions(InvocationContext context, Func<InvocationContext, Task> next)
         {
             gitToolsOptions.LogAllGitCommands = context.ParseResult.GetValueForOption(logAllGitCommandsOption);
+            gitToolsOptions.LogFilePath = context.ParseResult.GetValueForOption(logFileOption);
             var disableAnsi = context.ParseResult.GetValueForOption(disableAnsiOption);
             var quiet = context.ParseResult.GetValueForOption(quietOption);
             console.Profile.Capabilities.Ansi = !disableAnsi;
             console.Enabled = !quiet;
+
+            if (!string.IsNullOrWhiteSpace(gitToolsOptions.LogFilePath))
+            {
+                var logger = new LoggerConfiguration()
+                    .WriteTo.File(gitToolsOptions.LogFilePath)
+                    .CreateLogger();
+                console.SetLogger(logger);
+            }
 
             return next(context);
         }

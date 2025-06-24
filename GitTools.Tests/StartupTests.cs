@@ -151,6 +151,7 @@ public sealed class StartupTests
         rootCommand.ShouldNotBeNull();
         rootCommand.Description.ShouldBe("GitTools - A tool for managing your Git repositories.");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "log-all-git-commands");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "log-file");
     }
 
     [Fact]
@@ -481,6 +482,7 @@ public sealed class StartupTests
 
         // Assert
         rootCommand.Options.ShouldContain(static opt => opt.Name == "log-all-git-commands");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "log-file");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "disable-ansi");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "quiet");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "help");

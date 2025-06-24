@@ -1,4 +1,5 @@
-﻿using Spectre.Console;
+﻿using Serilog;
+using Spectre.Console;
 using Spectre.Console.Rendering;
 
 namespace GitTools.Services;
@@ -14,7 +15,12 @@ namespace GitTools.Services;
 /// </param>
 public sealed class AnsiConsoleWrapper(IAnsiConsole ansiConsole) : IAnsiConsole
 {
+    private ILogger? _logger;
+
     public bool Enabled { get; set; }
+
+    public void SetLogger(ILogger logger)
+        => _logger = logger;
 
     /// <inheritdoc />
     public void Clear(bool home)
@@ -32,6 +38,7 @@ public sealed class AnsiConsoleWrapper(IAnsiConsole ansiConsole) : IAnsiConsole
             return;
 
         ansiConsole.Write(renderable);
+        _logger?.Information(renderable.ToString());
     }
 
     /// <inheritdoc />
