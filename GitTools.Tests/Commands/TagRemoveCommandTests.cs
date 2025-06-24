@@ -63,7 +63,7 @@ public sealed class TagRemoveCommandTests
         _mockTagValidationService.ParseAndValidateTags("  ").Returns([]);
 
         // Act
-        await _command.ExecuteAsync("  ", @"C:\TestRepo", false);
+        await _command.ExecuteAsync("  ", "C:/TestRepo", false);
 
         // Assert
         _testConsole.Output.ShouldContain("No tags specified to remove.");
@@ -77,14 +77,14 @@ public sealed class TagRemoveCommandTests
         string[] tags = ["v1.0"];
         var searchResult = new TagSearchResult([], [], []);
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", false);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
 
         // Assert
         _testConsole.Output.ShouldContain("No repository with the specified tag(s) found.");
-        _mockConsoleDisplayService.Received(1).ShowScanErrors(searchResult.ScanErrors, @"C:\TestRepo");
+        _mockConsoleDisplayService.Received(1).ShowScanErrors(searchResult.ScanErrors, "C:/TestRepo");
     }
 
     [Fact]
@@ -95,23 +95,23 @@ public sealed class TagRemoveCommandTests
         string[] tags = ["v1.0"];
 
         var searchResult = new TagSearchResult(
-            [@"C:\TestRepo\Repo1"],
-            new Dictionary<string, List<string>> { [@"C:\TestRepo\Repo1"] = ["v1.0"] },
+            ["C:/TestRepo/Repo1"],
+            new Dictionary<string, List<string>> { ["C:/TestRepo/Repo1"] = ["v1.0"] },
             []
         );
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
-        _mockConsoleDisplayService.GetHierarchicalName(@"C:\TestRepo\Repo1", @"C:\TestRepo").Returns("Repo1");
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName("C:/TestRepo/Repo1", "C:/TestRepo").Returns("Repo1");
         _testConsole.Input.PushTextWithEnter(""); // No selection
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", false);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
 
         // Assert
         _mockTagValidationService.Received(1).ParseAndValidateTags(TAGS_INPUT);
-        _mockConsoleDisplayService.Received(1).ShowInitialInfo(@"C:\TestRepo", tags);
-        await _mockTagSearchService.Received(1).SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>());
+        _mockConsoleDisplayService.Received(1).ShowInitialInfo("C:/TestRepo", tags);
+        await _mockTagSearchService.Received(1).SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>());
     }
 
     [Fact]
@@ -123,23 +123,23 @@ public sealed class TagRemoveCommandTests
 
         var searchResult = new TagSearchResult
         (
-            [@"C:\TestRepo\Repo1", @"C:\TestRepo\Repo2"],
+            ["C:/TestRepo/Repo1", "C:/TestRepo/Repo2"],
             new Dictionary<string, List<string>>
             {
-                [@"C:\TestRepo\Repo1"] = ["v1.0"],
-                [@"C:\TestRepo\Repo2"] = ["v1.0"]
+                ["C:/TestRepo/Repo1"] = ["v1.0"],
+                ["C:/TestRepo/Repo2"] = ["v1.0"]
             },
             []
         );
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
-        _mockConsoleDisplayService.GetHierarchicalName(@"C:\TestRepo\Repo1", @"C:\TestRepo").Returns("Repo1");
-        _mockConsoleDisplayService.GetHierarchicalName(@"C:\TestRepo\Repo2", @"C:\TestRepo").Returns("Repo2");
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName("C:/TestRepo/Repo1", "C:/TestRepo").Returns("Repo1");
+        _mockConsoleDisplayService.GetHierarchicalName("C:/TestRepo/Repo2", "C:/TestRepo").Returns("Repo2");
         _testConsole.Input.PushTextWithEnter(""); // No selection
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", false);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
 
         // Assert
         _testConsole.Output.ShouldContain("No repository selected.");
@@ -151,7 +151,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         const string TAGS_INPUT = "v1.0";
         string[] tags = ["v1.0"];
-        const string REPO_PATH = @"C:\TestRepo\Repo1";
+        const string REPO_PATH = "C:/TestRepo/Repo1";
 
         var searchResult = new TagSearchResult
         (
@@ -161,13 +161,13 @@ public sealed class TagRemoveCommandTests
         );
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
-        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, @"C:\TestRepo").Returns("Repo1");
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, "C:/TestRepo").Returns("Repo1");
         _testConsole.Input.PushKey(ConsoleKey.Spacebar);
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", false);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
@@ -183,7 +183,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         const string TAGS_INPUT = "v1.0";
         string[] tags = ["v1.0"];
-        const string REPO_PATH = @"C:\TestRepo\Repo1";
+        const string REPO_PATH = "C:/TestRepo/Repo1";
 
         var searchResult = new TagSearchResult
         (
@@ -193,13 +193,13 @@ public sealed class TagRemoveCommandTests
         );
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
-        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, @"C:\TestRepo").Returns("Repo1");
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, "C:/TestRepo").Returns("Repo1");
         _testConsole.Input.PushKey(ConsoleKey.Spacebar);
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", true);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", true);
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
@@ -215,7 +215,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         const string TAGS_INPUT = "v1.0,v2.0";
         string[] tags = ["v1.0", "v2.0"];
-        const string REPO_PATH = @"C:\TestRepo\Repo1";
+        const string REPO_PATH = "C:/TestRepo/Repo1";
 
         var searchResult = new TagSearchResult
         (
@@ -225,13 +225,13 @@ public sealed class TagRemoveCommandTests
         );
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
-        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, @"C:\TestRepo").Returns("Repo1");
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, "C:/TestRepo").Returns("Repo1");
         _testConsole.Input.PushKey(ConsoleKey.Spacebar);
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", false);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
@@ -247,7 +247,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         const string TAGS_INPUT = "v1.0";
         string[] tags = ["v1.0"];
-        const string REPO_PATH = @"C:\TestRepo\Repo1";
+        const string REPO_PATH = "C:/TestRepo/Repo1";
         var exception = new InvalidOperationException("Git command failed");
 
         var searchResult = new TagSearchResult
@@ -258,14 +258,14 @@ public sealed class TagRemoveCommandTests
         );
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
-        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, @"C:\TestRepo").Returns("Repo1");
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, "C:/TestRepo").Returns("Repo1");
         _mockGitService.DeleteTagAsync(REPO_PATH, "v1.0").Returns(Task.FromException(exception));
         _testConsole.Input.PushKey(ConsoleKey.Spacebar);
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", false);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
@@ -280,7 +280,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         const string TAGS_INPUT = "v1.0";
         string[] tags = ["v1.0"];
-        const string REPO_PATH = @"C:\TestRepo\Repo1";
+        const string REPO_PATH = "C:/TestRepo/Repo1";
         var exception = new InvalidOperationException("Remote tag deletion failed");
 
         var searchResult = new TagSearchResult
@@ -291,14 +291,14 @@ public sealed class TagRemoveCommandTests
         );
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
-        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, @"C:\TestRepo").Returns("Repo1");
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, "C:/TestRepo").Returns("Repo1");
         _mockGitService.DeleteRemoteTagAsync(REPO_PATH, "v1.0").Returns(Task.FromException(exception));
         _testConsole.Input.PushKey(ConsoleKey.Spacebar);
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", true);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", true);
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
@@ -314,11 +314,11 @@ public sealed class TagRemoveCommandTests
         // Arrange
         const string TAGS_INPUT = "v1.0";
         string[] tags = ["v1.0"];
-        const string REPO_PATH = @"C:\TestRepo\Repo1";
+        const string REPO_PATH = "C:/TestRepo/Repo1";
 
         var scanErrors = new Dictionary<string, Exception>
         {
-            [@"C:\TestRepo\ErrorRepo"] = new Exception("Scan error")
+            ["C:/TestRepo/ErrorRepo"] = new Exception("Scan error")
         };
 
         var searchResult = new TagSearchResult
@@ -329,16 +329,16 @@ public sealed class TagRemoveCommandTests
         );
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
-        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, @"C:\TestRepo").Returns("Repo1");
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, "C:/TestRepo").Returns("Repo1");
         _testConsole.Input.PushKey(ConsoleKey.Spacebar);
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", false);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
 
         // Assert
-        _mockConsoleDisplayService.Received(1).ShowScanErrors(scanErrors, @"C:\TestRepo");
+        _mockConsoleDisplayService.Received(1).ShowScanErrors(scanErrors, "C:/TestRepo");
     }
 
     [Fact]
@@ -347,8 +347,8 @@ public sealed class TagRemoveCommandTests
         // Arrange
         const string TAGS_INPUT = "v1.0";
         string[] tags = ["v1.0"];
-        const string REPO1_PATH = @"C:\TestRepo\Repo1";
-        const string REPO2_PATH = @"C:\TestRepo\Repo2";
+        const string REPO1_PATH = "C:/TestRepo/Repo1";
+        const string REPO2_PATH = "C:/TestRepo/Repo2";
 
         var searchResult = new TagSearchResult
         (
@@ -378,15 +378,15 @@ public sealed class TagRemoveCommandTests
         );
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
-        _mockConsoleDisplayService.GetHierarchicalName(REPO1_PATH, @"C:\TestRepo").Returns("Repo1");
-        _mockConsoleDisplayService.GetHierarchicalName(REPO2_PATH, @"C:\TestRepo").Returns("Repo2");
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName(REPO1_PATH, "C:/TestRepo").Returns("Repo1");
+        _mockConsoleDisplayService.GetHierarchicalName(REPO2_PATH, "C:/TestRepo").Returns("Repo2");
         _testConsole.Input.PushKey(ConsoleKey.DownArrow); // The first option is SelectAll, so we move down to the first repository
         _testConsole.Input.PushKey(ConsoleKey.Spacebar);
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", false);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO1_PATH, "v1.0");
@@ -401,7 +401,7 @@ public sealed class TagRemoveCommandTests
         // Arrange
         const string TAGS_INPUT = "v1.0,v2.0";
         string[] tags = ["v1.0", "v2.0"];
-        const string REPO_PATH = @"C:\TestRepo\Repo1";
+        const string REPO_PATH = "C:/TestRepo/Repo1";
         var exception = new InvalidOperationException("Failed to delete v2.0");
 
         var searchResult = new TagSearchResult
@@ -412,15 +412,15 @@ public sealed class TagRemoveCommandTests
         );
 
         _mockTagValidationService.ParseAndValidateTags(TAGS_INPUT).Returns(tags);
-        _mockTagSearchService.SearchRepositoriesWithTagsAsync(@"C:\TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
-        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, @"C:\TestRepo").Returns("Repo1");
+        _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
+        _mockConsoleDisplayService.GetHierarchicalName(REPO_PATH, "C:/TestRepo").Returns("Repo1");
         _mockGitService.DeleteTagAsync(REPO_PATH, "v1.0").Returns(Task.CompletedTask);
         _mockGitService.DeleteTagAsync(REPO_PATH, "v2.0").Returns(Task.FromException(exception));
         _testConsole.Input.PushKey(ConsoleKey.Spacebar);
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, @"C:\TestRepo", false);
+        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");

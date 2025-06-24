@@ -1,5 +1,6 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
+using System.Runtime.InteropServices;
 using GitTools.Commands;
 using GitTools.Models;
 using GitTools.Services;
@@ -18,12 +19,14 @@ public sealed class ReCloneCommandTests
     private readonly IGitService _mockGitService = Substitute.For<IGitService>();
     private readonly TestConsole _testConsole = new();
     private readonly ReCloneCommand _command;
+    private static bool IsWindows
+        => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
     private const string REPO_NAME = "test-repo";
-    private const string REPO_PATH = @"C:\current\test-repo";
-    private const string PARENT_DIR = @"C:\current";
+    private static string _repoPath = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/current/test-repo");
+    private static string _parentDir = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/current");
     private const string REMOTE_URL = "https://github.com/user/test-repo.git";
-    private static readonly string _backupFile = Path.Combine(PARENT_DIR, $"{REPO_NAME}-backup.zip");
+    private static readonly string _backupFile = Path.Combine(_parentDir, $"{REPO_NAME}-backup.zip");
 
     public ReCloneCommandTests()
     {
@@ -70,17 +73,17 @@ public sealed class ReCloneCommandTests
         var invalidRepo = new GitRepository
         {
             Name = REPO_NAME,
-            Path = REPO_PATH,
+            Path = _repoPath,
             IsValid = false
         };
 
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(invalidRepo);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(invalidRepo);
 
         // Act
-        await _command.ExecuteAsync(REPO_PATH, false, false);
+        await _command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
-        _testConsole.Output.ShouldContain($"{REPO_PATH} is not valid or does not exist: {REPO_PATH}");
+        _testConsole.Output.ShouldContain($"{_repoPath} is not valid or does not exist: {_repoPath}");
 
         await _mockGitService.DidNotReceive().RunGitCommandAsync(Arg.Any<string>(), Arg.Any<string>());
         _mockBackupService.DidNotReceive().CreateBackup(Arg.Any<string>(), Arg.Any<string>());
@@ -92,16 +95,16 @@ public sealed class ReCloneCommandTests
         // Arrange
         var validRepo = CreateValidGitRepository();
 
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
-        _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns("M modified-file.txt");
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
+        _mockGitService.RunGitCommandAsync(_repoPath, "status --porcelain").Returns("M modified-file.txt");
 
         // Act
-        await _command.ExecuteAsync(REPO_PATH, false, false);
+        await _command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
         _testConsole.Output.ShouldContain("Uncommitted changes detected. Use --force to ignore.");
 
-        await _mockGitService.Received(1).RunGitCommandAsync(REPO_PATH, "status --porcelain");
+        await _mockGitService.Received(1).RunGitCommandAsync(_repoPath, "status --porcelain");
         _mockBackupService.DidNotReceive().CreateBackup(Arg.Any<string>(), Arg.Any<string>());
     }
 
@@ -112,15 +115,15 @@ public sealed class ReCloneCommandTests
         var validRepo = CreateValidGitRepository();
         SetupSuccessfulReclone(validRepo);
 
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
 
         // Act
-        await _command.ExecuteAsync(REPO_PATH, false, true);
+        await _command.ExecuteAsync(_repoPath, false, true);
 
         // Assert
-        await _mockGitService.DidNotReceive().RunGitCommandAsync(REPO_PATH, "status --porcelain");
+        await _mockGitService.DidNotReceive().RunGitCommandAsync(_repoPath, "status --porcelain");
         _mockBackupService.Received(1).CreateBackup(Arg.Any<string>(), _backupFile);
-        await _mockGitService.Received(1).RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
+        await _mockGitService.Received(1).RunGitCommandAsync(_parentDir, $"clone {REMOTE_URL} {REPO_NAME}");
         _testConsole.Output.ShouldContain("Repository recloned successfully");
     }
 
@@ -131,15 +134,15 @@ public sealed class ReCloneCommandTests
         var validRepo = CreateValidGitRepository();
         SetupSuccessfulReclone(validRepo);
 
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
-        _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
+        _mockGitService.RunGitCommandAsync(_repoPath, "status --porcelain").Returns(string.Empty);
 
         // Act
-        await _command.ExecuteAsync(REPO_PATH, true, false);
+        await _command.ExecuteAsync(_repoPath, true, false);
 
         // Assert
         _mockBackupService.DidNotReceive().CreateBackup(Arg.Any<string>(), Arg.Any<string>());
-        await _mockGitService.Received(1).RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
+        await _mockGitService.Received(1).RunGitCommandAsync(_parentDir, $"clone {REMOTE_URL} {REPO_NAME}");
         _testConsole.Output.ShouldContain("Repository recloned successfully");
     }
 
@@ -150,19 +153,19 @@ public sealed class ReCloneCommandTests
         var validRepo = CreateValidGitRepository();
         SetupSuccessfulReclone(validRepo);
 
-        _mockFileSystem.AddDirectory(REPO_PATH);
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
-        _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
+        _mockFileSystem.AddDirectory(_repoPath);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
+        _mockGitService.RunGitCommandAsync(_repoPath, "status --porcelain").Returns(string.Empty);
 
         // Act
-        await _command.ExecuteAsync(REPO_PATH, false, false);
+        await _command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
-        _mockBackupService.Received(1).CreateBackup(REPO_PATH, _backupFile);
-        await _mockGitService.Received(1).RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
-        await _mockGitService.Received(1).DeleteLocalGitRepositoryAsync(Arg.Is<string>(s => s.StartsWith(REPO_PATH) && s.Contains(REPO_NAME)));
+        _mockBackupService.Received(1).CreateBackup(_repoPath, _backupFile);
+        await _mockGitService.Received(1).RunGitCommandAsync(_parentDir, $"clone {REMOTE_URL} {REPO_NAME}");
+        await _mockGitService.Received(1).DeleteLocalGitRepositoryAsync(Arg.Is<string>(s => s.StartsWith(_repoPath) && s.Contains(REPO_NAME)));
 
-        _testConsole.Output.ShouldContain($"Recloning repository: {REPO_NAME} at {REPO_PATH}");
+        _testConsole.Output.ShouldContain($"Recloning repository: {REPO_NAME} at {_repoPath}");
         _testConsole.Output.ShouldContain($"Backup created: {_backupFile}");
         _testConsole.Output.ShouldContain("Repository recloned successfully");
     }
@@ -174,16 +177,16 @@ public sealed class ReCloneCommandTests
         var validRepo = CreateValidGitRepository();
         SetupSuccessfulReclone(validRepo);
 
-        _mockFileSystem.AddDirectory(REPO_PATH);
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
-        _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
+        _mockFileSystem.AddDirectory(_repoPath);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
+        _mockGitService.RunGitCommandAsync(_repoPath, "status --porcelain").Returns(string.Empty);
 
         // Act
-        await _command.ExecuteAsync(REPO_PATH, false, false);
+        await _command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
         var movedDirectories = _mockFileSystem.AllDirectories
-            .Where(static d => d.StartsWith(REPO_PATH, StringComparison.Ordinal) && d != REPO_PATH && d.Length > REPO_PATH.Length)
+            .Where(static d => d.StartsWith(_repoPath, StringComparison.Ordinal) && d != _repoPath && d.Length > _repoPath.Length)
             .ToList();
 
         movedDirectories.ShouldNotBeEmpty();
@@ -198,14 +201,14 @@ public sealed class ReCloneCommandTests
         SetupSuccessfulReclone(validRepo);
 
         // Simulate directory move failure by not adding the directory to mock filesystem
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
-        _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
+        _mockGitService.RunGitCommandAsync(_repoPath, "status --porcelain").Returns(string.Empty);
 
         // Act
-        await _command.ExecuteAsync(REPO_PATH, false, false);
+        await _command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
-        await _mockGitService.Received(1).RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
+        await _mockGitService.Received(1).RunGitCommandAsync(_parentDir, $"clone {REMOTE_URL} {REPO_NAME}");
         _testConsole.Output.ShouldContain("Repository recloned successfully");
     }
 
@@ -215,14 +218,14 @@ public sealed class ReCloneCommandTests
         // Arrange
         var validRepo = CreateValidGitRepository();
 
-        _mockFileSystem.AddDirectory(REPO_PATH);
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
-        _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
-        _mockGitService.RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}").Returns("Cloning...");
+        _mockFileSystem.AddDirectory(_repoPath);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
+        _mockGitService.RunGitCommandAsync(_repoPath, "status --porcelain").Returns(string.Empty);
+        _mockGitService.RunGitCommandAsync(_parentDir, $"clone {REMOTE_URL} {REPO_NAME}").Returns("Cloning...");
         _mockGitService.DeleteLocalGitRepositoryAsync(Arg.Any<string>()).Returns(true);
 
         // Act
-        await _command.ExecuteAsync(REPO_PATH, false, false);
+        await _command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
         _testConsole.Output.ShouldContain("Old repository deleted:");
@@ -235,14 +238,14 @@ public sealed class ReCloneCommandTests
         // Arrange
         var validRepo = CreateValidGitRepository();
 
-        _mockFileSystem.AddDirectory(REPO_PATH);
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
-        _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
-        _mockGitService.RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}").Returns("Cloning...");
+        _mockFileSystem.AddDirectory(_repoPath);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
+        _mockGitService.RunGitCommandAsync(_repoPath, "status --porcelain").Returns(string.Empty);
+        _mockGitService.RunGitCommandAsync(_parentDir, $"clone {REMOTE_URL} {REPO_NAME}").Returns("Cloning...");
         _mockGitService.DeleteLocalGitRepositoryAsync(Arg.Any<string>()).Returns(false);
 
         // Act
-        await _command.ExecuteAsync(REPO_PATH, false, false);
+        await _command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
         _testConsole.Output.ShouldNotContain("Old repository deleted:");
@@ -254,15 +257,15 @@ public sealed class ReCloneCommandTests
     {
         // Arrange
         var validRepo = CreateValidGitRepository(hasErrors: true);
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
 
         // Act
-        await _command.ExecuteAsync(REPO_PATH, false, false);
+        await _command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
         _testConsole.Output.ShouldContain("Repository has errors and cannot be inspected for changes.");
-        await _mockGitService.DidNotReceive().RunGitCommandAsync(REPO_PATH, "status --porcelain");
-        await _mockGitService.DidNotReceive().RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
+        await _mockGitService.DidNotReceive().RunGitCommandAsync(_repoPath, "status --porcelain");
+        await _mockGitService.DidNotReceive().RunGitCommandAsync(_parentDir, $"clone {REMOTE_URL} {REPO_NAME}");
     }
 
     [Fact]
@@ -275,19 +278,19 @@ public sealed class ReCloneCommandTests
         var command = new ReCloneCommand(mockFileSystem, _mockBackupService, _mockGitService, _testConsole);
 
         // Configure mock to throw an exception when Move is called
-        mockFileSystem.Directory.Exists(REPO_PATH).Returns(true);
+        mockFileSystem.Directory.Exists(_repoPath).Returns(true);
 
         mockFileSystem.Directory.When(static x => x.Move(Arg.Any<string>(), Arg.Any<string>()))
             .Do(static _ => throw new UnauthorizedAccessException("Access denied"));
 
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
-        _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
+        _mockGitService.RunGitCommandAsync(_repoPath, "status --porcelain").Returns(string.Empty);
 
         // Act
-        await command.ExecuteAsync(REPO_PATH, false, false);
+        await command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
-        await _mockGitService.Received(1).RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
+        await _mockGitService.Received(1).RunGitCommandAsync(_parentDir, $"clone {REMOTE_URL} {REPO_NAME}");
         await _mockGitService.DidNotReceive().DeleteLocalGitRepositoryAsync(Arg.Any<string>());
         _testConsole.Output.ShouldContain("Attempt to rename folder");
         _testConsole.Output.ShouldContain("failed: Access denied");
@@ -304,19 +307,19 @@ public sealed class ReCloneCommandTests
         var command = new ReCloneCommand(mockFileSystem, _mockBackupService, _mockGitService, _testConsole);
 
         // Configure mock to throw IOException when Move is called
-        mockFileSystem.Directory.Exists(REPO_PATH).Returns(true);
+        mockFileSystem.Directory.Exists(_repoPath).Returns(true);
 
         mockFileSystem.Directory.When(static x => x.Move(Arg.Any<string>(), Arg.Any<string>()))
             .Do(static _ => throw new IOException("Directory is in use"));
 
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
-        _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
+        _mockGitService.RunGitCommandAsync(_repoPath, "status --porcelain").Returns(string.Empty);
 
         // Act
-        await command.ExecuteAsync(REPO_PATH, false, false);
+        await command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
-        await _mockGitService.Received(1).RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
+        await _mockGitService.Received(1).RunGitCommandAsync(_parentDir, $"clone {REMOTE_URL} {REPO_NAME}");
         await _mockGitService.DidNotReceive().DeleteLocalGitRepositoryAsync(Arg.Any<string>());
         _testConsole.Output.ShouldContain("Attempt to rename folder");
         _testConsole.Output.ShouldContain("failed: Directory is in use");
@@ -333,19 +336,19 @@ public sealed class ReCloneCommandTests
         var command = new ReCloneCommand(mockFileSystem, _mockBackupService, _mockGitService, _testConsole);
 
         // Configure mock to throw DirectoryNotFoundException when Move is called
-        mockFileSystem.Directory.Exists(REPO_PATH).Returns(true);
+        mockFileSystem.Directory.Exists(_repoPath).Returns(true);
 
         mockFileSystem.Directory.When(static x => x.Move(Arg.Any<string>(), Arg.Any<string>()))
             .Do(static _ => throw new DirectoryNotFoundException("Directory not found"));
 
-        _mockGitService.GetGitRepositoryAsync(REPO_PATH).Returns(validRepo);
-        _mockGitService.RunGitCommandAsync(REPO_PATH, "status --porcelain").Returns(string.Empty);
+        _mockGitService.GetGitRepositoryAsync(_repoPath).Returns(validRepo);
+        _mockGitService.RunGitCommandAsync(_repoPath, "status --porcelain").Returns(string.Empty);
 
         // Act
-        await command.ExecuteAsync(REPO_PATH, false, false);
+        await command.ExecuteAsync(_repoPath, false, false);
 
         // Assert
-        await _mockGitService.Received(1).RunGitCommandAsync(PARENT_DIR, $"clone {REMOTE_URL} {REPO_NAME}");
+        await _mockGitService.Received(1).RunGitCommandAsync(_parentDir, $"clone {REMOTE_URL} {REPO_NAME}");
         await _mockGitService.DidNotReceive().DeleteLocalGitRepositoryAsync(Arg.Any<string>());
         _testConsole.Output.ShouldNotContain("Attempt to rename folder");
         _testConsole.Output.ShouldNotContain("failed:");
@@ -356,7 +359,7 @@ public sealed class ReCloneCommandTests
         => new()
         {
             Name = REPO_NAME,
-            Path = REPO_PATH,
+            Path = _repoPath,
             RemoteUrl = REMOTE_URL,
             IsValid = true,
             HasErrors = hasErrors

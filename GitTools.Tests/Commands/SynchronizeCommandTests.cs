@@ -10,11 +10,11 @@ namespace GitTools.Tests.Commands;
 [ExcludeFromCodeCoverage]
 public sealed class SynchronizeCommandTests
 {
-    private const string ROOT_DIRECTORY = "C:/repos";
-    private const string REPO_PATH = "C:/repos/repo1";
+    private static string _rootDirectory = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/repos");
+    private static string _repoPath = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/repos/repo1");
     private const string REPO_NAME = "repo1";
-    private static readonly List<BranchStatus> _syncedBranches = [new(REPO_PATH, "main", "origin/main", true, 0, 0)];
-    private static readonly List<BranchStatus> _outdatedBranches = [new(REPO_PATH, "main", "origin/main", true, 1, 0)];
+    private static readonly List<BranchStatus> _syncedBranches = [new(_repoPath, "main", "origin/main", true, 0, 0)];
+    private static readonly List<BranchStatus> _outdatedBranches = [new(_repoPath, "main", "origin/main", true, 1, 0)];
     private readonly IGitRepositoryScanner _mockScanner = Substitute.For<IGitRepositoryScanner>();
     private readonly IGitService _mockGitService = Substitute.For<IGitService>();
     private readonly TestConsole _testConsole = new();
@@ -49,10 +49,10 @@ public sealed class SynchronizeCommandTests
     public async Task ExecuteAsync_NoRepositories_ShouldShowMessage()
     {
         // Arrange
-        _mockScanner.Scan(ROOT_DIRECTORY).Returns([]);
+        _mockScanner.Scan(_rootDirectory).Returns([]);
 
         // Act
-        await _command.InvokeAsync([ROOT_DIRECTORY]);
+        await _command.InvokeAsync([_rootDirectory]);
 
         // Assert
         _testConsole.Output.ShouldContain("No Git repositories found.");
@@ -62,14 +62,14 @@ public sealed class SynchronizeCommandTests
     public async Task ExecuteAsync_AllRepositoriesSynced_ShouldShowMessage()
     {
         // Arrange
-        var repoPaths = new List<string> { REPO_PATH };
-        _mockScanner.Scan(ROOT_DIRECTORY).Returns(repoPaths);
+        var repoPaths = new List<string> { _repoPath };
+        _mockScanner.Scan(_rootDirectory).Returns(repoPaths);
 
-        _mockGitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIRECTORY, Arg.Any<bool>())
-            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, "https://example.com", false, _syncedBranches));
+        _mockGitService.GetRepositoryStatusAsync(_repoPath, _rootDirectory, Arg.Any<bool>())
+            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, _repoPath, "https://example.com", false, _syncedBranches));
 
         // Act
-        await _command.InvokeAsync([ROOT_DIRECTORY]);
+        await _command.InvokeAsync([_rootDirectory]);
 
         // Assert
         _testConsole.Output.ShouldContain("No out-of-sync repositories found.");
@@ -79,51 +79,51 @@ public sealed class SynchronizeCommandTests
     public async Task ExecuteAsync_ShowOnly_ShouldDisplayOutdatedRepos()
     {
         // Arrange
-        var repoPaths = new List<string> { REPO_PATH };
-        _mockScanner.Scan(ROOT_DIRECTORY).Returns(repoPaths);
+        var repoPaths = new List<string> { _repoPath };
+        _mockScanner.Scan(_rootDirectory).Returns(repoPaths);
 
-        _mockGitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIRECTORY, Arg.Any<bool>())
-            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, "https://example.com", false, _outdatedBranches));
+        _mockGitService.GetRepositoryStatusAsync(_repoPath, _rootDirectory, Arg.Any<bool>())
+            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, _repoPath, "https://example.com", false, _outdatedBranches));
 
         _mockDisplayService.When(static x => x.DisplayRepositoriesStatus(Arg.Any<List<GitRepositoryStatus>>(), Arg.Any<string>()))
             .Do(static _ => { });
 
         // Act
-        await _command.InvokeAsync([ROOT_DIRECTORY, "--show-only"]);
+        await _command.InvokeAsync([_rootDirectory, "--show-only"]);
 
         // Assert
-        _mockDisplayService.Received(1).DisplayRepositoriesStatus(Arg.Any<List<GitRepositoryStatus>>(), ROOT_DIRECTORY);
+        _mockDisplayService.Received(1).DisplayRepositoriesStatus(Arg.Any<List<GitRepositoryStatus>>(), _rootDirectory);
     }
 
     [Fact]
     public async Task ExecuteAsync_NoFetch_ShouldNotFetchRepositories()
     {
         // Arrange
-        var repoPaths = new List<string> { REPO_PATH };
-        _mockScanner.Scan(ROOT_DIRECTORY).Returns(repoPaths);
+        var repoPaths = new List<string> { _repoPath };
+        _mockScanner.Scan(_rootDirectory).Returns(repoPaths);
 
-        _mockGitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIRECTORY, false)
-            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, "https://example.com", false, _outdatedBranches));
+        _mockGitService.GetRepositoryStatusAsync(_repoPath, _rootDirectory, false)
+            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, _repoPath, "https://example.com", false, _outdatedBranches));
 
         _mockDisplayService.When(static x => x.DisplayRepositoriesStatus(Arg.Any<List<GitRepositoryStatus>>(), Arg.Any<string>()))
             .Do(static _ => { });
 
         // Act
-        await _command.InvokeAsync([ROOT_DIRECTORY, "--show-only", "--no-fetch"]);
+        await _command.InvokeAsync([_rootDirectory, "--show-only", "--no-fetch"]);
 
         // Assert
-        await _mockGitService.Received(1).GetRepositoryStatusAsync(REPO_PATH, ROOT_DIRECTORY, false);
+        await _mockGitService.Received(1).GetRepositoryStatusAsync(_repoPath, _rootDirectory, false);
     }
 
     [Fact]
     public async Task ExecuteAsync_Automatic_ShouldUpdateAllOutdatedRepos()
     {
         // Arrange
-        var repoPaths = new List<string> { REPO_PATH };
-        _mockScanner.Scan(ROOT_DIRECTORY).Returns(repoPaths);
+        var repoPaths = new List<string> { _repoPath };
+        _mockScanner.Scan(_rootDirectory).Returns(repoPaths);
 
-        _mockGitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIRECTORY, Arg.Any<bool>())
-            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, "https://example.com", false, _outdatedBranches));
+        _mockGitService.GetRepositoryStatusAsync(_repoPath, _rootDirectory, Arg.Any<bool>())
+            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, _repoPath, "https://example.com", false, _outdatedBranches));
 
         _mockGitService.SynchronizeRepositoryAsync
         (
@@ -133,13 +133,13 @@ public sealed class SynchronizeCommandTests
             Arg.Any<bool>()
         ).Returns(true);
 
-        _mockDisplayService.GetHierarchicalName(REPO_PATH, ROOT_DIRECTORY).Returns(REPO_NAME);
+        _mockDisplayService.GetHierarchicalName(_repoPath, _rootDirectory).Returns(REPO_NAME);
 
         _mockDisplayService.When(static x => x.DisplayRepositoriesStatus(Arg.Any<List<GitRepositoryStatus>>(), Arg.Any<string>()))
             .Do(static _ => { });
 
         // Act
-        await _command.InvokeAsync([ROOT_DIRECTORY, "--automatic"]);
+        await _command.InvokeAsync([_rootDirectory, "--automatic"]);
 
         // Assert
         _testConsole.Output.ShouldContain("succeeded");
@@ -149,11 +149,11 @@ public sealed class SynchronizeCommandTests
     public async Task ExecuteAsync_AllSelected_ShouldUpdateAllOutdatedRepos()
     {
         // Arrange
-        var repoPaths = new List<string> { REPO_PATH };
-        _mockScanner.Scan(ROOT_DIRECTORY).Returns(repoPaths);
+        var repoPaths = new List<string> { _repoPath };
+        _mockScanner.Scan(_rootDirectory).Returns(repoPaths);
 
-        _mockGitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIRECTORY, Arg.Any<bool>())
-            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, "https://example.com", false, _outdatedBranches));
+        _mockGitService.GetRepositoryStatusAsync(_repoPath, _rootDirectory, Arg.Any<bool>())
+            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, _repoPath, "https://example.com", false, _outdatedBranches));
 
         _mockGitService.WhenForAnyArgs(x => x.SynchronizeRepositoryAsync
         (
@@ -171,7 +171,7 @@ public sealed class SynchronizeCommandTests
             Arg.Any<bool>()
         ).Returns(true);
 
-        _mockDisplayService.GetHierarchicalName(REPO_PATH, ROOT_DIRECTORY).Returns(REPO_NAME);
+        _mockDisplayService.GetHierarchicalName(_repoPath, _rootDirectory).Returns(REPO_NAME);
 
         _mockDisplayService.When(static x => x.DisplayRepositoriesStatus(Arg.Any<List<GitRepositoryStatus>>(), Arg.Any<string>()))
             .Do(static _ => { });
@@ -180,7 +180,7 @@ public sealed class SynchronizeCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        await _command.InvokeAsync([ROOT_DIRECTORY]);
+        await _command.InvokeAsync([_rootDirectory]);
 
         // Assert
         _testConsole.Output.ShouldContain("succeeded");
@@ -190,11 +190,11 @@ public sealed class SynchronizeCommandTests
     public async Task ExecuteAsync_NoneSelected_ShouldPrintMessage()
     {
         // Arrange
-        var repoPaths = new List<string> { REPO_PATH };
-        _mockScanner.Scan(ROOT_DIRECTORY).Returns(repoPaths);
+        var repoPaths = new List<string> { _repoPath };
+        _mockScanner.Scan(_rootDirectory).Returns(repoPaths);
 
-        _mockGitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIRECTORY, Arg.Any<bool>())
-            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, "https://example.com", false, _outdatedBranches));
+        _mockGitService.GetRepositoryStatusAsync(_repoPath, _rootDirectory, Arg.Any<bool>())
+            .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, _repoPath, "https://example.com", false, _outdatedBranches));
 
         _mockGitService.SynchronizeRepositoryAsync
         (
@@ -204,7 +204,7 @@ public sealed class SynchronizeCommandTests
             Arg.Any<bool>()
         ).Returns(true);
 
-        _mockDisplayService.GetHierarchicalName(REPO_PATH, ROOT_DIRECTORY).Returns(REPO_NAME);
+        _mockDisplayService.GetHierarchicalName(_repoPath, _rootDirectory).Returns(REPO_NAME);
 
         _mockDisplayService.When(static x => x.DisplayRepositoriesStatus(Arg.Any<List<GitRepositoryStatus>>(), Arg.Any<string>()))
             .Do(static _ => { });
@@ -212,7 +212,7 @@ public sealed class SynchronizeCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        await _command.InvokeAsync([ROOT_DIRECTORY]);
+        await _command.InvokeAsync([_rootDirectory]);
 
         // Assert
         _testConsole.Output.ShouldContain("No repository selected");
@@ -222,14 +222,14 @@ public sealed class SynchronizeCommandTests
     public async Task ExecuteAsync_ErrorGettingRepositoryStatus_ShouldPrintMessage()
     {
         // Arrange
-        var repoPaths = new List<string> { REPO_PATH };
-        _mockScanner.Scan(ROOT_DIRECTORY).Returns(repoPaths);
+        var repoPaths = new List<string> { _repoPath };
+        _mockScanner.Scan(_rootDirectory).Returns(repoPaths);
 
-        _mockGitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIRECTORY, Arg.Any<bool>())
+        _mockGitService.GetRepositoryStatusAsync(_repoPath, _rootDirectory, Arg.Any<bool>())
             .ThrowsAsync(new InvalidOperationException("Fail to get repository status"));
 
         // Act
-        await _command.InvokeAsync([ROOT_DIRECTORY]);
+        await _command.InvokeAsync([_rootDirectory]);
 
         // Assert
         _testConsole.Output.ShouldContain("Fail to get repository status");

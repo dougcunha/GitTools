@@ -18,12 +18,12 @@ public sealed class GitServiceTests
     private readonly GitToolsOptions _options = new();
     private readonly GitService _gitService;
 
-    private const string REPO_PATH = @"C:\test\repo";
+    private const string REPO_PATH = "C:/test/repo";
     private const string REPO_NAME = "test-repo";
     private const string TAG_NAME = "v1.0.0";
     private const string GIT_DIR = ".git";
     private const string REMOTE_URL = "https://github.com/user/repo.git";
-    private const string CURRENT_DIRECTORY = @"C:\current";
+    private const string CURRENT_DIRECTORY = "C:/current";
 
     public GitServiceTests()
         => _gitService = new GitService(_fileSystem, _processRunner, _console, _options);
@@ -1013,10 +1013,11 @@ public sealed class GitServiceTests
     }
 
     [Fact]
-    public async Task DeleteLocalGitRepositoryAsync_OnWindows_ShouldUsePowerShellCommand()
+    public async Task DeleteLocalGitRepositoryAsync_ShouldUseAppropriatedCommand()
     {
         // Arrange
-        const string REPOSITORY_PATH = @"C:\test\repo";
+        const string REPOSITORY_PATH = "C:/test/repo";
+        var isWindows = Environment.OSVersion.Platform == PlatformID.Win32NT;
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
             .Returns(0);
@@ -1031,9 +1032,12 @@ public sealed class GitServiceTests
 
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(static psi =>
-                psi.FileName == "powershell" &&
-                psi.Arguments.Contains($"Remove-Item -Recurse -Force '{REPOSITORY_PATH}'")),
+            Arg.Is<ProcessStartInfo>
+            (
+                psi =>
+                    psi.FileName.Contains(isWindows ? "powershell" : "bash") &&
+                    psi.Arguments.Contains(isWindows ? $"Remove-Item -Recurse -Force '{REPOSITORY_PATH}'" : "rm -rf")
+            ),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
         );
