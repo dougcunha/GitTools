@@ -69,14 +69,17 @@ public sealed class AnsiConsoleWrapperTests
     public void Write_WhenLoggerConfigured_WritesToLogger()
     {
         // Arrange
-        _wrapper.Enabled = ENABLED;
-        var renderable = new Markup("test");
+        AnsiConsoleWrapper wrapper = new(new TestConsole());
+        wrapper.SetLogger(_logger);
+        wrapper.Enabled = ENABLED;
+        const string MSG = "test";
+        var renderable = new Paragraph(MSG);
 
         // Act
-        _wrapper.Write(renderable);
+        wrapper.Write(renderable);
 
         // Assert
-        _logger.Received(1).Information(renderable.ToString());
+        _logger.Received(1).Information("{@Msg}", MSG);
     }
 
     [Fact]

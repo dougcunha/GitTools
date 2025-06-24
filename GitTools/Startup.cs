@@ -104,13 +104,14 @@ public static class Startup
             console.Profile.Capabilities.Ansi = !disableAnsi;
             console.Enabled = !quiet;
 
-            if (!string.IsNullOrWhiteSpace(gitToolsOptions.LogFilePath))
-            {
-                var logger = new LoggerConfiguration()
-                    .WriteTo.File(gitToolsOptions.LogFilePath)
-                    .CreateLogger();
-                console.SetLogger(logger);
-            }
+            if (string.IsNullOrWhiteSpace(gitToolsOptions.LogFilePath))
+                return next(context);
+
+            var logger = new LoggerConfiguration()
+                .WriteTo.File(gitToolsOptions.LogFilePath)
+                .CreateLogger();
+
+            console.SetLogger(logger);
 
             return next(context);
         }
