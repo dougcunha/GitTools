@@ -1,6 +1,7 @@
 #!/bin/bash
 # Script to setup development environment for GitTools on Linux systems
 # Installs .NET SDK and required tools for code coverage
+# Do not run as root
 
 set -e  # Exit on any error
 
