@@ -8,6 +8,7 @@
 ## Index
 
 - [Features](#features)
+- [Performance](#performance)
 - [Commands](#commands)
   - [Remove Tags (rm)](#remove-tags-rm)
   - [List Tags (ls)](#list-tags-ls)
@@ -17,7 +18,7 @@
   - [Synchronize (sync)](#synchronize-sync)
   - [Build](#build)
 - [Code Coverage](#code-coverage)
-- [Publish as Single File](#publish-as-single-file)
+- [AOT Compilation](#aot-compilation)
 - [Contributing](#contributing)
 - [Third-party Libraries](#third-party-libraries)
 - [License](#license)
@@ -39,6 +40,17 @@ GitTools is a command-line tool for managing Git repositories, including searchi
 - **Modern Terminal UI**: Built with [Spectre.Console](https://spectreconsole.net/) for beautiful interfaces
 - **Modern CLI Parsing**: Uses [System.CommandLine](https://github.com/dotnet/command-line-api) for extensible command-line parsing
 - **Global Options**: Configure output behavior with global options available across all commands
+- **AOT Optimized**: Native compilation for faster startup and smaller deployments
+
+## Performance
+
+GitTools is built with performance in mind:
+
+- **AOT Compilation**: Uses Ahead-of-Time (AOT) compilation for native performance
+- **Fast Startup**: Near-instantaneous startup times with AOT-compiled executables
+- **Small Footprint**: Optimized binary size through trimming and AOT compilation
+- **Memory Efficient**: Modern .NET 9 runtime with optimized memory usage
+- **Self-Contained**: No runtime dependencies required for deployment
 
 ## Commands
 
@@ -292,14 +304,39 @@ The coverage report includes:
 - **Method Coverage**: Percentage of methods covered by tests
 - **Per-file Analysis**: Detailed coverage breakdown for each source file
 
-## Publish as Single File
+## AOT Compilation
+
+GitTools is optimized for AOT (Ahead-of-Time) compilation, providing superior performance and deployment characteristics:
+
+### Benefits
+
+- **Faster Startup**: Near-instantaneous application startup
+- **Smaller Size**: Trimmed executables with only required code
+- **No Runtime Dependencies**: Self-contained executables
+- **Better Performance**: Native machine code execution
+- **Reduced Memory Usage**: Optimized memory allocation patterns
+
+### Building AOT Executables
 
 ```sh
-dotnet publish -c Release -r <RID>
+# Build for Windows (x64)
+dotnet publish -c Release -r win-x64
+
+# Build for Linux (x64)  
+dotnet publish -c Release -r linux-x64
+
+# Build for macOS (ARM64)
+dotnet publish -c Release -r osx-arm64
 ```
 
-Replace `<RID>` with your target runtime identifier, for example `win-x64` for
-Windows or `linux-x64` for Linux.
+### Technical Implementation
+
+- **Source Generators**: JSON serialization uses source-generated contexts
+- **Trim-Safe**: All code is compatible with IL trimming
+- **Reflection-Free**: No runtime reflection dependencies
+- **Static Analysis**: All types are statically analyzable at compile time
+
+The release binaries are automatically built with AOT enabled for optimal performance.
 
 ## Contributing
 
