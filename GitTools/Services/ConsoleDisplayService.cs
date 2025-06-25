@@ -27,12 +27,7 @@ public sealed class ConsoleDisplayService(IAnsiConsole console) : IConsoleDispla
             console.Write(rule);
 
             // Use simple exception display for AOT compatibility
-            console.MarkupLineInterpolated($"[red]Error: {exception.Message}[/]");
-
-            if (!string.IsNullOrWhiteSpace(exception.StackTrace))
-            {
-                console.MarkupLineInterpolated($"[grey]Stack trace: {exception.StackTrace}[/]");
-            }
+            console.MarkupLineInterpolated($"[red]Error: {exception.Message}[/]\n{exception.StackTrace}");
         }
     }
 

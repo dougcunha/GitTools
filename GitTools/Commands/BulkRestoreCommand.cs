@@ -56,28 +56,21 @@ public sealed class BulkRestoreCommand : Command
         {
             var json = await _fileSystem.File.ReadAllTextAsync(configFile).ConfigureAwait(false);
 
-            // Try to deserialize as GitRepositoryBackup first (new format)
             var backupData = JsonSerializer.Deserialize(json, GitToolsJsonContext.Default.ListGitRepositoryBackup);
 
-            if (backupData?.Count > 0)
-            {
-                repositories = backupData.Select(b => new GitRepository
+            repositories = backupData?.Select
+            (
+                static b => new GitRepository
                 {
                     Name = b.Name,
                     Path = b.Path,
                     RemoteUrl = b.RemoteUrl,
                     IsValid = true,
                     HasErrors = false
-                }).Where(static r => !string.IsNullOrWhiteSpace(r.RemoteUrl))
-                .OrderBy(static r => r.Name).ToList();
-            }
-            else
-            {
-                // Fallback to GitRepository format (legacy)
-                repositories = JsonSerializer.Deserialize(json, GitToolsJsonContext.Default.ListGitRepository)
-                    ?.Where(static r => !string.IsNullOrWhiteSpace(r.RemoteUrl))
-                    .OrderBy(static r => r.Name).ToList();
-            }
+                }
+            )
+            .Where(static r => !string.IsNullOrWhiteSpace(r.RemoteUrl))
+            .OrderBy(static r => r.Name).ToList();
         }
         catch (Exception ex)
         {
