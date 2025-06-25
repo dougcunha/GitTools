@@ -101,9 +101,9 @@ public static class Startup
         {
             gitToolsOptions.LogAllGitCommands = context.ParseResult.GetValueForOption(logAllGitCommandsOption);
             gitToolsOptions.LogFilePath = context.ParseResult.GetValueForOption(logFileOption);
+            gitToolsOptions.IncludeSubmodules = context.ParseResult.GetValueForOption(includeSubmodulesOption);
             var disableAnsi = context.ParseResult.GetValueForOption(disableAnsiOption);
             var quiet = context.ParseResult.GetValueForOption(quietOption);
-            gitToolsOptions.IncludeSubmodules = context.ParseResult.GetValueForOption(includeSubmodulesOption);
             console.Profile.Capabilities.Ansi = !disableAnsi;
             console.Enabled = !quiet;
 

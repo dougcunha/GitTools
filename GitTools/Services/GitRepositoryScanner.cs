@@ -17,14 +17,13 @@ public sealed partial class GitRepositoryScanner
 {
     private const string GIT_DIR = ".git";
     private const string GIT_MODULES_FILE = ".gitmodules";
-    private readonly GitToolsOptions _options = options;
 
     /// <inheritdoc/>
     public List<string> Scan(string rootFolder)
     {
         var gitRepos = new List<string>();
         var processedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        SearchGitRepositories(rootFolder, gitRepos, processedPaths, _options.IncludeSubmodules);
+        SearchGitRepositories(rootFolder, gitRepos, processedPaths, options.IncludeSubmodules);
 
         return [.. gitRepos.Distinct()];
     }
@@ -102,9 +101,7 @@ public sealed partial class GitRepositoryScanner
                 }
 
                 if (includeSubmodules)
-                {
                     AddSubmodules(currentDir, processedPaths, pendingDirs);
-                }
             }
             else
             {

@@ -307,6 +307,9 @@ This project uses the following open source libraries:
 
 - [Spectre.Console](https://spectreconsole.net/) — for beautiful, interactive console UIs in .NET
 - [System.CommandLine](https://github.com/dotnet/command-line-api) — for modern, extensible command-line parsing
+- [Serilog](https://serilog.net/) - for logging capabilities
+- [Shouldly](https://github.com/shouldly/shouldly) - for elegant - and free - unit test assertions
+- [NSubstitute](https://nsubstitute.github.io/) - for simple and effective mocking
 
 ## License
 
