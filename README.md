@@ -53,6 +53,7 @@ These options are available for all commands:
 - `--disable-ansi`, `-da`: Disable ANSI color codes in console output (useful for plain text output or incompatible terminals)
 - `--quiet`, `-q`: Suppress all console output (useful for automated scripts or silent operation)
 - `--include-submodules`, `-is`: Include Git submodules when scanning for repositories (default true)
+- `--repository-filter`, `-rf`: Filter repositories by name using wildcard patterns. Can be used multiple times.
 
 **Examples:**
 
@@ -74,6 +75,9 @@ GitTools ls ./projects --log-file gittools.log
 
 # Exclude submodules from scanning
 GitTools sync ./projects --include-submodules false
+
+# Filter repositories by name
+GitTools sync ./projects --repository-filter "frontend-*" --repository-filter "*-service"
 ```
 
 ### Remove Tags (rm)

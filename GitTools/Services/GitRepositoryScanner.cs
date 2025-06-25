@@ -1,6 +1,7 @@
 using System.IO.Abstractions;
 using System.Text.RegularExpressions;
 using GitTools.Models;
+using GitTools.Utils;
 using Spectre.Console;
 
 namespace GitTools.Services;
@@ -25,7 +26,12 @@ public sealed partial class GitRepositoryScanner
         var processedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         SearchGitRepositories(rootFolder, gitRepos, processedPaths, options.IncludeSubmodules);
 
-        return [.. gitRepos.Distinct()];
+        var repositories = gitRepos.Distinct().ToList();
+
+        if (options.HasRepositoryFilters)
+            repositories = ApplyRepositoryFiltering(repositories, rootFolder);
+
+        return repositories;
     }
 
     /// <summary>
@@ -169,6 +175,49 @@ public sealed partial class GitRepositoryScanner
         {
             console.MarkupLineInterpolated($"[grey]Error processing submodules in: {repoDir} ({ex.Message})[/]");
         }
+    }
+
+    /// <summary>
+    /// Applies repository filtering based on the configured patterns.
+    /// </summary>
+    /// <param name="repositories">The list of repository paths to filter.</param>
+    /// <param name="rootFolder">The root folder used for relative path calculation.</param>
+    /// <returns>The filtered list of repositories.</returns>
+    private List<string> ApplyRepositoryFiltering(List<string> repositories, string rootFolder)
+    {
+        var filteredRepositories = new List<string>();
+
+        foreach (var filter in options.RepositoryFilters)
+        {
+            var repositoryNames = repositories.Select(path => GetRepositoryName(path, rootFolder));
+            var matchedNames = WildcardMatcher.MatchItems(repositoryNames, filter);
+
+            var matchedPaths = repositories.Where(path => matchedNames.Contains(GetRepositoryName(path, rootFolder)));
+
+            filteredRepositories.AddRange(matchedPaths);
+        }
+
+        var result = filteredRepositories.Distinct().ToList();
+
+        if (result.Count != repositories.Count)
+        {
+            console.MarkupLineInterpolated($"[blue]Repository filtering applied: {result.Count} of {repositories.Count} repositories match the specified patterns.[/]");
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Gets the repository name for filtering purposes.
+    /// </summary>
+    /// <param name="repositoryPath">The full path to the repository.</param>
+    /// <param name="rootFolder">The root folder used for relative path calculation.</param>
+    /// <returns>The repository name used for filtering.</returns>
+    private static string GetRepositoryName(string repositoryPath, string rootFolder)
+    {
+        var relativePath = Path.GetRelativePath(rootFolder, repositoryPath);
+
+        return relativePath.Replace('\\', '/');
     }
 
     /// <summary>
