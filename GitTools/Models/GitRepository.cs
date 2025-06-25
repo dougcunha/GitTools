@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace GitTools.Models;
 
@@ -24,34 +25,40 @@ public sealed class GitRepository
     ///  Gets or sets the name of the repository.
     ///  This is typically the folder name where the repository is located.
     /// </summary>
+    [JsonPropertyName("name")]
     public required string Name { get; init; }
 
     /// <summary>
     ///  Gets or sets the path to the repository.
     ///  This is the full file system path to the repository directory.
     /// </summary>
+    [JsonPropertyName("path")]
     public required string Path { get; init; }
 
     /// <summary>
     ///  Gets or sets the remote URL of the repository.
     ///  This is the URL of the remote repository, typically where the code is hosted (e.g., GitHub, GitLab).
     /// </summary>
+    [JsonPropertyName("remote_url")]
     public string? RemoteUrl { get; init; }
 
     /// <summary>
     ///  Gets the parent directory of the repository path.
     ///  This is the directory that contains the repository folder.
     /// </summary>
+    [JsonIgnore]
     public string ParentDir
         => System.IO.Path.GetDirectoryName(Path) ?? string.Empty;
 
     /// <summary>
     /// Gets or sets a value indicating whether the repository is valid.
     /// </summary>
+    [JsonPropertyName("is_valid")]
     public bool IsValid { get; init; }
 
     /// <summary>
     /// Get or sets a value indicating whether the repository has errors while executing git commands.
     /// </summary>
+    [JsonPropertyName("has_errors")]
     public bool HasErrors { get; init; }
 }

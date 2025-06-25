@@ -44,7 +44,7 @@ jobs:
         run: |
           dotnet publish -c Release -r win-x64 `
             -p:GenerateAssemblyInfo=true `
-            -p:PublishReadyToRun=true `
+            -p:PublishAot=true `
             -p:Version=${{ steps.gitversion.outputs.fullSemVer }} `
             -p:AssemblyVersion=${{ steps.gitversion.outputs.assemblySemVer }} `
             -p:FileVersion=${{ steps.gitversion.outputs.assemblySemFileVer }} `
@@ -116,7 +116,7 @@ jobs:
         run: |
           dotnet publish -c Release -r linux-x64 \
             -p:GenerateAssemblyInfo=true \
-            -p:PublishReadyToRun=true \
+            -p:PublishAot=true \
             -p:Version=${{ steps.gitversion.outputs.fullSemVer }} \
             -p:AssemblyVersion=${{ steps.gitversion.outputs.assemblySemVer }} \
             -p:FileVersion=${{ steps.gitversion.outputs.assemblySemFileVer }} \

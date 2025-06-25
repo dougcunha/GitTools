@@ -26,13 +26,13 @@ public sealed class ConsoleDisplayService(IAnsiConsole console) : IConsoleDispla
 
             console.Write(rule);
 
-            console.WriteException
-            (
-                exception,
-                string.IsNullOrWhiteSpace(exception.StackTrace) // Avoid IndexOutOfRangeException inside Spectre.Console
-                    ? ExceptionFormats.ShortenEverything | ExceptionFormats.NoStackTrace
-                    : ExceptionFormats.ShortenEverything
-            );
+            // Use simple exception display for AOT compatibility
+            console.MarkupLineInterpolated($"[red]Error: {exception.Message}[/]");
+
+            if (!string.IsNullOrWhiteSpace(exception.StackTrace))
+            {
+                console.MarkupLineInterpolated($"[grey]Stack trace: {exception.StackTrace}[/]");
+            }
         }
     }
 
