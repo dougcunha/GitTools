@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.IO.Abstractions;
 using System.Text.Json;
+using GitTools.Json;
 using GitTools.Models;
 using GitTools.Services;
 using Spectre.Console;
@@ -55,12 +56,20 @@ public sealed class BulkRestoreCommand : Command
         {
             var json = await _fileSystem.File.ReadAllTextAsync(configFile).ConfigureAwait(false);
 
-            repositories = JsonSerializer.Deserialize<List<GitRepository>>
+            var backupData = JsonSerializer.Deserialize(json, GitToolsJsonContext.Default.ListGitRepositoryBackup);
+
+            repositories = backupData?.Select
             (
-                json,
-                GitRepository.JsonSerializerOptions
+                static b => new GitRepository
+                {
+                    Name = b.Name,
+                    Path = b.Path,
+                    RemoteUrl = b.RemoteUrl,
+                    IsValid = true,
+                    HasErrors = false
+                }
             )
-            ?.Where(static r => !string.IsNullOrWhiteSpace(r.RemoteUrl))
+            .Where(static r => !string.IsNullOrWhiteSpace(r.RemoteUrl))
             .OrderBy(static r => r.Name).ToList();
         }
         catch (Exception ex)

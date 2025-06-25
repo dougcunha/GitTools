@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.IO.Abstractions;
 using System.Text.Json;
+using GitTools.Json;
 using GitTools.Models;
 using GitTools.Services;
 using Spectre.Console;
@@ -66,11 +67,14 @@ public sealed class BulkBackupCommand : Command
 
         var path = Path.GetFullPath(directory);
 
-        var json = JsonSerializer.Serialize
-        (
-            repositories.Select(r => new { Name = Path.GetFileName(r.Path), Path = Path.GetRelativePath(path, r.Path), r.RemoteUrl }),
-            GitRepository.JsonSerializerOptions
-        );
+        var backupData = repositories.Select(r => new GitRepositoryBackup
+        {
+            Name = Path.GetFileName(r.Path),
+            Path = Path.GetRelativePath(path, r.Path),
+            RemoteUrl = r.RemoteUrl
+        }).ToList();
+
+        var json = JsonSerializer.Serialize(backupData, GitToolsJsonContext.Default.ListGitRepositoryBackup);
 
         var outputDirectory = Path.GetDirectoryName(output);
 
