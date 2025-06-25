@@ -115,13 +115,13 @@ jobs:
       - name: Publish linux-x64
         run: |
           dotnet publish -c Release -r linux-x64 \
-            -p:GenerateAssemblyInfo=true `
-            -p:PublishReadyToRun=true `
-            -p:Version=${{ steps.gitversion.outputs.fullSemVer }} `
-            -p:AssemblyVersion=${{ steps.gitversion.outputs.assemblySemVer }} `
-            -p:FileVersion=${{ steps.gitversion.outputs.assemblySemFileVer }} `
-            -p:InformationalVersion=${{ steps.gitversion.outputs.informationalVersion }} `
-            -p:ProductVersion=${{ steps.gitversion.outputs.assemblySemVer }} `
+            -p:GenerateAssemblyInfo=true \
+            -p:PublishReadyToRun=true \
+            -p:Version=${{ steps.gitversion.outputs.fullSemVer }} \
+            -p:AssemblyVersion=${{ steps.gitversion.outputs.assemblySemVer }} \
+            -p:FileVersion=${{ steps.gitversion.outputs.assemblySemFileVer }} \
+            -p:InformationalVersion=${{ steps.gitversion.outputs.informationalVersion }} \
+            -p:ProductVersion=${{ steps.gitversion.outputs.assemblySemVer }} \
             GitTools/GitTools.csproj
 
       - name: Copy LICENSE to output
