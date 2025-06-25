@@ -31,10 +31,19 @@ jobs:
       - name: Show calculated version
         run: |
           echo GitVersion: ${{ steps.gitversion.outputs.fullSemVer }}
+          echo AssemblyVersion: ${{ steps.gitversion.outputs.assemblySemVer }}
+          echo FileVersion: ${{ steps.gitversion.outputs.assemblySemFileVer }}
+          echo ProductVersion: ${{ steps.gitversion.outputs.informationalVersion }}
       - name: Restore dependencies
         run: dotnet restore
       - name: Publish win-x64
-        run: dotnet publish -c Release -r win-x64 /p:Version=${{ steps.gitversion.outputs.fullSemVer }} GitTools/GitTools.csproj
+        run: |
+          dotnet publish -c Release -r win-x64 `
+            /p:Version=${{ steps.gitversion.outputs.fullSemVer }} `
+            /p:AssemblyVersion=${{ steps.gitversion.outputs.assemblySemVer }} `
+            /p:FileVersion=${{ steps.gitversion.outputs.assemblySemFileVer }} `
+            /p:InformationalVersion=${{ steps.gitversion.outputs.informationalVersion }} `
+            GitTools/GitTools.csproj
       - name: Copy LICENSE to output
         if: success()
         run: copy LICENSE GitTools/bin/Release/net9.0/win-x64/publish/
@@ -60,6 +69,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: GitTools/bin/Release/net9.0/win-x64/publish/GitTools-${{ steps.gitversion.outputs.assemblySemVer }}.win-x64.zip
+
   build-linux:
     runs-on: ubuntu-latest
     steps:
@@ -81,10 +91,19 @@ jobs:
       - name: Show calculated version
         run: |
           echo GitVersion: ${{ steps.gitversion.outputs.fullSemVer }}
+          echo AssemblyVersion: ${{ steps.gitversion.outputs.assemblySemVer }}
+          echo FileVersion: ${{ steps.gitversion.outputs.assemblySemFileVer }}
+          echo ProductVersion: ${{ steps.gitversion.outputs.informationalVersion }}
       - name: Restore dependencies
         run: dotnet restore
       - name: Publish linux-x64
-        run: dotnet publish -c Release -r linux-x64 /p:Version=${{ steps.gitversion.outputs.fullSemVer }} GitTools/GitTools.csproj
+        run: |
+          dotnet publish -c Release -r linux-x64 \
+            /p:Version=${{ steps.gitversion.outputs.fullSemVer }} \
+            /p:AssemblyVersion=${{ steps.gitversion.outputs.assemblySemVer }} \
+            /p:FileVersion=${{ steps.gitversion.outputs.assemblySemFileVer }} \
+            /p:InformationalVersion=${{ steps.gitversion.outputs.informationalVersion }} \
+            GitTools/GitTools.csproj
       - name: Copy LICENSE to output
         if: success()
         run: cp LICENSE GitTools/bin/Release/net9.0/linux-x64/publish/
