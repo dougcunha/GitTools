@@ -17,4 +17,9 @@ public sealed class GitToolsOptions
     /// Gets or sets the path to the log file where console output will be replicated.
     /// </summary>
     public string? LogFilePath { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether submodules should be included when scanning for repositories.
+    /// </summary>
+    public bool IncludeSubmodules { get; set; } = true;
 }

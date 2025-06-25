@@ -2,6 +2,7 @@ using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using System.Reflection;
 using GitTools.Services;
+using GitTools.Models;
 using NSubstitute.ExceptionExtensions;
 using Spectre.Console.Testing;
 
@@ -13,6 +14,7 @@ public sealed class GitRepositoryScannerTests
     private readonly TestConsole _console = new();
     private readonly MockFileSystem _fileSystem;
     private readonly GitRepositoryScanner _scanner;
+    private readonly GitToolsOptions _options = new();
     private static readonly string _rootFolder = Path.Combine(Path.GetTempPath(), "repos");
     private const string GIT_DIR = ".git";
     private const string GIT_MODULES_FILE = ".gitmodules";
@@ -20,7 +22,7 @@ public sealed class GitRepositoryScannerTests
     public GitRepositoryScannerTests()
     {
         _fileSystem = new MockFileSystem();
-        _scanner = new GitRepositoryScanner(_console, _fileSystem);
+        _scanner = new GitRepositoryScanner(_console, _fileSystem, _options);
     }
 
     [Fact]
@@ -162,7 +164,8 @@ public sealed class GitRepositoryScannerTests
         _fileSystem.AddFile(gitmodulesPath, new MockFileData(GITMODULES_CONTENT));
 
         // Act
-        var result = _scanner.Scan(_rootFolder, false);
+        _options.IncludeSubmodules = false;
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldContain(mainRepoPath);
@@ -193,7 +196,8 @@ public sealed class GitRepositoryScannerTests
         _fileSystem.AddFile(gitmodulesPath, new MockFileData(GITMODULES_CONTENT));
 
         // Act
-        var result = _scanner.Scan(_rootFolder, true);
+        _options.IncludeSubmodules = true;
+        var result = _scanner.Scan(_rootFolder);
 
         // Assert
         result.ShouldContain(mainRepoPath);
@@ -346,7 +350,7 @@ public sealed class GitRepositoryScannerTests
         mockFileSystem.Directory.Exists(Path.Combine(_rootFolder, "valid-submodule", ".git"))
             .Throws(new IOException("Test exception reading submodule directory"));
 
-        var scannerWithException = new GitRepositoryScanner(_console, mockFileSystem);
+        var scannerWithException = new GitRepositoryScanner(_console, mockFileSystem, _options);
 
         // Act
         var result = scannerWithException.Scan(_rootFolder);
@@ -364,7 +368,7 @@ public sealed class GitRepositoryScannerTests
         // Arrange
         var mockFileSystem = Substitute.For<IFileSystem>();
         mockFileSystem.Directory.GetDirectories(_rootFolder).Throws(new IOException("Test exception accessing directory"));
-        var scannerWithException = new GitRepositoryScanner(_console, mockFileSystem);
+        var scannerWithException = new GitRepositoryScanner(_console, mockFileSystem, _options);
 
         // Act
         var result = scannerWithException.Scan(_rootFolder);
@@ -382,7 +386,7 @@ public sealed class GitRepositoryScannerTests
         
         var console = new TestConsole();
         var fileSystem = Substitute.For<IFileSystem>();
-        var scanner = new GitRepositoryScanner(console, fileSystem);
+        var scanner = new GitRepositoryScanner(console, fileSystem, new GitToolsOptions());
         
         var gitRepos = new List<string>();
         var processedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

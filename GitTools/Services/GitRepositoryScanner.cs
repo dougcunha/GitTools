@@ -1,5 +1,6 @@
 using System.IO.Abstractions;
 using System.Text.RegularExpressions;
+using GitTools.Models;
 using Spectre.Console;
 
 namespace GitTools.Services;
@@ -7,7 +8,12 @@ namespace GitTools.Services;
 /// <summary>
 /// Scans directories for git repositories and submodules.
 /// </summary>
-public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSystem fileSystem) : IGitRepositoryScanner
+public sealed partial class GitRepositoryScanner
+(
+    IAnsiConsole console,
+    IFileSystem fileSystem,
+    GitToolsOptions options
+) : IGitRepositoryScanner
 {
     private const string GIT_DIR = ".git";
     private const string GIT_MODULES_FILE = ".gitmodules";
@@ -15,15 +21,9 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
     /// <inheritdoc/>
     public List<string> Scan(string rootFolder)
     {
-        return Scan(rootFolder, true);
-    }
-
-    /// <inheritdoc/>
-    public List<string> Scan(string rootFolder, bool includeSubmodules)
-    {
         var gitRepos = new List<string>();
         var processedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        SearchGitRepositories(rootFolder, gitRepos, processedPaths, includeSubmodules);
+        SearchGitRepositories(rootFolder, gitRepos, processedPaths, options.IncludeSubmodules);
 
         return [.. gitRepos.Distinct()];
     }
@@ -101,9 +101,7 @@ public sealed partial class GitRepositoryScanner(IAnsiConsole console, IFileSyst
                 }
 
                 if (includeSubmodules)
-                {
                     AddSubmodules(currentDir, processedPaths, pendingDirs);
-                }
             }
             else
             {
