@@ -52,6 +52,7 @@ These options are available for all commands:
 - `--log-file`, `-lf`: Replicate all console output to the specified log file
 - `--disable-ansi`, `-da`: Disable ANSI color codes in console output (useful for plain text output or incompatible terminals)
 - `--quiet`, `-q`: Suppress all console output (useful for automated scripts or silent operation)
+- `--include-submodules`, `-is`: Include Git submodules when scanning for repositories (default true)
 
 **Examples:**
 
@@ -70,6 +71,9 @@ GitTools reclone ./my-project --log-all-git-commands --disable-ansi
 
 # Write output to a log file
 GitTools ls ./projects --log-file gittools.log
+
+# Exclude submodules from scanning
+GitTools sync ./projects --include-submodules false
 ```
 
 ### Remove Tags (rm)
@@ -218,7 +222,7 @@ GitTools restore repos.json <target-directory> --force-ssh
 Detect repositories that are behind the specified branch and optionally update them.
 
 ```sh
-GitTools sync <root-directory> [--show-only] [--with-uncommitted] [--push-untracked] [--automatic] [--no-fetch] [--no-submodules]
+GitTools sync <root-directory> [--show-only] [--with-uncommitted] [--push-untracked] [--automatic] [--no-fetch]
 ```
 
 #### Sync Options
@@ -229,7 +233,6 @@ GitTools sync <root-directory> [--show-only] [--with-uncommitted] [--push-untrac
 - `--push-untracked`, `-pu`: Push untracked branches to the remote repository
 - `--automatic`, `-a`: Run the command without user interaction (useful for scripts)
 - `--no-fetch`, `-nf`: Do not fetch from remote before checking repositories
-- `--no-submodules`, `-ns`: Do not include submodules during repository scanning
 
 #### Behavior
 
@@ -243,7 +246,7 @@ Use `--automatic` to run without user interaction, automatically selecting all o
 
 Use `--push-untracked` to also push any new local branches to the remote repository during synchronization.
 
-Use `--no-submodules` to exclude Git submodules from the scanning process.
+Use `--include-submodules false` to exclude Git submodules from the scanning process.
 
 ## Build
 

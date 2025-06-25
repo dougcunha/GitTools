@@ -67,10 +67,12 @@ public static class Startup
         var logFileOption = new Option<string?>(["--log-file", "-lf"], "Path to a log file where console output will be replicated");
         var disableAnsiOption = new Option<bool>(["--disable-ansi", "-da"], "Disable ANSI color codes in the console output");
         var quietOption = new Option<bool>(["--quiet", "-q"], "Suppress all console output");
+        var includeSubmodulesOption = new Option<bool>(["--include-submodules", "-is"], () => true, "Include Git submodules when scanning for repositories");
         rootCommand.AddGlobalOption(logAllGitCommandsOption);
         rootCommand.AddGlobalOption(logFileOption);
         rootCommand.AddGlobalOption(disableAnsiOption);
         rootCommand.AddGlobalOption(quietOption);
+        rootCommand.AddGlobalOption(includeSubmodulesOption);
         var tagRemoveCommand = serviceProvider.GetRequiredService<TagRemoveCommand>();
         var tagListCommand = serviceProvider.GetRequiredService<TagListCommand>();
         var recloneCommand = serviceProvider.GetRequiredService<ReCloneCommand>();
@@ -101,6 +103,7 @@ public static class Startup
             gitToolsOptions.LogFilePath = context.ParseResult.GetValueForOption(logFileOption);
             var disableAnsi = context.ParseResult.GetValueForOption(disableAnsiOption);
             var quiet = context.ParseResult.GetValueForOption(quietOption);
+            gitToolsOptions.IncludeSubmodules = context.ParseResult.GetValueForOption(includeSubmodulesOption);
             console.Profile.Capabilities.Ansi = !disableAnsi;
             console.Enabled = !quiet;
 
