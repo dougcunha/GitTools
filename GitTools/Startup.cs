@@ -68,10 +68,12 @@ public static class Startup
         var disableAnsiOption = new Option<bool>(["--disable-ansi", "-da"], "Disable ANSI color codes in the console output");
         var quietOption = new Option<bool>(["--quiet", "-q"], "Suppress all console output");
         var includeSubmodulesOption = new Option<bool>(["--include-submodules", "-is"], () => true, "Include Git submodules when scanning for repositories");
+
         var repositoryFilterOption = new Option<string[]>(["--repository-filter", "-rf"], "Filter repositories by name using wildcard patterns (*, ?). Can be specified multiple times.")
         {
             AllowMultipleArgumentsPerToken = true
         };
+
         rootCommand.AddGlobalOption(logAllGitCommandsOption);
         rootCommand.AddGlobalOption(logFileOption);
         rootCommand.AddGlobalOption(disableAnsiOption);

@@ -215,16 +215,9 @@ public sealed partial class GitRepositoryScanner
     /// <returns>The repository name used for filtering.</returns>
     private static string GetRepositoryName(string repositoryPath, string rootFolder)
     {
-        try
-        {
-            var relativePath = Path.GetRelativePath(rootFolder, repositoryPath);
+        var relativePath = Path.GetRelativePath(rootFolder, repositoryPath);
 
-            return relativePath.Replace('\\', '/');
-        }
-        catch
-        {
-            return Path.GetFileName(repositoryPath) ?? repositoryPath;
-        }
+        return relativePath.Replace('\\', '/');
     }
 
     /// <summary>
