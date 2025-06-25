@@ -60,16 +60,38 @@ check_dotnet_installed() {
         INSTALLED_VERSION=$(dotnet --version 2>/dev/null | cut -d'.' -f1,2)
         print_info "Found .NET version: $INSTALLED_VERSION"
         
-        if [ "$INSTALLED_VERSION" = "$DOTNET_VERSION" ]; then
-            print_success ".NET $DOTNET_VERSION is already installed"
-            return 0
-        else
-            print_warning ".NET $INSTALLED_VERSION is installed, but we need $DOTNET_VERSION"
-            return 1
-        fi
+        # Accept .NET 6.0, 7.0, 8.0, or 9.0 as compatible versions, but prefer 9.0
+        case $INSTALLED_VERSION in
+            "9.0")
+                print_success ".NET $INSTALLED_VERSION is already installed and is the preferred version"
+                return 0
+                ;;
+            "6.0"|"7.0"|"8.0")
+                print_warning ".NET $INSTALLED_VERSION is installed, but we prefer version 9.0"
+                return 1
+                ;;
+            *)
+                print_warning ".NET $INSTALLED_VERSION is installed, but we prefer a newer version"
+                return 1
+                ;;
+        esac
     else
         print_info ".NET SDK not found"
         return 1
+    fi
+}
+
+# Function to check available .NET packages
+check_available_dotnet_packages() {
+    print_info "Checking available .NET SDK packages..."
+    if command -v apt-cache >/dev/null 2>&1; then
+        AVAILABLE_PACKAGES=$(apt-cache search dotnet-sdk | grep -E "dotnet-sdk-[0-9]" || true)
+        if [ -n "$AVAILABLE_PACKAGES" ]; then
+            print_info "Available .NET SDK packages:"
+            echo "$AVAILABLE_PACKAGES"
+        else
+            print_warning "No .NET SDK packages found in repositories"
+        fi
     fi
 }
 
@@ -94,12 +116,40 @@ install_dotnet_ubuntu_debian() {
     
     if [ "$IS_ROOT" = true ]; then
         dpkg -i packages-microsoft-prod.deb
+        
+        # Ensure software-properties-common is installed for add-apt-repository
+        print_info "Installing software-properties-common..."
         apt-get update
-        apt-get install -y dotnet-sdk-9.0
+        apt-get install -y software-properties-common
+        
+        # Add the .NET backports PPA for .NET 9.0
+        print_info "Adding .NET backports PPA for .NET 9.0..."
+        add-apt-repository -y ppa:dotnet/backports
+        apt-get update
+        
+        # Check what packages are available
+        check_available_dotnet_packages
+        
+        # Try to install .NET 9.0 first, then fallback to older versions
+        apt-get install -y dotnet-sdk-9.0 || apt-get install -y dotnet-sdk-8.0 || apt-get install -y dotnet-sdk-7.0 || apt-get install -y dotnet-sdk-6.0
     else
         sudo dpkg -i packages-microsoft-prod.deb
+        
+        # Ensure software-properties-common is installed for add-apt-repository
+        print_info "Installing software-properties-common..."
         sudo apt-get update
-        sudo apt-get install -y dotnet-sdk-9.0
+        sudo apt-get install -y software-properties-common
+        
+        # Add the .NET backports PPA for .NET 9.0
+        print_info "Adding .NET backports PPA for .NET 9.0..."
+        sudo add-apt-repository -y ppa:dotnet/backports
+        sudo apt-get update
+        
+        # Check what packages are available
+        check_available_dotnet_packages
+        
+        # Try to install .NET 9.0 first, then fallback to older versions
+        sudo apt-get install -y dotnet-sdk-9.0 || sudo apt-get install -y dotnet-sdk-8.0 || sudo apt-get install -y dotnet-sdk-7.0 || sudo apt-get install -y dotnet-sdk-6.0
     fi
     
     rm packages-microsoft-prod.deb
@@ -113,19 +163,19 @@ install_dotnet_rhel() {
     if [ "$DISTRO" = "fedora" ]; then
         if [ "$IS_ROOT" = true ]; then
             dnf install -y https://packages.microsoft.com/config/fedora/$(rpm -E %fedora)/packages-microsoft-prod.rpm
-            dnf install -y dotnet-sdk-9.0
+            dnf install -y dotnet-sdk-9.0 || dnf install -y dotnet-sdk-8.0 || dnf install -y dotnet-sdk-7.0 || dnf install -y dotnet-sdk-6.0
         else
             sudo dnf install -y https://packages.microsoft.com/config/fedora/$(rpm -E %fedora)/packages-microsoft-prod.rpm
-            sudo dnf install -y dotnet-sdk-9.0
+            sudo dnf install -y dotnet-sdk-9.0 || sudo dnf install -y dotnet-sdk-8.0 || sudo dnf install -y dotnet-sdk-7.0 || sudo dnf install -y dotnet-sdk-6.0
         fi
     else
         # For RHEL/CentOS
         if [ "$IS_ROOT" = true ]; then
             yum install -y https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm
-            yum install -y dotnet-sdk-9.0
+            yum install -y dotnet-sdk-9.0 || yum install -y dotnet-sdk-8.0 || yum install -y dotnet-sdk-7.0 || yum install -y dotnet-sdk-6.0
         else
             sudo yum install -y https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm
-            sudo yum install -y dotnet-sdk-9.0
+            sudo yum install -y dotnet-sdk-9.0 || sudo yum install -y dotnet-sdk-8.0 || sudo yum install -y dotnet-sdk-7.0 || sudo yum install -y dotnet-sdk-6.0
         fi
     fi
 }
@@ -155,9 +205,9 @@ install_dotnet_snap() {
     fi
     
     if [ "$IS_ROOT" = true ]; then
-        snap install dotnet-sdk --classic --channel=9.0
+        snap install dotnet-sdk --classic --channel=9.0/stable || snap install dotnet-sdk --classic --channel=8.0/stable || snap install dotnet-sdk --classic --channel=7.0/stable || snap install dotnet-sdk --classic
     else
-        sudo snap install dotnet-sdk --classic --channel=9.0
+        sudo snap install dotnet-sdk --classic --channel=9.0/stable || sudo snap install dotnet-sdk --classic --channel=8.0/stable || sudo snap install dotnet-sdk --classic --channel=7.0/stable || sudo snap install dotnet-sdk --classic
     fi
 }
 
