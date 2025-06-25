@@ -22,4 +22,15 @@ public sealed class GitToolsOptions
     /// Gets or sets a value indicating whether submodules should be included when scanning for repositories.
     /// </summary>
     public bool IncludeSubmodules { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the repository filtering patterns using wildcard syntax (* and ?).
+    /// When specified, only repositories matching at least one pattern will be processed.
+    /// </summary>
+    public string[] RepositoryFilters { get; set; } = [];
+
+    /// <summary>
+    /// Gets a value indicating whether repository filtering is enabled.
+    /// </summary>
+    public bool HasRepositoryFilters => RepositoryFilters.Length > 0;
 }

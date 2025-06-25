@@ -68,11 +68,16 @@ public static class Startup
         var disableAnsiOption = new Option<bool>(["--disable-ansi", "-da"], "Disable ANSI color codes in the console output");
         var quietOption = new Option<bool>(["--quiet", "-q"], "Suppress all console output");
         var includeSubmodulesOption = new Option<bool>(["--include-submodules", "-is"], () => true, "Include Git submodules when scanning for repositories");
+        var repositoryFilterOption = new Option<string[]>(["--repository-filter", "-rf"], "Filter repositories by name using wildcard patterns (*, ?). Can be specified multiple times.")
+        {
+            AllowMultipleArgumentsPerToken = true
+        };
         rootCommand.AddGlobalOption(logAllGitCommandsOption);
         rootCommand.AddGlobalOption(logFileOption);
         rootCommand.AddGlobalOption(disableAnsiOption);
         rootCommand.AddGlobalOption(quietOption);
         rootCommand.AddGlobalOption(includeSubmodulesOption);
+        rootCommand.AddGlobalOption(repositoryFilterOption);
         var tagRemoveCommand = serviceProvider.GetRequiredService<TagRemoveCommand>();
         var tagListCommand = serviceProvider.GetRequiredService<TagListCommand>();
         var recloneCommand = serviceProvider.GetRequiredService<ReCloneCommand>();
@@ -102,6 +107,7 @@ public static class Startup
             gitToolsOptions.LogAllGitCommands = context.ParseResult.GetValueForOption(logAllGitCommandsOption);
             gitToolsOptions.LogFilePath = context.ParseResult.GetValueForOption(logFileOption);
             gitToolsOptions.IncludeSubmodules = context.ParseResult.GetValueForOption(includeSubmodulesOption);
+            gitToolsOptions.RepositoryFilters = context.ParseResult.GetValueForOption(repositoryFilterOption) ?? [];
             var disableAnsi = context.ParseResult.GetValueForOption(disableAnsiOption);
             var quiet = context.ParseResult.GetValueForOption(quietOption);
             console.Profile.Capabilities.Ansi = !disableAnsi;

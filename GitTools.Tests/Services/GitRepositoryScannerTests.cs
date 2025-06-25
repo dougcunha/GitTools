@@ -64,6 +64,47 @@ public sealed class GitRepositoryScannerTests
     }
 
     [Fact]
+    public void Scan_WithRepositoryFilters_ShouldFilterRepositories()
+    {
+        // Arrange
+        _options.RepositoryFilters = ["frontend-*", "*-service"];
+        var frontend = Path.Combine(_rootFolder, "frontend-app");
+        var backend = Path.Combine(_rootFolder, "backend-api");
+        var service = Path.Combine(_rootFolder, "user-service");
+        var tools = Path.Combine(_rootFolder, "tools");
+
+        _fileSystem.AddDirectory(Path.Combine(frontend, GIT_DIR));
+        _fileSystem.AddDirectory(Path.Combine(backend, GIT_DIR));
+        _fileSystem.AddDirectory(Path.Combine(service, GIT_DIR));
+        _fileSystem.AddDirectory(Path.Combine(tools, GIT_DIR));
+
+        // Act
+        var result = _scanner.Scan(_rootFolder);
+
+        // Assert
+        result.ShouldContain(frontend);
+        result.ShouldContain(service);
+        result.ShouldNotContain(backend);
+        result.ShouldNotContain(tools);
+        result.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Scan_WithNonMatchingFilter_ShouldReturnEmptyList()
+    {
+        // Arrange
+        _options.RepositoryFilters = ["does-not-match*"];
+        var repo = Path.Combine(_rootFolder, "repo");
+        _fileSystem.AddDirectory(Path.Combine(repo, GIT_DIR));
+
+        // Act
+        var result = _scanner.Scan(_rootFolder);
+
+        // Assert
+        result.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Scan_WithNestedGitRepositories_ShouldReturnParentRepository()
     {
         // Arrange

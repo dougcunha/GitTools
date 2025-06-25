@@ -209,6 +209,21 @@ public sealed class StartupTests
     }
 
     [Fact]
+    public void BuildCommand_WithRepositoryFilter_ShouldUpdateOptions()
+    {
+        var services = new ServiceCollection();
+        services.RegisterServices();
+        var provider = services.BuildServiceProvider();
+
+        var (_, rootCommand, middleware) = provider.BuildCommand();
+        var parse = rootCommand.Parse("--repository-filter *-api --repository-filter frontend-*");
+        middleware.Invoke(new InvocationContext(parse), static _ => Task.CompletedTask);
+
+        var options = provider.GetRequiredService<GitToolsOptions>();
+        options.RepositoryFilters.ShouldBe(["*-api", "frontend-*"]);
+    }
+
+    [Fact]
     public void BuildCommand_ShouldAddTagRemoveCommand()
     {
         // Arrange
@@ -523,6 +538,7 @@ public sealed class StartupTests
         rootCommand.Options.ShouldContain(static opt => opt.Name == "disable-ansi");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "quiet");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "include-submodules");
+        rootCommand.Options.ShouldContain(static opt => opt.Name == "repository-filter");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "help");
         rootCommand.Options.ShouldContain(static opt => opt.Name == "version");
     }
