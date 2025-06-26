@@ -1,4 +1,4 @@
-using System.CommandLine;
+using System.CommandLine.Parsing;
 using GitTools.Commands;
 using GitTools.Models;
 using GitTools.Services;
@@ -10,8 +10,8 @@ namespace GitTools.Tests.Commands;
 [ExcludeFromCodeCoverage]
 public sealed class SynchronizeCommandTests
 {
-    private static string _rootDirectory = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/repos");
-    private static string _repoPath = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/repos/repo1");
+    private static readonly string _rootDirectory = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/repos");
+    private static readonly string _repoPath = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/repos/repo1");
     private const string REPO_NAME = "repo1";
     private static readonly List<BranchStatus> _syncedBranches = [new(_repoPath, "main", "origin/main", true, 0, 0)];
     private static readonly List<BranchStatus> _outdatedBranches = [new(_repoPath, "main", "origin/main", true, 1, 0)];
@@ -25,6 +25,13 @@ public sealed class SynchronizeCommandTests
     {
         _testConsole.Interactive();
         _command = new SynchronizeCommand(_mockScanner, _mockGitService, _testConsole, _mockDisplayService);
+    }
+
+    private Task<int> InvokeCommandAsync(params string[] args)
+    {
+        var parseResult = CommandLineParser.Parse(_command, args);
+
+        return parseResult.InvokeAsync();
     }
 
     [Fact]
@@ -52,7 +59,7 @@ public sealed class SynchronizeCommandTests
         _mockScanner.Scan(_rootDirectory).Returns([]);
 
         // Act
-        await _command.InvokeAsync([_rootDirectory]);
+        await InvokeCommandAsync(_rootDirectory);
 
         // Assert
         _testConsole.Output.ShouldContain("No Git repositories found.");
@@ -69,7 +76,7 @@ public sealed class SynchronizeCommandTests
             .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, _repoPath, "https://example.com", false, _syncedBranches));
 
         // Act
-        await _command.InvokeAsync([_rootDirectory]);
+        await InvokeCommandAsync(_rootDirectory);
 
         // Assert
         _testConsole.Output.ShouldContain("No out-of-sync repositories found.");
@@ -89,7 +96,7 @@ public sealed class SynchronizeCommandTests
             .Do(static _ => { });
 
         // Act
-        await _command.InvokeAsync([_rootDirectory, "--show-only"]);
+        await InvokeCommandAsync(_rootDirectory, "--show-only");
 
         // Assert
         _mockDisplayService.Received(1).DisplayRepositoriesStatus(Arg.Any<List<GitRepositoryStatus>>(), _rootDirectory);
@@ -109,7 +116,7 @@ public sealed class SynchronizeCommandTests
             .Do(static _ => { });
 
         // Act
-        await _command.InvokeAsync([_rootDirectory, "--show-only", "--no-fetch"]);
+        await InvokeCommandAsync(_rootDirectory, "--show-only", "--no-fetch");
 
         // Assert
         await _mockGitService.Received(1).GetRepositoryStatusAsync(_repoPath, _rootDirectory, false);
@@ -126,7 +133,7 @@ public sealed class SynchronizeCommandTests
             .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, _repoPath, "https://example.com", false, _syncedBranches));
 
         // Act
-        await _command.InvokeAsync([_rootDirectory]);
+        await InvokeCommandAsync(_rootDirectory);
 
         // Assert
         _mockScanner.Received(1).Scan(_rootDirectory);
@@ -143,7 +150,7 @@ public sealed class SynchronizeCommandTests
             .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, _repoPath, "https://example.com", false, _syncedBranches));
 
         // Act
-        await _command.InvokeAsync([_rootDirectory]);
+        await InvokeCommandAsync(_rootDirectory);
 
         // Assert
         _mockScanner.Received(1).Scan(_rootDirectory);
@@ -173,7 +180,7 @@ public sealed class SynchronizeCommandTests
             .Do(static _ => { });
 
         // Act
-        await _command.InvokeAsync([_rootDirectory, "--automatic"]);
+        await InvokeCommandAsync(_rootDirectory, "--automatic");
 
         // Assert
         _testConsole.Output.ShouldContain("succeeded");
@@ -189,7 +196,7 @@ public sealed class SynchronizeCommandTests
         _mockGitService.GetRepositoryStatusAsync(_repoPath, _rootDirectory, Arg.Any<bool>())
             .Returns(new GitRepositoryStatus(REPO_NAME, REPO_NAME, _repoPath, "https://example.com", false, _outdatedBranches));
 
-        _mockGitService.WhenForAnyArgs(x => x.SynchronizeRepositoryAsync
+        _mockGitService.WhenForAnyArgs(static x => x.SynchronizeRepositoryAsync
         (
             Arg.Any<GitRepositoryStatus>(),
             Arg.Any<Action<FormattableString>>(),
@@ -214,7 +221,7 @@ public sealed class SynchronizeCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        await _command.InvokeAsync([_rootDirectory]);
+        await InvokeCommandAsync(_rootDirectory);
 
         // Assert
         _testConsole.Output.ShouldContain("succeeded");
@@ -246,7 +253,7 @@ public sealed class SynchronizeCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        await _command.InvokeAsync([_rootDirectory]);
+        await InvokeCommandAsync(_rootDirectory);
 
         // Assert
         _testConsole.Output.ShouldContain("No repository selected");
@@ -263,7 +270,7 @@ public sealed class SynchronizeCommandTests
             .ThrowsAsync(new InvalidOperationException("Fail to get repository status"));
 
         // Act
-        await _command.InvokeAsync([_rootDirectory]);
+        await InvokeCommandAsync(_rootDirectory);
 
         // Assert
         _testConsole.Output.ShouldContain("Fail to get repository status");

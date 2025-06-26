@@ -60,7 +60,7 @@ public sealed class BulkBackupCommandTests
         const string OUTPUT = "/output/repos.json";
 
         // Act
-        await _command.ExecuteAsync(ROOT, OUTPUT);
+        await _command.Parse([ROOT, OUTPUT]).InvokeAsync();
 
         // Assert
         var json = await _fileSystem.File.ReadAllTextAsync(OUTPUT);
@@ -88,7 +88,7 @@ public sealed class BulkBackupCommandTests
         _scanner.Scan(ROOT).Returns([]);
 
         // Act
-        await _command.ExecuteAsync(ROOT, OUTPUT);
+        await _command.Parse([ROOT, OUTPUT]).InvokeAsync();
 
         // Assert
         _fileSystem.File.Exists(OUTPUT).ShouldBeFalse();
@@ -118,7 +118,7 @@ public sealed class BulkBackupCommandTests
         const string OUTPUT = "/output/repos.json";
 
         // Act
-        await _command.ExecuteAsync(ROOT, OUTPUT);
+        await _command.Parse([ROOT, OUTPUT]).InvokeAsync();
 
         // Assert
         var repos = JsonSerializer.Deserialize<List<GitRepository>>
@@ -160,7 +160,7 @@ public sealed class BulkBackupCommandTests
         });
 
         // Act
-        await _command.ExecuteAsync(ROOT, OUTPUT);
+        await _command.Parse([ROOT, OUTPUT]).InvokeAsync();
 
         // Assert
         var repos = JsonSerializer.Deserialize<List<GitRepository>>
@@ -177,5 +177,3 @@ public sealed class BulkBackupCommandTests
         await _gitService.Received(1).GetGitRepositoryAsync(REPO_INVALID);
     }
 }
-
-

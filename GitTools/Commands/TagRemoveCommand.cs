@@ -31,25 +31,35 @@ public sealed class TagRemoveCommand : Command
         _gitService = gitService;
         _console = console;
 
-        var dirOption = new Argument<string>("directory", "Root directory of git repositories");
-
-        var tagsOption = new Argument<string>("tags", "Tags to remove (comma separated)")
+        var dirOption = new Argument<string>("directory")
         {
+            Description = "Root directory of git repositories",
             Arity = ArgumentArity.ExactlyOne
         };
 
-        var remoteOption = new Option<bool>(["--remote", "-r"], "Also remove the tag from the remote repository (if present)");
+        var tagsOption = new Argument<string>("tags")
+        {
+            Description = "Tags to remove (comma separated)",
+            Arity = ArgumentArity.ExactlyOne
+        };
 
-        AddArgument(dirOption);
-        AddArgument(tagsOption);
-        AddOption(remoteOption);
+        var remoteOption = new Option<bool>("--remote", "-r")
+        {
+            Description = "Also remove the tag from the remote repository (if present)"
+        };
 
-        this.SetHandler
+        Arguments.Add(dirOption);
+        Arguments.Add(tagsOption);
+        Options.Add(remoteOption);
+
+        SetAction
         (
-            ExecuteAsync,
-            tagsOption,
-            dirOption,
-            remoteOption
+            parseResult => ExecuteAsync
+            (
+                parseResult.GetValue(tagsOption)!,
+                parseResult.GetValue(dirOption)!,
+                parseResult.GetValue(remoteOption)
+            )
         );
     }
 
@@ -61,7 +71,7 @@ public sealed class TagRemoveCommand : Command
     /// <param name="baseFolder">The root folder to scan for Git repositories.</param>
     /// <param name="removeRemote">Whether the tags should also be removed from remote repositories.</param>
     /// <returns>A task that represents the asynchronous operation.</returns>
-    public async Task ExecuteAsync(string tagsInput, string baseFolder, bool removeRemote)
+    private async Task ExecuteAsync(string tagsInput, string baseFolder, bool removeRemote)
     {
         var tags = _tagValidationService.ParseAndValidateTags(tagsInput);
 

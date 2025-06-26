@@ -23,29 +23,55 @@ public sealed class SynchronizeCommand : Command
         _console = console;
         _displayService = displayService;
 
-        var rootArg = new Argument<string>("root-directory", "Root directory of git repositories");
-        var showOnlyOption = new Option<bool>(["--show-only", "-so"], "Do not update repositories, just show which ones are outdated");
-        var withUncommittedOption = new Option<bool>(["--with-uncommitted", "-wu"], "Try to update repositories with uncommitted changes");
-        var pushUntrackedBranchesOption = new Option<bool>(["--push-untracked", "-pu"], "Push untracked branches to the remote repository");
-        var automaticOption = new Option<bool>(["--automatic", "-a"], "Run the command without user interaction (useful for scripts)");
-        var noFetchOption = new Option<bool>(["--no-fetch", "-nf"], "Do not fetch from remote before checking repositories");
+        var rootArg = new Argument<string>("root-directory")
+        {
+            Description = "Root directory of git repositories",
+            Arity = ArgumentArity.ExactlyOne
+        };
 
-        AddArgument(rootArg);
-        AddOption(showOnlyOption);
-        AddOption(withUncommittedOption);
-        AddOption(pushUntrackedBranchesOption);
-        AddOption(automaticOption);
-        AddOption(noFetchOption);
+        var showOnlyOption = new Option<bool>("--show-only", "-so")
+        {
+            Description = "Do not update repositories, just show which ones are outdated"
+        };
 
-        this.SetHandler
+        var withUncommittedOption = new Option<bool>("--with-uncommitted", "-wu")
+        {
+            Description = "Try to update repositories with uncommitted changes"
+        };
+
+        var pushUntrackedBranchesOption = new Option<bool>("--push-untracked", "-pu")
+        {
+            Description = "Push untracked branches to the remote repository"
+        };
+
+        var automaticOption = new Option<bool>("--automatic", "-a")
+        {
+            Description = "Run the command without user interaction (useful for scripts)"
+        };
+
+        var noFetchOption = new Option<bool>("--no-fetch", "-nf")
+        {
+            Description = "Do not fetch from remote before checking repositories"
+        };
+
+        Arguments.Add(rootArg);
+        Options.Add(showOnlyOption);
+        Options.Add(withUncommittedOption);
+        Options.Add(pushUntrackedBranchesOption);
+        Options.Add(automaticOption);
+        Options.Add(noFetchOption);
+
+        SetAction
         (
-            ExecuteAsync,
-            rootArg,
-            showOnlyOption,
-            withUncommittedOption,
-            pushUntrackedBranchesOption,
-            automaticOption,
-            noFetchOption
+            (parseResult) => ExecuteAsync
+            (
+                parseResult.GetValue(rootArg)!,
+                parseResult.GetValue(showOnlyOption),
+                parseResult.GetValue(withUncommittedOption),
+                parseResult.GetValue(pushUntrackedBranchesOption),
+                parseResult.GetValue(automaticOption),
+                parseResult.GetValue(noFetchOption)
+            )
         );
     }
 

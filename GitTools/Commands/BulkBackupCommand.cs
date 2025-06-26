@@ -31,16 +31,32 @@ public sealed class BulkBackupCommand : Command
         _fileSystem = fileSystem;
         _console = console;
 
-        var directoryArgument = new Argument<string>("directory", "Root directory of git repositories");
-        var outputArgument = new Argument<string>("output", "Path to output JSON file");
+        var directoryArgument = new Argument<string>("directory")
+        {
+            Description = "Root directory of git repositories",
+            Arity = ArgumentArity.ExactlyOne
+        };
 
-        AddArgument(directoryArgument);
-        AddArgument(outputArgument);
+        var outputArgument = new Argument<string>("output")
+        {
+            Description = "Path to output JSON file",
+            Arity = ArgumentArity.ExactlyOne
+        };
 
-        this.SetHandler(ExecuteAsync, directoryArgument, outputArgument);
+        Arguments.Add(directoryArgument);
+        Arguments.Add(outputArgument);
+
+        SetAction
+        (
+            parseResult => ExecuteAsync
+            (
+                parseResult.GetValue(directoryArgument)!,
+                parseResult.GetValue(outputArgument)!
+            )
+        );
     }
 
-    public async Task ExecuteAsync(string directory, string output)
+    private async Task ExecuteAsync(string directory, string output)
     {
         var repoPaths = _console.Status()
             .Start
@@ -67,12 +83,12 @@ public sealed class BulkBackupCommand : Command
 
         var path = Path.GetFullPath(directory);
 
-        var backupData = repositories.Select(r => new GitRepositoryBackup
+        var backupData = repositories.ConvertAll(r => new GitRepositoryBackup
         {
             Name = Path.GetFileName(r.Path),
             Path = Path.GetRelativePath(path, r.Path),
             RemoteUrl = r.RemoteUrl
-        }).ToList();
+        });
 
         var json = JsonSerializer.Serialize(backupData, GitToolsJsonContext.Default.ListGitRepositoryBackup);
 
@@ -117,4 +133,3 @@ public sealed class BulkBackupCommand : Command
         return content.Contains("/modules/", StringComparison.OrdinalIgnoreCase);
     }
 }
-

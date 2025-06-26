@@ -28,23 +28,35 @@ public sealed class TagListCommand : Command
         _consoleDisplayService = consoleDisplayService;
         _console = console;
 
-        var dirArgument = new Argument<string>("directory", "Root directory of git repositories");
-
-        var tagsArgument = new Argument<string>("tags", "Tags to search (comma separated)")
+        var dirArgument = new Argument<string>("directory")
         {
+            Description = "Root directory of git repositories",
             Arity = ArgumentArity.ExactlyOne
         };
 
-        AddArgument(dirArgument);
-        AddArgument(tagsArgument);
+        var tagsArgument = new Argument<string>("tags")
+        {
+            Description = "Tags to search (comma separated)",
+            Arity = ArgumentArity.ExactlyOne
+        };
 
-        this.SetHandler(ExecuteAsync, tagsArgument, dirArgument);
+        Arguments.Add(dirArgument);
+        Arguments.Add(tagsArgument);
+
+        SetAction
+        (
+            parseResult => ExecuteAsync
+            (
+                parseResult.GetValue(tagsArgument)!,
+                parseResult.GetValue(dirArgument)!
+            )
+        );
     }
 
     /// <summary>
     /// Executes the tag listing operation.
     /// </summary>
-    public async Task ExecuteAsync(string tagsInput, string baseFolder)
+    private async Task ExecuteAsync(string tagsInput, string baseFolder)
     {
         var patterns = _tagValidationService.ParseAndValidateTags(tagsInput);
 

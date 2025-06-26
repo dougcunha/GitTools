@@ -1,7 +1,9 @@
-using System.CommandLine.Parsing;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
+
+[assembly: InternalsVisibleTo("GitTools.Tests")]
 
 namespace GitTools;
 
@@ -10,17 +12,19 @@ file static class Program
 {
     private static async Task Main(string[] args)
     {
-        var (parser, _, _) = new ServiceCollection()
+        var serviceProvider = new ServiceCollection()
             .RegisterServices()
-            .BuildServiceProvider()
-            .BuildCommand();
+            .BuildServiceProvider();
 
-        await parser.InvokeAsync(args).ConfigureAwait(false);
+        var parseResult = serviceProvider.BuildAndParseCommand(args);
+        var exitCode = await parseResult.InvokeAsync().ConfigureAwait(false);
 
         if (Debugger.IsAttached)
         {
             Console.WriteLine("Press any key to exit...");
             Console.Read();
         }
+
+        Environment.Exit(exitCode);
     }
 }

@@ -52,7 +52,7 @@ public sealed class TagRemoveCommandTests
         // Assert
         _command.Options.Count.ShouldBe(1);
         var remoteOption = _command.Options[0];
-        remoteOption.Name.ShouldBe("remote");
+        remoteOption.Name.ShouldBe("--remote");
         remoteOption.Description.ShouldBe("Also remove the tag from the remote repository (if present)");
     }
 
@@ -63,7 +63,7 @@ public sealed class TagRemoveCommandTests
         _mockTagValidationService.ParseAndValidateTags("  ").Returns([]);
 
         // Act
-        await _command.ExecuteAsync("  ", "C:/TestRepo", false);
+        await _command.Parse(["rm", "  ", "C:/TestRepo"]).InvokeAsync();
 
         // Assert
         _testConsole.Output.ShouldContain("No tags specified to remove.");
@@ -80,7 +80,7 @@ public sealed class TagRemoveCommandTests
         _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/TestRepo", tags, Arg.Any<Action<string>?>()).Returns(searchResult);
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
+        await _command.Parse("rm C:/TestRepo v1.0").InvokeAsync();
 
         // Assert
         _testConsole.Output.ShouldContain("No repository with the specified tag(s) found.");
@@ -94,7 +94,8 @@ public sealed class TagRemoveCommandTests
         const string TAGS_INPUT = "v1.0";
         string[] tags = ["v1.0"];
 
-        var searchResult = new TagSearchResult(
+        var searchResult = new TagSearchResult
+        (
             ["C:/TestRepo/Repo1"],
             new Dictionary<string, List<string>> { ["C:/TestRepo/Repo1"] = ["v1.0"] },
             []
@@ -106,7 +107,7 @@ public sealed class TagRemoveCommandTests
         _testConsole.Input.PushTextWithEnter(""); // No selection
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
+        await _command.Parse(["rm", "C:/TestRepo", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         _mockTagValidationService.Received(1).ParseAndValidateTags(TAGS_INPUT);
@@ -139,7 +140,7 @@ public sealed class TagRemoveCommandTests
         _testConsole.Input.PushTextWithEnter(""); // No selection
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
+        await _command.Parse(["rm", "C:/TestRepo", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         _testConsole.Output.ShouldContain("No repository selected.");
@@ -167,7 +168,7 @@ public sealed class TagRemoveCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
+        await _command.Parse(["rm", "C:/TestRepo", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
@@ -199,7 +200,7 @@ public sealed class TagRemoveCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", true);
+        await _command.Parse(["rm", "--remote", "C:/TestRepo", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
@@ -231,7 +232,7 @@ public sealed class TagRemoveCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
+        await _command.Parse(["rm", "C:/TestRepo", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
@@ -265,7 +266,7 @@ public sealed class TagRemoveCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
+        await _command.Parse(["rm", "C:/TestRepo", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
@@ -298,7 +299,7 @@ public sealed class TagRemoveCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", true);
+        await _command.Parse(["rm", "--remote", "C:/TestRepo", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
@@ -335,7 +336,7 @@ public sealed class TagRemoveCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
+        await _command.Parse(["rm", "C:/TestRepo", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         _mockConsoleDisplayService.Received(1).ShowScanErrors(scanErrors, "C:/TestRepo");
@@ -363,14 +364,14 @@ public sealed class TagRemoveCommandTests
 
         _mockTagSearchService.WhenForAnyArgs
         (
-            substituteCall => substituteCall.SearchRepositoriesWithTagsAsync(
+            static substituteCall => substituteCall.SearchRepositoriesWithTagsAsync(
                 Arg.Any<string>(),
                 Arg.Any<string[]>(),
                 Arg.Any<Action<string>?>())
         )
         .Do
         (
-            callInfo =>
+            static callInfo =>
             {
                 var action = callInfo.Arg<Action<string>?>(); // Capture the action to simulate progress updates
                 action?.Invoke("Searching repositories...");
@@ -386,7 +387,7 @@ public sealed class TagRemoveCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
+        await _command.Parse(["rm", "C:/TestRepo", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO1_PATH, "v1.0");
@@ -420,7 +421,7 @@ public sealed class TagRemoveCommandTests
         _testConsole.Input.PushKey(ConsoleKey.Enter); // Select first repository
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/TestRepo", false);
+        await _command.Parse(["rm", "C:/TestRepo", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         await _mockGitService.Received(1).DeleteTagAsync(REPO_PATH, "v1.0");
