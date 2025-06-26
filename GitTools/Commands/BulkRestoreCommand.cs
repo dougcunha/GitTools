@@ -17,31 +17,54 @@ public sealed class BulkRestoreCommand : Command
     private readonly IFileSystem _fileSystem;
     private readonly IAnsiConsole _console;
 
-    public BulkRestoreCommand(
+    public BulkRestoreCommand
+    (
         IGitService gitService,
         IFileSystem fileSystem,
-        IAnsiConsole console)
+        IAnsiConsole console
+    )
         : base("restore", "Clones repositories from a backup configuration file.")
     {
         _gitService = gitService;
         _fileSystem = fileSystem;
         _console = console;
 
-        var configArg = new Argument<string>("config-file", "Path to JSON produced by backup");
-        var directoryArg = new Argument<string>("directory", "Target root directory");
-        var forceSshOption = new Option<bool>("--force-ssh", "Force SSH URLs for cloning repositories");
+        var configArg = new Argument<string>("config-file")
+        {
+            Description = "Path to JSON produced by backup",
+            Arity = ArgumentArity.ExactlyOne
+        };
 
-        AddArgument(configArg);
-        AddArgument(directoryArg);
-        AddOption(forceSshOption);
+        var directoryArg = new Argument<string>("directory")
+        {
+            Description = "Target root directory",
+            Arity = ArgumentArity.ExactlyOne
+        };
 
-        this.SetHandler(ExecuteAsync, configArg, directoryArg, forceSshOption);
+        var forceSshOption = new Option<bool>("--force-ssh")
+        {
+            Description = "Force SSH URLs for cloning repositories"
+        };
+
+        Arguments.Add(configArg);
+        Arguments.Add(directoryArg);
+        Options.Add(forceSshOption);
+
+        SetAction
+        (
+            parseResult => ExecuteAsync
+            (
+                parseResult.GetValue(configArg)!,
+                parseResult.GetValue(directoryArg)!,
+                parseResult.GetValue(forceSshOption)
+            )
+        );
     }
 
     /// <summary>
     /// Executes the restoration process.
     /// </summary>
-    public async Task ExecuteAsync(string configFile, string directory, bool forceSsh)
+    private async Task ExecuteAsync(string configFile, string directory, bool forceSsh)
     {
         if (!_fileSystem.File.Exists(configFile))
         {

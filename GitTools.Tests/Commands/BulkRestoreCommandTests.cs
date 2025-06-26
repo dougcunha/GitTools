@@ -36,14 +36,14 @@ public sealed class BulkRestoreCommandTests
     public void Constructor_ShouldConfigureOptions()
     {
         _command.Options.Count.ShouldBe(1);
-        _command.Options.ShouldContain(o => o.Name == "force-ssh" && o.Description == "Force SSH URLs for cloning repositories");
+        _command.Options.ShouldContain(static o => o.Name == "--force-ssh" && o.Description == "Force SSH URLs for cloning repositories");
     }
 
     [Fact]
     public async Task ExecuteAsync_ConfigFileMissing_ShouldShowError()
     {
         // Arrange & Act
-        await _command.ExecuteAsync("missing.json", "/target", false);
+        await _command.Parse("restore missing.json /target --force-ssh").InvokeAsync();
 
         // Assert
         _console.Output.ShouldContain("Configuration file not found");
@@ -57,7 +57,7 @@ public sealed class BulkRestoreCommandTests
         _fileSystem.AddFile("config.json", new MockFileData("{invalid"));
 
         // Act
-        await _command.ExecuteAsync("config.json", "/target", false);
+        await _command.Parse("restore config.json /target").InvokeAsync();
 
         // Assert
         _console.Output.ShouldContain("Failed to read configuration");
@@ -81,7 +81,7 @@ public sealed class BulkRestoreCommandTests
         _console.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        await _command.ExecuteAsync("config.json", "/work", false);
+        await _command.Parse("restore config.json /work").InvokeAsync();
 
         // Assert
         await _gitService.Received(1).RunGitCommandAsync("/work", "clone https://example.com/r1.git repo1");
@@ -107,7 +107,7 @@ public sealed class BulkRestoreCommandTests
         _console.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        await _command.ExecuteAsync("config.json", "/work", false);
+        await _command.Parse("restore config.json /work").InvokeAsync();
 
         // Assert
         _console.Output.ShouldContain("Repo1 failed: Clone failed");
@@ -121,7 +121,7 @@ public sealed class BulkRestoreCommandTests
         _fileSystem.AddFile("config.json", new MockFileData(json));
 
         // Act
-        await _command.ExecuteAsync("config.json", "/target", false);
+        await _command.Parse("restore config.json /target").InvokeAsync();
 
         // Assert
         _console.Output.ShouldContain("No repositories found in the configuration");
@@ -144,7 +144,7 @@ public sealed class BulkRestoreCommandTests
         _console.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        await _command.ExecuteAsync("config.json", "/work", false);
+        await _command.Parse("restore config.json /work").InvokeAsync();
 
         // Assert
         _console.Output.ShouldContain("No repositories selected for restore");
@@ -169,10 +169,9 @@ public sealed class BulkRestoreCommandTests
         _console.Input.PushKey(ConsoleKey.Enter);
 
         // Act
-        await _command.ExecuteAsync("config.json", "/work", true);
+        await _command.Parse("restore config.json /work --force-ssh").InvokeAsync();
 
         // Assert
         await _gitService.Received(1).RunGitCommandAsync("/work", "clone git@example.com:r1.git repo1");
     }
 }
-

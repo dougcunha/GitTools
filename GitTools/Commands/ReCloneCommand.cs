@@ -29,26 +29,41 @@ public sealed class ReCloneCommand : Command
         _gitService = gitService;
         _console = console;
 
-        var repositoryPathArgument = new Argument<string>
+        var repositoryPathArgument = new Argument<string>("repository-path")
+        {
+            Description = "Path to the git repository to reclone",
+            Arity = ArgumentArity.ExactlyOne
+        };
+
+        var noBackupOption = new Option<bool>("--no-backup")
+        {
+            Description = "Do not create a backup zip of the folder"
+        };
+
+        var forceOption = new Option<bool>("--force")
+        {
+            Description = "Ignore uncommitted changes to the repository"
+        };
+
+        Arguments.Add(repositoryPathArgument);
+        Options.Add(noBackupOption);
+        Options.Add(forceOption);
+
+        SetAction
         (
-            "repository-path",
-            "Path to the git repository to reclone"
+            parseResult => ExecuteAsync
+            (
+                parseResult.GetValue(repositoryPathArgument)!,
+                parseResult.GetValue(noBackupOption),
+                parseResult.GetValue(forceOption)
+            )
         );
-
-        var noBackupOption = new Option<bool>("--no-backup", "Do not create a backup zip of the folder");
-        var forceOption = new Option<bool>("--force", "Ignore uncommitted changes to the repository");
-
-        AddArgument(repositoryPathArgument);
-        AddOption(noBackupOption);
-        AddOption(forceOption);
-
-        this.SetHandler(ExecuteAsync, repositoryPathArgument, noBackupOption, forceOption);
     }
 
     /// <summary>
     /// Executes the reclone operation.
     /// </summary>
-    public async Task ExecuteAsync(string repositoryPath, bool noBackup, bool force)
+    private async Task ExecuteAsync(string repositoryPath, bool noBackup, bool force)
     {
         var repo = await _gitService.GetGitRepositoryAsync(repositoryPath).ConfigureAwait(false);
 

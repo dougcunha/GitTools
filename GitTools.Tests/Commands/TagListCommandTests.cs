@@ -50,7 +50,7 @@ public sealed class TagListCommandTests
         _mockTagValidationService.ParseAndValidateTags("  ").Returns([]);
 
         // Act
-        await _command.ExecuteAsync("  ", "C:/repos");
+        await _command.Parse(["C:/repos", "  "]).InvokeAsync();
 
         // Assert
         _testConsole.Output.ShouldContain("No tags specified to search.");
@@ -68,7 +68,7 @@ public sealed class TagListCommandTests
         _mockTagSearchService.SearchRepositoriesWithTagsAsync("C:/repos", tags, Arg.Any<Action<string>>()).Returns(searchResult);
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/repos");
+        await _command.Parse(["C:/repos", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         _testConsole.Output.ShouldContain("No repository with the specified tag(s) found.");
@@ -97,7 +97,7 @@ public sealed class TagListCommandTests
         _mockConsoleDisplayService.GetHierarchicalName("C:/repos/repo1", "C:/repos").Returns("repo1");
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/repos");
+        await _command.Parse(["C:/repos", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         _testConsole.Output.ShouldContain("repo1");
@@ -123,7 +123,7 @@ public sealed class TagListCommandTests
         _mockConsoleDisplayService.GetHierarchicalName("C:/repos/repo1", "C:/repos").Returns("repo1");
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/repos");
+        await _command.Parse(["C:/repos", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         _testConsole.Output.ShouldContain("v1.0");
@@ -144,10 +144,9 @@ public sealed class TagListCommandTests
         _testConsole.Input.PushTextWithEnter("y");
 
         // Act
-        await _command.ExecuteAsync(TAGS_INPUT, "C:/repos");
+        await _command.Parse(["C:/repos", TAGS_INPUT]).InvokeAsync();
 
         // Assert
         _mockConsoleDisplayService.Received(1).ShowScanErrors(scanErrors, "C:/repos");
     }
 }
-

@@ -1,14 +1,12 @@
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using System.IO.Abstractions;
 using GitTools.Commands;
-using GitTools.Services;
 using GitTools.Models;
+using GitTools.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Spectre.Console;
-using System.CommandLine.Builder;
-using System.CommandLine.Parsing;
-using System.CommandLine.Invocation;
 
 namespace GitTools;
 
@@ -17,6 +15,44 @@ namespace GitTools;
 /// </summary>
 public static class Startup
 {
+    internal static readonly Option<bool> LogAllGitCommandsOption = new("--log-all-git-commands", "-lg")
+    {
+        Description = "Log all git commands to the console",
+        Recursive = true,
+    };
+
+    internal static readonly Option<string?> LogFileOption = new("--log-file", "-lf")
+    {
+        Description = "Path to a log file where console output will be replicated",
+        Recursive = true,
+        Arity = ArgumentArity.ZeroOrOne
+    };
+
+    internal static readonly Option<bool> DisableAnsiOption = new("--disable-ansi", "-da")
+    {
+        Description = "Disable ANSI color codes in the console output",
+        Recursive = true,
+    };
+
+    internal static readonly Option<bool> QuietOption = new("--quiet", "-q")
+    {
+        Description = "Suppress all console output",
+        Recursive = true,
+    };
+
+    internal static readonly Option<bool> IncludeSubmodulesOption = new("--include-submodules", "-is")
+    {
+        Description = "Include Git submodules when scanning for repositories",
+        Recursive = true,
+    };
+
+    internal static readonly Option<string[]> RepositoryFilterOption = new("--repository-filter", "-rf")
+    {
+        Description = "Filter repositories by name using wildcard patterns (*, ?). Can be specified multiple times.",
+        AllowMultipleArgumentsPerToken = true,
+        Recursive = true
+    };
+
     /// <summary>
     /// Registers the necessary services for the GitTools application.
     /// </summary>
@@ -51,80 +87,84 @@ public static class Startup
     }
 
     /// <summary>
-    /// Creates the root command for the GitTools application using the provided service provider.
-    /// This command serves as the entry point for the application and includes all registered commands.
+    /// Creates and parses the command line for the GitTools application.
     /// </summary>
-    /// <param name="serviceProvider">
-    /// The service provider to resolve command dependencies.
-    /// </param>
-    /// <returns>
-    /// The root command for the GitTools application.
-    /// </returns>
-    public static (Parser parser, RootCommand rootCommand, InvocationMiddleware parseOptionsMiddleware) BuildCommand(this IServiceProvider serviceProvider)
+    /// <param name="serviceProvider">The service provider to resolve command dependencies.</param>
+    /// <param name="args">The command line arguments to parse.</param>
+    /// <returns>A ParseResult containing the parsed command line.</returns>
+    public static ParseResult BuildAndParseCommand(this IServiceProvider serviceProvider, params string[] args)
+    {
+        var rootCommand = BuildRootCommand(serviceProvider);
+        var parseResult = CommandLineParser.Parse(rootCommand, args);
+        ConfigureGlobalOptions(parseResult, serviceProvider);
+
+        if (parseResult.Errors.Count == 0)
+            return parseResult;
+
+        var console = serviceProvider.GetRequiredService<AnsiConsoleWrapper>();
+        console.MarkupLine("[red]Error parsing command line arguments:[/]");
+
+        foreach (var error in parseResult.Errors)
+            console.MarkupLine($"[red]{error.Message}[/]");
+
+        return parseResult;
+    }
+
+    private static RootCommand BuildRootCommand(IServiceProvider serviceProvider)
     {
         var rootCommand = new RootCommand("GitTools - A tool for managing your Git repositories.");
-        var logAllGitCommandsOption = new Option<bool>(["--log-all-git-commands", "-lg"], "Log all git commands to the console");
-        var logFileOption = new Option<string?>(["--log-file", "-lf"], "Path to a log file where console output will be replicated");
-        var disableAnsiOption = new Option<bool>(["--disable-ansi", "-da"], "Disable ANSI color codes in the console output");
-        var quietOption = new Option<bool>(["--quiet", "-q"], "Suppress all console output");
-        var includeSubmodulesOption = new Option<bool>(["--include-submodules", "-is"], () => true, "Include Git submodules when scanning for repositories");
 
-        var repositoryFilterOption = new Option<string[]>(["--repository-filter", "-rf"], "Filter repositories by name using wildcard patterns (*, ?). Can be specified multiple times.")
-        {
-            AllowMultipleArgumentsPerToken = true
-        };
+        rootCommand.Options.Add(LogAllGitCommandsOption);
+        rootCommand.Options.Add(LogFileOption);
+        rootCommand.Options.Add(DisableAnsiOption);
+        rootCommand.Options.Add(QuietOption);
+        rootCommand.Options.Add(IncludeSubmodulesOption);
+        rootCommand.Options.Add(RepositoryFilterOption);
 
-        rootCommand.AddGlobalOption(logAllGitCommandsOption);
-        rootCommand.AddGlobalOption(logFileOption);
-        rootCommand.AddGlobalOption(disableAnsiOption);
-        rootCommand.AddGlobalOption(quietOption);
-        rootCommand.AddGlobalOption(includeSubmodulesOption);
-        rootCommand.AddGlobalOption(repositoryFilterOption);
         var tagRemoveCommand = serviceProvider.GetRequiredService<TagRemoveCommand>();
         var tagListCommand = serviceProvider.GetRequiredService<TagListCommand>();
         var recloneCommand = serviceProvider.GetRequiredService<ReCloneCommand>();
         var bulkBackupCommand = serviceProvider.GetRequiredService<BulkBackupCommand>();
         var bulkRestoreCommand = serviceProvider.GetRequiredService<BulkRestoreCommand>();
         var outdatedCommand = serviceProvider.GetRequiredService<SynchronizeCommand>();
+
+        rootCommand.Subcommands.Add(tagRemoveCommand);
+        rootCommand.Subcommands.Add(tagListCommand);
+        rootCommand.Subcommands.Add(recloneCommand);
+        rootCommand.Subcommands.Add(bulkBackupCommand);
+        rootCommand.Subcommands.Add(bulkRestoreCommand);
+        rootCommand.Subcommands.Add(outdatedCommand);
+
+        return rootCommand;
+    }
+
+    private static void ConfigureGlobalOptions(ParseResult parseResult, IServiceProvider serviceProvider)
+    {
         var gitToolsOptions = serviceProvider.GetRequiredService<GitToolsOptions>();
         var console = serviceProvider.GetRequiredService<AnsiConsoleWrapper>();
 
-        rootCommand.AddCommand(tagRemoveCommand);
-        rootCommand.AddCommand(tagListCommand);
-        rootCommand.AddCommand(recloneCommand);
-        rootCommand.AddCommand(bulkBackupCommand);
-        rootCommand.AddCommand(bulkRestoreCommand);
-        rootCommand.AddCommand(outdatedCommand);
+        var logAllGitCommands = parseResult.GetValue(LogAllGitCommandsOption);
+        var logFilePath = parseResult.GetValue(LogFileOption);
+        var includeSubmodules = parseResult.GetValue(IncludeSubmodulesOption);
+        var repositoryFilters = parseResult.GetValue(RepositoryFilterOption) ?? [];
+        var disableAnsi = parseResult.GetValue(DisableAnsiOption);
+        var quiet = parseResult.GetValue(QuietOption);
 
-        var builder = new CommandLineBuilder(rootCommand);
+        gitToolsOptions.LogAllGitCommands = logAllGitCommands;
+        gitToolsOptions.LogFilePath = logFilePath;
+        gitToolsOptions.IncludeSubmodules = includeSubmodules;
+        gitToolsOptions.RepositoryFilters = repositoryFilters;
 
-        var parser = builder
-            .UseDefaults()
-            .AddMiddleware(ParseGlobalOptions).Build();
+        console.Profile.Capabilities.Ansi = !disableAnsi;
+        console.Enabled = !quiet;
 
-        return (parser, rootCommand, ParseGlobalOptions);
+        if (string.IsNullOrWhiteSpace(gitToolsOptions.LogFilePath))
+            return;
 
-        Task ParseGlobalOptions(InvocationContext context, Func<InvocationContext, Task> next)
-        {
-            gitToolsOptions.LogAllGitCommands = context.ParseResult.GetValueForOption(logAllGitCommandsOption);
-            gitToolsOptions.LogFilePath = context.ParseResult.GetValueForOption(logFileOption);
-            gitToolsOptions.IncludeSubmodules = context.ParseResult.GetValueForOption(includeSubmodulesOption);
-            gitToolsOptions.RepositoryFilters = context.ParseResult.GetValueForOption(repositoryFilterOption) ?? [];
-            var disableAnsi = context.ParseResult.GetValueForOption(disableAnsiOption);
-            var quiet = context.ParseResult.GetValueForOption(quietOption);
-            console.Profile.Capabilities.Ansi = !disableAnsi;
-            console.Enabled = !quiet;
+        var logger = new LoggerConfiguration()
+            .WriteTo.File(gitToolsOptions.LogFilePath)
+            .CreateLogger();
 
-            if (string.IsNullOrWhiteSpace(gitToolsOptions.LogFilePath))
-                return next(context);
-
-            var logger = new LoggerConfiguration()
-                .WriteTo.File(gitToolsOptions.LogFilePath)
-                .CreateLogger();
-
-            console.SetLogger(logger);
-
-            return next(context);
-        }
+        console.SetLogger(logger);
     }
 }
