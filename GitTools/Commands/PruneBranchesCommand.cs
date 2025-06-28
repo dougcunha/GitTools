@@ -139,9 +139,6 @@ public sealed class PruneBranchesCommand : Command
                 .AddChoiceGroup("Select all", branchKeys)
                 .UseConverter(key =>
                 {
-                    if (key == "Select all")
-                        return key;
-
                     var parts = key.Split('|', 2);
                     var repo = parts[0];
                     var branch = parts[1];
