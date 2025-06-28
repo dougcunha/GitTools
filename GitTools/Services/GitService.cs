@@ -546,6 +546,108 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     }
 
     /// <inheritdoc/>
+    public async Task<string?> GetCurrentBranchAsync(string repositoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return null;
+
+        try
+        {
+            var currentBranch = await RunGitCommandAsync(repositoryPath, "rev-parse --abbrev-ref HEAD").ConfigureAwait(false);
+
+            return string.IsNullOrWhiteSpace(currentBranch) ? null : currentBranch.Trim();
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error retrieving current branch in {repositoryPath}: {ex.Message}[/]");
+
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<string>> GetPrunableBranchesAsync(string repositoryPath, bool merged, bool gone, int? olderThanDays)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return [];
+
+        var protectedBranches = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "master",
+            "main",
+            "develop"
+        };
+
+        var current = await GetCurrentBranchAsync(repositoryPath).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(current))
+            protectedBranches.Add(current);
+
+        try
+        {
+            if (merged)
+            {
+                var mergedOutput = await RunGitCommandAsync(repositoryPath, "branch --merged --format='%(refname:short)'").ConfigureAwait(false);
+                AddBranches(result, mergedOutput);
+            }
+
+            if (gone)
+            {
+                var goneOutput = await RunGitCommandAsync(repositoryPath, "branch -vv").ConfigureAwait(false);
+                foreach (var line in goneOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    if (!line.Contains("[gone]", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var branch = line.TrimStart('*', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
+                    result.Add(branch);
+                }
+            }
+
+            if (olderThanDays.HasValue)
+            {
+                var threshold = DateTimeOffset.UtcNow.AddDays(-olderThanDays.Value);
+                var dateOutput = await RunGitCommandAsync(repositoryPath, "for-each-ref --format='%(committerdate:iso8601)|%(refname:short)' refs/heads").ConfigureAwait(false);
+
+                foreach (var line in dateOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    var parts = line.Split('|', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+                    if (parts.Length != 2)
+                        continue;
+
+                    if (DateTimeOffset.TryParse(parts[0], out var commitDate) && commitDate < threshold)
+                        result.Add(parts[1]);
+                }
+            }
+
+            result.ExceptWith(protectedBranches);
+
+            return [.. result];
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error getting prunable branches in {repositoryPath}: {ex.Message}[/]");
+
+            return [];
+        }
+    }
+
+    /// <inheritdoc/>
+    public Task DeleteLocalBranchAsync(string repositoryPath, string branch, bool force = false)
+        => RunGitCommandAsync(repositoryPath, $"branch {(force ? "-D" : "-d")} {branch}");
+
+    private static void AddBranches(HashSet<string> target, string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+            return;
+
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            target.Add(line.Replace("'", string.Empty).Trim('*', ' '));
+    }
+
+    /// <inheritdoc/>
     public async Task<(bool isTracked, string? upstream)> IsBranchTrackedAsync(string repositoryPath, string branch)
     {
         if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))

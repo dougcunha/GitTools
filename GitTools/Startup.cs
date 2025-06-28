@@ -79,6 +79,7 @@ public static class Startup
         services.AddSingleton<BulkBackupCommand>();
         services.AddSingleton<BulkRestoreCommand>();
         services.AddSingleton<SynchronizeCommand>();
+        services.AddSingleton<PruneBranchesCommand>();
         services.AddSingleton<ITagSearchService, TagSearchService>();
         services.AddSingleton<ITagValidationService, TagValidationService>();
         services.AddSingleton<IConsoleDisplayService, ConsoleDisplayService>();
@@ -127,6 +128,7 @@ public static class Startup
         var bulkBackupCommand = serviceProvider.GetRequiredService<BulkBackupCommand>();
         var bulkRestoreCommand = serviceProvider.GetRequiredService<BulkRestoreCommand>();
         var outdatedCommand = serviceProvider.GetRequiredService<SynchronizeCommand>();
+        var pruneBranchesCommand = serviceProvider.GetRequiredService<PruneBranchesCommand>();
 
         rootCommand.Subcommands.Add(tagRemoveCommand);
         rootCommand.Subcommands.Add(tagListCommand);
@@ -134,6 +136,7 @@ public static class Startup
         rootCommand.Subcommands.Add(bulkBackupCommand);
         rootCommand.Subcommands.Add(bulkRestoreCommand);
         rootCommand.Subcommands.Add(outdatedCommand);
+        rootCommand.Subcommands.Add(pruneBranchesCommand);
 
         return rootCommand;
     }

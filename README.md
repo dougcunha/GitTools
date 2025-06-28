@@ -16,6 +16,7 @@
   - [Bulk Backup (bkp)](#bulk-backup-bkp)
   - [Bulk Restore (restore)](#bulk-restore-restore)
   - [Synchronize (sync)](#synchronize-sync)
+  - [Prune Branches (prune-branches)](#prune-branches-prune-branches)
   - [Build](#build)
 - [Code Coverage](#code-coverage)
 - [AOT Compilation](#aot-compilation)
@@ -263,6 +264,23 @@ Use `--automatic` to run without user interaction, automatically selecting all o
 Use `--push-untracked` to also push any new local branches to the remote repository during synchronization.
 
 Use `--include-submodules false` to exclude Git submodules from the scanning process.
+
+### Prune Branches (prune-branches)
+
+Clean up stale local branches across multiple repositories.
+
+```sh
+GitTools prune-branches <root-directory> [--merged] [--gone] [--older-than <days>] [--automatic] [--dry-run]
+```
+
+#### Prune Options
+
+- `root-directory` (required): Root directory to scan for Git repositories.
+- `--merged`: Include branches already merged into HEAD (default when no other option is provided).
+- `--gone`: Include branches whose upstream was deleted on the remote.
+- `--older-than`: Include branches whose last commit is older than the specified number of days.
+- `--automatic`, `-a`: Delete all matched branches without prompting.
+- `--dry-run`: Show the branches that would be deleted without actually deleting them.
 
 ## Build
 

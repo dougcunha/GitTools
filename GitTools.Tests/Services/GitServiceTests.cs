@@ -3010,4 +3010,68 @@ public sealed class GitServiceTests
         _console.Output.ShouldContain(REPO_PATH);
         _console.Output.ShouldContain(ERROR_MESSAGE);
     }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WithMergedOption_ShouldReturnBranches()
+    {
+        // Arrange
+        const string MERGED_OUTPUT = "feature/one\nfeature/two";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("branch --merged"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_OUTPUT));
+                else if (psi.Arguments.Contains("rev-parse"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldContain("feature/one");
+        result.ShouldContain("feature/two");
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_ShouldExcludeProtectedBranches()
+    {
+        // Arrange
+        const string MERGED_OUTPUT = "main\nfeature/old";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("branch --merged"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_OUTPUT));
+                else if (psi.Arguments.Contains("rev-parse"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldNotContain("main");
+        result.ShouldContain("feature/old");
+    }
 }
