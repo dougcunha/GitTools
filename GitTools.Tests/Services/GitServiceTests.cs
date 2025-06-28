@@ -22,6 +22,8 @@ public sealed class GitServiceTests
     private const string REPO_NAME = "test-repo";
     private const string TAG_NAME = "v1.0.0";
     private const string GIT_DIR = ".git";
+    private const string MAIN_BRANCH = "main";
+    private const string DEVELOP_BRANCH = "develop";
     private const string REMOTE_URL = "https://github.com/user/repo.git";
     private const string CURRENT_DIRECTORY = "C:/current";
 
@@ -2176,22 +2178,7 @@ public sealed class GitServiceTests
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(static callInfo =>
-            {
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-                var psi = callInfo.ArgAt<ProcessStartInfo>(0);
-
-                if (psi.Arguments.Contains("config --get remote.origin.url"))
-                {
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(REMOTE_LOCAL_URL));
-                }
-                else if (psi.Arguments.Contains("branch --format") || psi.Arguments.Contains("status --porcelain"))
-                {
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
-                }
-
-                return 0;
-            });
+            .Returns(static callInfo => MockNoBranchesGitProcess(callInfo, REMOTE_LOCAL_URL));
 
         // Act
         var result = await _gitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIR);
@@ -2205,6 +2192,56 @@ public sealed class GitServiceTests
         result.LocalBranches.ShouldBeEmpty();
         result.ErrorMessage.ShouldBe(EXPECTED_ERROR);
         result.HasErrors.ShouldBeTrue();
+    }
+
+    // ReSharper disable once CyclomaticComplexity
+    private static int MockNoBranchesGitProcess(NSubstitute.Core.CallInfo callInfo, string REMOTE_LOCAL_URL)
+    {
+        var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+        var psi = callInfo.ArgAt<ProcessStartInfo>(0);
+
+        if (psi.Arguments.Contains("config --get remote.origin.url"))
+        {
+            outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(REMOTE_LOCAL_URL));
+        }
+        else if (psi.Arguments.Contains("branch --format") || psi.Arguments.Contains("status --porcelain"))
+        {
+            outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
+        }
+        else if (psi.Arguments.Contains("for-each-ref"))
+        {
+            // Mock upstream tracking for main and develop, but not feature
+            if (psi.Arguments.Contains($"refs/heads/{MAIN_BRANCH}"))
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("origin/main"));
+            else if (psi.Arguments.Contains($"refs/heads/{DEVELOP_BRANCH}"))
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("origin/develop"));
+            else
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
+        }
+        else if (psi.Arguments.Contains("show-ref"))
+        {
+            // Mock remote ref existence for tracked branches
+            if (psi.Arguments.Contains("origin/main") || psi.Arguments.Contains("origin/develop"))
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs($"abc123 refs/remotes/{psi.Arguments.Split(' ')[1]}"));
+            else
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
+        }
+        else if (psi.Arguments.Contains("rev-parse --abbrev-ref HEAD"))
+        {
+            outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MAIN_BRANCH));
+        }
+        else if (psi.Arguments.Contains("rev-list --left-right --count"))
+        {
+            // Mock ahead/behind counts
+            if (psi.Arguments.Contains($"{MAIN_BRANCH}...origin/{MAIN_BRANCH}"))
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("0\t2"));
+            else if (psi.Arguments.Contains($"{DEVELOP_BRANCH}...origin/{DEVELOP_BRANCH}"))
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("1\t0"));
+            else
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("0\t0"));
+        }
+
+        return 0;
     }
 
     [Fact]
@@ -2238,9 +2275,7 @@ public sealed class GitServiceTests
         // Arrange
         const string ROOT_DIR = @"C:\repos";
         const string REMOTE_LOCAL_URL = "https://github.com/user/repo.git";
-        const string MAIN_BRANCH = "main";
         const string FEATURE_BRANCH = "feature/new-feature";
-        const string DEVELOP_BRANCH = "develop";
 
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
@@ -2283,7 +2318,8 @@ public sealed class GitServiceTests
                 {
                     // Mock remote ref existence for tracked branches
                     if (psi.Arguments.Contains("origin/main") || psi.Arguments.Contains("origin/develop"))
-                        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs($"abc123 refs/remotes/{psi.Arguments.Split(' ')[1]}"));                    else
+                        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs($"abc123 refs/remotes/{psi.Arguments.Split(' ')[1]}"));
+                    else
                         outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
                 }
                 else if (psi.Arguments.Contains("rev-parse --abbrev-ref HEAD"))
@@ -3009,5 +3045,861 @@ public sealed class GitServiceTests
         _console.Output.ShouldContain("Error poping stashing changes");
         _console.Output.ShouldContain(REPO_PATH);
         _console.Output.ShouldContain(ERROR_MESSAGE);
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_ShouldExcludeProtectedBranches()
+    {
+        // Arrange
+        const string MERGED_OUTPUT = "main\nfeature/old";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("branch --merged"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_OUTPUT));
+                else if (psi.Arguments.Contains("rev-parse"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldNotContain("main");
+        result.ShouldContain("feature/old");
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WithOlderThanAndDetachedHead_ShouldFilterOutDetachedHead()
+    {
+        // Arrange
+        const int OLDER_THAN_DAYS = 30;
+        const string OLD_NORMAL_BRANCH = "feature/old-branch";
+        const string OLD_DETACHED_BRANCH = "HEAD detached at abc123";
+
+        var threshold = DateTimeOffset.UtcNow.AddDays(-OLDER_THAN_DAYS - 1);
+        var thresholdIso = threshold.ToString("yyyy-MM-dd HH:mm:ss zzz");
+
+        var dateOutput = $"{thresholdIso}|{OLD_NORMAL_BRANCH}\n{thresholdIso}|{OLD_DETACHED_BRANCH}";
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync
+        (
+            Arg.Is<ProcessStartInfo>
+            (
+                psi => psi.Arguments
+                    .Contains("for-each-ref --format='%(committerdate:iso8601)|%(refname:short)' refs/heads")
+            ),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(Task.FromResult(0))
+            .AndDoes(callInfo =>
+            {
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+                foreach (var line in dateOutput.Split('\n'))
+                {
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(line));
+                }
+            });
+
+        _processRunner.RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(psi => psi.Arguments.Contains("rev-parse --abbrev-ref HEAD")),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(Task.FromResult(0))
+            .AndDoes(callInfo =>
+            {
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MAIN_BRANCH));
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, false, false, OLDER_THAN_DAYS);
+
+        // Assert
+        result.ShouldContain(OLD_NORMAL_BRANCH);
+        result.ShouldNotContain(OLD_DETACHED_BRANCH);
+        result.ShouldNotContain("HEAD");
+        result.ShouldNotContain("detached");
+
+        await _processRunner.Received(2).RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>());
+    }
+
+    [Fact]
+    public async Task GetCurrentBranchAsync_WhenBranchExists_ShouldReturnBranchName()
+    {
+        // Arrange
+        const string CURRENT_BRANCH = "main";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(static callInfo =>
+            {
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(CURRENT_BRANCH));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetCurrentBranchAsync(REPO_PATH);
+
+        // Assert
+        result.ShouldBe(CURRENT_BRANCH);
+
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(static psi =>
+                psi.FileName == "git" &&
+                psi.Arguments == "rev-parse --abbrev-ref HEAD" &&
+                psi.WorkingDirectory == REPO_PATH),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetCurrentBranchAsync_WhenBranchHasWhitespace_ShouldReturnTrimmedBranchName()
+    {
+        // Arrange
+        const string CURRENT_BRANCH = "  feature/test-branch  ";
+        const string EXPECTED_BRANCH = "feature/test-branch";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(static callInfo =>
+            {
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(CURRENT_BRANCH));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetCurrentBranchAsync(REPO_PATH);
+
+        // Assert
+        result.ShouldBe(EXPECTED_BRANCH);
+    }
+
+    [Fact]
+    public async Task GetCurrentBranchAsync_WhenOutputIsEmpty_ShouldReturnNull()
+    {
+        // Arrange
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(static callInfo =>
+            {
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetCurrentBranchAsync(REPO_PATH);
+
+        // Assert
+        result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetCurrentBranchAsync_WhenOutputIsWhitespace_ShouldReturnNull()
+    {
+        // Arrange
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(static callInfo =>
+            {
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("   "));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetCurrentBranchAsync(REPO_PATH);
+
+        // Assert
+        result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetCurrentBranchAsync_WhenRepositoryPathIsNull_ShouldReturnNull()
+    {
+        // Act
+        var result = await _gitService.GetCurrentBranchAsync(null!);
+
+        // Assert
+        result.ShouldBeNull();
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetCurrentBranchAsync_WhenRepositoryPathIsEmpty_ShouldReturnNull()
+    {
+        // Act
+        var result = await _gitService.GetCurrentBranchAsync(string.Empty);
+
+        // Assert
+        result.ShouldBeNull();
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetCurrentBranchAsync_WhenRepositoryDoesNotExist_ShouldReturnNull()
+    {
+        // Arrange
+        const string NON_EXISTENT_REPO_PATH = @"C:\non\existent\repo";
+        _fileSystem.Directory.Exists(NON_EXISTENT_REPO_PATH).Returns(false);
+
+        // Act
+        var result = await _gitService.GetCurrentBranchAsync(NON_EXISTENT_REPO_PATH);
+
+        // Assert
+        result.ShouldBeNull();
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetCurrentBranchAsync_WhenGitCommandFails_ShouldReturnNullAndLogError()
+    {
+        // Arrange
+        const string ERROR_MESSAGE = "Git error occurred";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
+
+        // Act
+        var result = await _gitService.GetCurrentBranchAsync(REPO_PATH);
+
+        // Assert
+        result.ShouldBeNull();
+        _console.Output.ShouldContain("Error retrieving current branch");
+        _console.Output.ShouldContain(REPO_PATH);
+        _console.Output.ShouldContain(ERROR_MESSAGE);
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenMergedBranchesRequested_ShouldReturnMergedBranches()
+    {
+        // Arrange
+        const string MERGED_BRANCHES_OUTPUT = """
+            'feature/branch1'
+            'feature/branch2'
+            'main'
+            """;
+        const string CURRENT_BRANCH = "main";
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+                var psi = callInfo.ArgAt<ProcessStartInfo>(0);
+
+                if (psi.Arguments.Contains("branch --merged"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_BRANCHES_OUTPUT));
+                else if (psi.Arguments.Contains("rev-parse --abbrev-ref HEAD"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(CURRENT_BRANCH));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldContain("feature/branch1");
+        result.ShouldContain("feature/branch2");
+        result.ShouldNotContain("main"); // Protected branch
+        result.ShouldNotContain("master"); // Protected branch
+        result.ShouldNotContain("develop"); // Protected branch
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WithMergedOption_ShouldReturnBranches()
+    {
+        // Arrange
+        const string MERGED_OUTPUT = "feature/one\nfeature/two";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("branch --merged"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_OUTPUT));
+                else if (psi.Arguments.Contains("rev-parse"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldContain("feature/one");
+        result.ShouldContain("feature/two");
+        result.ShouldNotContain("main"); // Protected branch
+        result.ShouldNotContain("develop"); // Protected branch
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenGoneBranchesRequested_ShouldReturnGoneBranches()
+    {
+        // Arrange
+        const string GONE_OUTPUT = """
+              feature/gone1    abc123 [origin/feature/gone1: gone] Last commit
+            * main             def456 [origin/main] Current branch
+              feature/gone2    ghi789 [origin/feature/gone2: gone] Another commit
+            """;
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("branch -vv"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GONE_OUTPUT));
+                else if (psi.Arguments.Contains("rev-parse"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: true, olderThanDays: null);
+
+        // Assert
+        result.ShouldContain("feature/gone1");
+        result.ShouldContain("feature/gone2");
+        result.ShouldNotContain("main");
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenOlderThanDaysRequested_ShouldReturnOldBranches()
+    {
+        // Arrange
+        const int OLDER_THAN_DAYS = 30;
+        var oldDate = DateTimeOffset.UtcNow.AddDays(-40).ToString("yyyy-MM-ddTHH:mm:sszzz");
+        var recentDate = DateTimeOffset.UtcNow.AddDays(-10).ToString("yyyy-MM-ddTHH:mm:sszzz");
+
+        var dateOutput = $"""
+            {oldDate}|feature/old-branch
+            {recentDate}|feature/recent-branch
+            {oldDate}|main
+            """;
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("for-each-ref --format"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(dateOutput));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, olderThanDays: OLDER_THAN_DAYS);
+
+        // Assert
+        result.ShouldContain("feature/old-branch");
+        result.ShouldNotContain("feature/recent-branch");
+        result.ShouldNotContain("main"); // Protected branch
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenMultipleCriteriaProvided_ShouldReturnUnionOfResults()
+    {
+        // Arrange
+        const string MERGED_BRANCHES_OUTPUT = "'feature/merged1'\n'feature/merged2'";
+        const string GONE_BRANCHES_OUTPUT = "  feature/gone1    abc123 [origin/feature/gone1: gone] Last commit";
+        var oldDate = DateTimeOffset.UtcNow.AddDays(-40).ToString("yyyy-MM-ddTHH:mm:sszzz");
+        var dateOutput = $"{oldDate}|feature/old-branch";
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("branch --merged"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_BRANCHES_OUTPUT));
+                else if (psi.Arguments.Contains("branch -vv"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GONE_BRANCHES_OUTPUT));
+                else if (psi.Arguments.Contains("for-each-ref --format"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(dateOutput));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: true, olderThanDays: 30);
+
+        // Assert
+        result.ShouldContain("feature/merged1");
+        result.ShouldContain("feature/merged2");
+        result.ShouldContain("feature/gone1");
+        result.ShouldContain("feature/old-branch");
+        result.Count.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenCurrentBranchIsInResults_ShouldExcludeCurrentBranch()
+    {
+        // Arrange
+        const string CURRENT_BRANCH = "feature/current";
+        const string MERGED_BRANCHES_OUTPUT = """
+            main
+            feature/normal-branch
+            (HEAD detached at abc1234)
+            """;
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("branch --merged"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_BRANCHES_OUTPUT));
+                else if (psi.Arguments.Contains("rev-parse --abbrev-ref HEAD"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(CURRENT_BRANCH));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldContain("feature/normal-branch");
+        result.ShouldNotContain("main"); // Protected branch
+        result.ShouldNotContain("feature/current"); // Current branch should be filtered out
+        result.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenRepositoryPathIsNull_ShouldReturnEmptyList()
+    {
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(null!, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldBeEmpty();
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenRepositoryPathIsEmpty_ShouldReturnEmptyList()
+    {
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(string.Empty, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldBeEmpty();
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenRepositoryDoesNotExist_ShouldReturnEmptyList()
+    {
+        // Arrange
+        const string NON_EXISTENT_REPO_PATH = @"C:\non\existent\repo";
+        _fileSystem.Directory.Exists(NON_EXISTENT_REPO_PATH).Returns(false);
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(NON_EXISTENT_REPO_PATH, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldBeEmpty();
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenGitCommandFails_ShouldReturnEmptyListAndLogError()
+    {
+        // Arrange
+        const string ERROR_MESSAGE = "Git command failed";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldBeEmpty();
+        _console.Output.ShouldContain("Error getting prunable branches");
+        _console.Output.ShouldContain(REPO_PATH);
+        _console.Output.ShouldContain(ERROR_MESSAGE);
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenNoCriteriaProvided_ShouldReturnEmptyList()
+    {
+        // Arrange
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldBeEmpty();
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenInvalidDateFormat_ShouldSkipInvalidEntries()
+    {
+        // Arrange
+        const string DATE_OUTPUT = """
+            2024-01-15T10:30:00+00:00|feature/valid-date
+            invalid-date|feature/invalid-date
+            |feature/empty-date
+            """;
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("for-each-ref"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(DATE_OUTPUT));
+                else if (psi.Arguments.Contains("rev-parse"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, olderThanDays: 60);
+
+        // Assert - Only valid entries should be included
+        result.ShouldContain("feature/valid-date");
+        result.ShouldNotContain("feature/invalid-date");
+        result.ShouldNotContain("feature/empty-date");
+        result.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WithDetachedHeadBranches_ShouldFilterOutDetachedHeads()
+    {
+        // Arrange
+        const string MERGED_OUTPUT = """
+            main
+            feature/normal-branch
+            (HEAD detached at abc1234)
+            """;
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("branch --merged"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_OUTPUT));
+                else if (psi.Arguments.Contains("rev-parse --abbrev-ref HEAD"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+
+        // Assert - Should exclude detached head and protected branches
+        result.ShouldContain("feature/normal-branch");
+        result.ShouldNotContain("main"); // Protected branch
+        result.ShouldNotContain("feature/current"); // Current branch should be filtered out
+        result.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WithGoneBranchesIncludingDetached_ShouldFilterOutDetachedHeads()
+    {
+        // Arrange
+        const string GONE_OUTPUT = """
+              feature/gone1    abc123 [origin/feature/gone1: gone] Last commit
+            * main             def456 [origin/main] Current branch
+              feature/gone2    ghi789 [origin/feature/gone2: gone] Another commit
+              (HEAD detached at xyz)  123abcd [origin/detached: gone]
+            """;
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var psi = callInfo.Arg<ProcessStartInfo>();
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+
+                if (psi.Arguments.Contains("branch -vv"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GONE_OUTPUT));
+                else if (psi.Arguments.Contains("rev-parse"))
+                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
+
+                return 0;
+            });
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: true, olderThanDays: null);
+
+        // Assert - Should include only normal gone branches, not detached heads
+        result.ShouldContain("feature/gone1");
+        result.ShouldContain("feature/gone2");
+        result.ShouldNotContain("main");
+    }
+
+    [Fact]
+    public async Task DeleteLocalBranchAsync_WhenBranchExists_ShouldCallGitBranchDelete()
+    {
+        // Arrange
+        const string BRANCH_NAME = "feature/test-branch";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(0);
+
+        // Act
+        await _gitService.DeleteLocalBranchAsync(REPO_PATH, BRANCH_NAME);
+
+        // Assert
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(psi =>
+                psi.FileName == "git" &&
+                psi.Arguments == $"branch -d {BRANCH_NAME}" &&
+                psi.WorkingDirectory == REPO_PATH),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task DeleteLocalBranchAsync_WhenForceIsTrue_ShouldCallGitBranchDeleteWithForceFlag()
+    {
+        // Arrange
+        const string BRANCH_NAME = "feature/test-branch";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(0);
+
+        // Act
+        await _gitService.DeleteLocalBranchAsync(REPO_PATH, BRANCH_NAME, force: true);
+
+        // Assert
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(psi =>
+                psi.FileName == "git" &&
+                psi.Arguments == $"branch -D {BRANCH_NAME}" &&
+                psi.WorkingDirectory == REPO_PATH),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task DeleteLocalBranchAsync_WhenRepositoryPathIsNull_ShouldThrowException()
+    {
+        // Arrange
+        const string BRANCH_NAME = "feature/test-branch";
+
+        // Act & Assert
+        var exception = await Should.ThrowAsync<ArgumentNullException>(
+            () => _gitService.DeleteLocalBranchAsync(null!, BRANCH_NAME));
+
+        exception.ShouldNotBeNull();
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task DeleteLocalBranchAsync_WhenBranchNameIsNullOrWhitespace_ShouldCallGitWithInvalidBranch(string? branchName)
+    {
+        // Arrange
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns<int>(_ => throw new InvalidOperationException("error: branch '' not found."));
+
+        // Act & Assert
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => _gitService.DeleteLocalBranchAsync(REPO_PATH, branchName!));
+
+        exception.ShouldNotBeNull();
+
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task DeleteLocalBranchAsync_WhenGitCommandFails_ShouldThrowException()
+    {
+        // Arrange
+        const string BRANCH_NAME = "feature/test-branch";
+        const string ERROR_MESSAGE = "error: branch 'feature/test-branch' not found.";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns<int>(_ => throw new InvalidOperationException(ERROR_MESSAGE));
+
+        // Act & Assert
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => _gitService.DeleteLocalBranchAsync(REPO_PATH, BRANCH_NAME));
+
+        exception.Message.ShouldBe(ERROR_MESSAGE);
+
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task DeleteLocalBranchAsync_WhenBranchHasSpecialCharacters_ShouldPassCorrectArguments()
+    {
+        // Arrange
+        const string BRANCH_NAME = "feature/test-branch-with-special#chars";
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
+            .Returns(0);
+
+        // Act
+        await _gitService.DeleteLocalBranchAsync(REPO_PATH, BRANCH_NAME);
+
+        // Assert
+        await _processRunner.Received(1).RunAsync
+        (
+            Arg.Is<ProcessStartInfo>(psi =>
+                psi.FileName == "git" &&
+                psi.Arguments == $"branch -d {BRANCH_NAME}" &&
+                psi.WorkingDirectory == REPO_PATH),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
     }
 }

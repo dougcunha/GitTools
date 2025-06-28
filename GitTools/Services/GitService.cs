@@ -3,6 +3,7 @@ using System.IO.Abstractions;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using GitTools.Extensions;
 using GitTools.Models;
 using Spectre.Console;
 
@@ -42,7 +43,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
 
         return string.IsNullOrWhiteSpace(result)
             ? []
-            : [.. result.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+            : [.. result.SplitLines()];
     }
 
     /// <inheritdoc/>
@@ -304,7 +305,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
                 $"rev-list --left-right --count {branchName}...origin/{branchName}"
             ).ConfigureAwait(false);
 
-            var counts = countStr.Split('\t', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var counts = countStr.SplitAndTrim('\t');
 
             (string aheadCount, string behindCount) = counts.Length == 2
                 ? (counts[0], counts[1])
@@ -362,7 +363,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
                 ? []
                 :
                 [
-                    .. result.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .. result.SplitLines()
                         .Select(static s => s.Replace("'", string.Empty, StringComparison.OrdinalIgnoreCase))
                 ];
         }
@@ -542,6 +543,129 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             console.MarkupInterpolated($"[red]Error checking current branch in {repositoryPath}: {ex.Message}[/]");
 
             return false;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<string?> GetCurrentBranchAsync(string repositoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return null;
+
+        try
+        {
+            var currentBranch = await RunGitCommandAsync(repositoryPath, "rev-parse --abbrev-ref HEAD").ConfigureAwait(false);
+
+            return string.IsNullOrWhiteSpace(currentBranch) ? null : currentBranch.Trim();
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error retrieving current branch in {repositoryPath}: {ex.Message}[/]");
+
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<string>> GetPrunableBranchesAsync(string repositoryPath, bool merged, bool gone, int? olderThanDays)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return [];
+
+        // Return empty list if no criteria are provided
+        if (!merged && !gone && !olderThanDays.HasValue)
+            return [];
+
+        var protectedBranches = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "master",
+            "main",
+            "develop"
+        };
+
+        var current = await GetCurrentBranchAsync(repositoryPath).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(current))
+            protectedBranches.Add(current);
+
+        try
+        {
+            if (merged)
+            {
+                var mergedOutput = await RunGitCommandAsync(repositoryPath, "branch --merged").ConfigureAwait(false);
+                AddBranches(result, mergedOutput);
+            }
+
+            if (gone)
+            {
+                var goneOutput = await RunGitCommandAsync(repositoryPath, "branch -vv").ConfigureAwait(false);
+                foreach (var line in goneOutput.SplitLines())
+                {
+                    if (!line.Contains(": gone]", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var branch = line.TrimStart('*', ' ').SplitRemoveEmpty(' ')[0];
+
+                    if (IsDetachedHead(branch))
+                        continue;
+
+                    result.Add(branch);
+                }
+            }
+
+            if (olderThanDays.HasValue)
+            {
+                var threshold = DateTimeOffset.UtcNow.AddDays(-olderThanDays.Value);
+                var dateOutput = await RunGitCommandAsync(repositoryPath, "for-each-ref --format='%(committerdate:iso8601)|%(refname:short)' refs/heads").ConfigureAwait(false);
+
+                foreach (var line in dateOutput.SplitLines())
+                {
+                    var parts = line.SplitAndTrim('|', 2);
+
+                    if (parts.Length != 2)
+                        continue;
+
+                    var branch = parts[1];
+
+                    if (IsDetachedHead(branch))
+                        continue;
+
+                    if (DateTimeOffset.TryParse(parts[0], out var commitDate) && commitDate < threshold)
+                        result.Add(branch);
+                }
+            }
+
+            result.ExceptWith(protectedBranches);
+
+            return [.. result];
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error getting prunable branches in {repositoryPath}: {ex.Message}[/]");
+
+            return [];
+        }
+    }
+
+    private static bool IsDetachedHead(string branch)
+        => branch.Contains("HEAD", StringComparison.OrdinalIgnoreCase) ||
+        branch.Contains("detached", StringComparison.OrdinalIgnoreCase);
+
+    /// <inheritdoc/>
+    public Task DeleteLocalBranchAsync(string repositoryPath, string branch, bool force = false)
+        => RunGitCommandAsync(repositoryPath, $"branch {(force ? "-D" : "-d")} {branch}");
+
+    private static void AddBranches(HashSet<string> target, string output)
+    {
+        foreach (var line in output.SplitLines())
+        {
+            var branch = line.Replace("'", string.Empty).Trim('*', ' ');
+
+            if (IsDetachedHead(branch))
+                continue;
+
+            target.Add(branch);
         }
     }
 

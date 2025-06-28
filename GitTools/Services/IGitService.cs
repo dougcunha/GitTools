@@ -275,4 +275,31 @@ public interface IGitService
     /// true if the specified branch is the current branch; otherwise, false.
     /// </returns>
     Task<bool> IsCurrentBranchAsync(string repositoryPath, string branch);
+
+    /// <summary>
+    /// Gets the name of the current branch in the specified repository.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository to check.
+    /// </param>
+    /// <returns>The name of the current branch or <c>null</c> if it cannot be determined.</returns>
+    Task<string?> GetCurrentBranchAsync(string repositoryPath);
+
+    /// <summary>
+    /// Gets the list of local branches that can be pruned based on the provided criteria.
+    /// </summary>
+    /// <param name="repositoryPath">The path to the git repository.</param>
+    /// <param name="merged">Include branches already merged into HEAD.</param>
+    /// <param name="gone">Include branches whose upstream was removed.</param>
+    /// <param name="olderThanDays">Include branches older than the specified number of days.</param>
+    /// <returns>A list of branch names that can be safely pruned.</returns>
+    Task<List<string>> GetPrunableBranchesAsync(string repositoryPath, bool merged, bool gone, int? olderThanDays);
+
+    /// <summary>
+    /// Deletes a local branch from the specified repository.
+    /// </summary>
+    /// <param name="repositoryPath">The path to the git repository.</param>
+    /// <param name="branch">The branch to delete.</param>
+    /// <param name="force">Use force deletion.</param>
+    Task DeleteLocalBranchAsync(string repositoryPath, string branch, bool force = false);
 }
