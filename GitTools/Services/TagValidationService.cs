@@ -1,3 +1,5 @@
+using GitTools.Extensions;
+
 namespace GitTools.Services;
 
 /// <summary>
@@ -12,7 +14,7 @@ public sealed class TagValidationService : ITagValidationService
             return [];
 
         return [.. tagsInput
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .SplitAndTrim(',')
             .Where(tag => !string.IsNullOrWhiteSpace(tag))];
     }
 

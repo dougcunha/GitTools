@@ -3,6 +3,7 @@ using System.IO.Abstractions;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using GitTools.Extensions;
 using GitTools.Models;
 using Spectre.Console;
 
@@ -42,7 +43,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
 
         return string.IsNullOrWhiteSpace(result)
             ? []
-            : [.. result.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+            : [.. result.SplitLines()];
     }
 
     /// <inheritdoc/>
@@ -304,7 +305,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
                 $"rev-list --left-right --count {branchName}...origin/{branchName}"
             ).ConfigureAwait(false);
 
-            var counts = countStr.Split('\t', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var counts = countStr.SplitAndTrim('\t');
 
             (string aheadCount, string behindCount) = counts.Length == 2
                 ? (counts[0], counts[1])
@@ -362,7 +363,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
                 ? []
                 :
                 [
-                    .. result.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .. result.SplitLines()
                         .Select(static s => s.Replace("'", string.Empty, StringComparison.OrdinalIgnoreCase))
                 ];
         }
@@ -573,6 +574,10 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
             return [];
 
+        // Return empty list if no criteria are provided
+        if (!merged && !gone && !olderThanDays.HasValue)
+            return [];
+
         var protectedBranches = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "master",
@@ -588,19 +593,23 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         {
             if (merged)
             {
-                var mergedOutput = await RunGitCommandAsync(repositoryPath, "branch --merged --format='%(refname:short)'").ConfigureAwait(false);
+                var mergedOutput = await RunGitCommandAsync(repositoryPath, "branch --merged").ConfigureAwait(false);
                 AddBranches(result, mergedOutput);
             }
 
             if (gone)
             {
                 var goneOutput = await RunGitCommandAsync(repositoryPath, "branch -vv").ConfigureAwait(false);
-                foreach (var line in goneOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                foreach (var line in goneOutput.SplitLines())
                 {
-                    if (!line.Contains("[gone]", StringComparison.OrdinalIgnoreCase))
+                    if (!line.Contains(": gone]", StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    var branch = line.TrimStart('*', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
+                    var branch = line.TrimStart('*', ' ').SplitRemoveEmpty(' ')[0];
+
+                    if (IsDetachedHead(branch))
+                        continue;
+
                     result.Add(branch);
                 }
             }
@@ -610,15 +619,20 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
                 var threshold = DateTimeOffset.UtcNow.AddDays(-olderThanDays.Value);
                 var dateOutput = await RunGitCommandAsync(repositoryPath, "for-each-ref --format='%(committerdate:iso8601)|%(refname:short)' refs/heads").ConfigureAwait(false);
 
-                foreach (var line in dateOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                foreach (var line in dateOutput.SplitLines())
                 {
-                    var parts = line.Split('|', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    var parts = line.SplitAndTrim('|', 2);
 
                     if (parts.Length != 2)
                         continue;
 
+                    var branch = parts[1];
+
+                    if (IsDetachedHead(branch))
+                        continue;
+
                     if (DateTimeOffset.TryParse(parts[0], out var commitDate) && commitDate < threshold)
-                        result.Add(parts[1]);
+                        result.Add(branch);
                 }
             }
 
@@ -634,17 +648,25 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         }
     }
 
+    private static bool IsDetachedHead(string branch)
+        => branch.Contains("HEAD", StringComparison.OrdinalIgnoreCase) ||
+        branch.Contains("detached", StringComparison.OrdinalIgnoreCase);
+
     /// <inheritdoc/>
     public Task DeleteLocalBranchAsync(string repositoryPath, string branch, bool force = false)
         => RunGitCommandAsync(repositoryPath, $"branch {(force ? "-D" : "-d")} {branch}");
 
     private static void AddBranches(HashSet<string> target, string output)
     {
-        if (string.IsNullOrWhiteSpace(output))
-            return;
+        foreach (var line in output.SplitLines())
+        {
+            var branch = line.Replace("'", string.Empty).Trim('*', ' ');
 
-        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            target.Add(line.Replace("'", string.Empty).Trim('*', ' '));
+            if (IsDetachedHead(branch))
+                continue;
+
+            target.Add(branch);
+        }
     }
 
     /// <inheritdoc/>

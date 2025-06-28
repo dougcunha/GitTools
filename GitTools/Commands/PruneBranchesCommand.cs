@@ -22,6 +22,7 @@ public sealed class PruneBranchesCommand : Command
         _console = console;
         _displayService = displayService;
 
+        Aliases.Add("pb");
 
         var rootArg = new Argument<string>("root-directory")
         {
@@ -62,14 +63,18 @@ public sealed class PruneBranchesCommand : Command
         Options.Add(automaticOption);
         Options.Add(dryRunOption);
 
-        SetAction(
-            parseResult => ExecuteAsync(
+        SetAction
+        (
+            parseResult => ExecuteAsync
+            (
                 parseResult.GetValue(rootArg)!,
                 parseResult.GetValue(mergedOption),
                 parseResult.GetValue(goneOption),
                 parseResult.GetValue(olderThanOption),
                 parseResult.GetValue(automaticOption),
-                parseResult.GetValue(dryRunOption)));
+                parseResult.GetValue(dryRunOption)
+            )
+        );
     }
 
     private async Task ExecuteAsync(string rootDirectory, bool merged, bool gone, int? olderThan, bool automatic, bool dryRun)
