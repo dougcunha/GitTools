@@ -1,4 +1,5 @@
 using GitTools.Commands;
+using GitTools.Models;
 using GitTools.Services;
 using Spectre.Console.Testing;
 
@@ -81,7 +82,7 @@ public sealed class PruneBranchesCommandTests
     {
         // Arrange
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([BRANCH_NAME]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(BRANCH_NAME)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -98,7 +99,7 @@ public sealed class PruneBranchesCommandTests
     {
         // Arrange
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([MERGED_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(MERGED_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -115,7 +116,7 @@ public sealed class PruneBranchesCommandTests
     {
         // Arrange
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, false, true, null).Returns([GONE_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, false, true, null).Returns([CreateBranchStatus(GONE_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -135,7 +136,7 @@ public sealed class PruneBranchesCommandTests
         const string OLD_BRANCH = "feature/old-branch";
 
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, false, false, OLDER_THAN_DAYS).Returns([OLD_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, false, false, OLDER_THAN_DAYS).Returns([CreateBranchStatus(OLD_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -153,7 +154,7 @@ public sealed class PruneBranchesCommandTests
         // Arrange
         const int OLDER_THAN_DAYS = 15;
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, true, OLDER_THAN_DAYS).Returns([MERGED_BRANCH, GONE_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, true, OLDER_THAN_DAYS).Returns([CreateBranchStatus(MERGED_BRANCH), CreateBranchStatus(GONE_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -170,8 +171,8 @@ public sealed class PruneBranchesCommandTests
     {
         // Arrange
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH, REPO2_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([MERGED_BRANCH]);
-        _gitService.GetPrunableBranchesAsync(REPO2_PATH, true, false, null).Returns([GONE_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(MERGED_BRANCH)]);
+        _gitService.GetPrunableBranchesAsync(REPO2_PATH, true, false, null).Returns([CreateBranchStatus(GONE_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
         _display.GetHierarchicalName(REPO2_PATH, ROOT_DIR).Returns("repo2");
 
@@ -192,7 +193,7 @@ public sealed class PruneBranchesCommandTests
     {
         // Arrange
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([MERGED_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(MERGED_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -211,7 +212,7 @@ public sealed class PruneBranchesCommandTests
         const string BRANCH2 = "feature/deletable";
 
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([MERGED_BRANCH, BRANCH2]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(MERGED_BRANCH), CreateBranchStatus(BRANCH2)]);
         _gitService.DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH).Returns(Task.FromException(new InvalidOperationException(ERROR_MESSAGE)));
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
@@ -231,7 +232,7 @@ public sealed class PruneBranchesCommandTests
     {
         // Arrange
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([MERGED_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(MERGED_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -250,7 +251,7 @@ public sealed class PruneBranchesCommandTests
         const string HIERARCHICAL_NAME = "folder/nested-repo";
 
         _scanner.Scan(ROOT_DIR).Returns([NESTED_REPO]);
-        _gitService.GetPrunableBranchesAsync(NESTED_REPO, true, false, null).Returns([MERGED_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(NESTED_REPO, true, false, null).Returns([CreateBranchStatus(MERGED_BRANCH)]);
         _display.GetHierarchicalName(NESTED_REPO, ROOT_DIR).Returns(HIERARCHICAL_NAME);
 
         // Act
@@ -268,9 +269,9 @@ public sealed class PruneBranchesCommandTests
         const string REPO3_PATH = @"C:\repos\repo3";
 
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH, REPO2_PATH, REPO3_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([MERGED_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(MERGED_BRANCH)]);
         _gitService.GetPrunableBranchesAsync(REPO2_PATH, true, false, null).Returns([]);
-        _gitService.GetPrunableBranchesAsync(REPO3_PATH, true, false, null).Returns([GONE_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO3_PATH, true, false, null).Returns([CreateBranchStatus(GONE_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
         _display.GetHierarchicalName(REPO3_PATH, ROOT_DIR).Returns("repo3");
 
@@ -307,7 +308,7 @@ public sealed class PruneBranchesCommandTests
         // Arrange
         const int LARGE_DAYS = 365;
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, false, false, LARGE_DAYS).Returns([MERGED_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, false, false, LARGE_DAYS).Returns([CreateBranchStatus(MERGED_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -367,7 +368,7 @@ public sealed class PruneBranchesCommandTests
         const string COMPLEX_BRANCH3 = "release/v1.2.3-beta";
 
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([COMPLEX_BRANCH1, COMPLEX_BRANCH2, COMPLEX_BRANCH3]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(COMPLEX_BRANCH1), CreateBranchStatus(COMPLEX_BRANCH2), CreateBranchStatus(COMPLEX_BRANCH3)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -392,7 +393,7 @@ public sealed class PruneBranchesCommandTests
         const string ERROR_MESSAGE = "Branch is protected";
 
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([SUCCESS_BRANCH, FAIL_BRANCH, SUCCESS_BRANCH2]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(SUCCESS_BRANCH), CreateBranchStatus(FAIL_BRANCH), CreateBranchStatus(SUCCESS_BRANCH2)]);
         _gitService.DeleteLocalBranchAsync(REPO1_PATH, FAIL_BRANCH).Returns(Task.FromException(new InvalidOperationException(ERROR_MESSAGE)));
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
@@ -416,7 +417,7 @@ public sealed class PruneBranchesCommandTests
         // Arrange
         _console.Input.PushTextWithEnter(""); // Simula usuário não selecionando nada
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([MERGED_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(MERGED_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -435,7 +436,7 @@ public sealed class PruneBranchesCommandTests
         _console.Input.PushKey(ConsoleKey.Enter);    // Confirm selection
 
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([MERGED_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(MERGED_BRANCH)]);
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -457,7 +458,7 @@ public sealed class PruneBranchesCommandTests
 
         _scanner.Scan(ROOT_DIR).Returns([MAIN_REPO, SUBMODULE_REPO]);
         // Main repo has a normal branch that should be pruned
-        _gitService.GetPrunableBranchesAsync(MAIN_REPO, true, false, null).Returns([NORMAL_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(MAIN_REPO, true, false, null).Returns([CreateBranchStatus(NORMAL_BRANCH)]);
         // Submodule has detached HEAD which should NOT be returned by GetPrunableBranchesAsync
         _gitService.GetPrunableBranchesAsync(SUBMODULE_REPO, true, false, null).Returns([]);
         _display.GetHierarchicalName(MAIN_REPO, ROOT_DIR).Returns("sourcegit");
@@ -474,6 +475,9 @@ public sealed class PruneBranchesCommandTests
         _console.Output.ShouldContain("Branch pruning completed.");
     }
 
+    private static BranchStatus CreateBranchStatus(string name)
+        => new BranchStatus("/repo/path", name, "xxx", false, 0, 0, true, false, DateTime.Now, true);
+
     [Fact]
     public async Task ExecuteAsync_WithComplexBranchNamesInInteractiveMode_ShouldFormatCorrectly()
     {
@@ -485,7 +489,10 @@ public sealed class PruneBranchesCommandTests
         _console.Input.PushKey(ConsoleKey.Enter);    // Confirm selection
 
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([DETACHED_HEAD_BRANCH, COMPLEX_BRANCH]);
+
+        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null)
+            .Returns([CreateBranchStatus(DETACHED_HEAD_BRANCH), CreateBranchStatus(COMPLEX_BRANCH)]);
+
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
@@ -536,7 +543,7 @@ public sealed class PruneBranchesCommandTests
         // Detached heads should NOT be returned by GetPrunableBranchesAsync after our fix
 
         _scanner.Scan(ROOT_DIR).Returns([SOURCEGIT_REPO, COLIBRI_REPO, AGILE_REPO, KIOSK_REPO, DCONNECT_REPO]);
-        _gitService.GetPrunableBranchesAsync(SOURCEGIT_REPO, true, false, null).Returns([CUSTOM_BRANCH]);
+        _gitService.GetPrunableBranchesAsync(SOURCEGIT_REPO, true, false, null).Returns([CreateBranchStatus(CUSTOM_BRANCH)]);
         // All submodules with detached heads should return empty lists (filtered out)
         _gitService.GetPrunableBranchesAsync(COLIBRI_REPO, true, false, null).Returns([]);
         _gitService.GetPrunableBranchesAsync(AGILE_REPO, true, false, null).Returns([]);

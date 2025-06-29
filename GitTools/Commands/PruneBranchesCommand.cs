@@ -1,4 +1,5 @@
 using System.CommandLine;
+using GitTools.Models;
 using GitTools.Services;
 using Spectre.Console;
 
@@ -103,7 +104,7 @@ public sealed class PruneBranchesCommand : Command
                 new TaskDescriptionColumn())
             .StartAsync(async ctx =>
             {
-                var result = new Dictionary<string, List<string>>();
+                var result = new Dictionary<string, List<BranchStatus>>();
                 var task = ctx.AddTask("Analyzing repositories...");
                 task.MaxValue = repoPaths.Count;
 
@@ -111,8 +112,10 @@ public sealed class PruneBranchesCommand : Command
                 {
                     task.Description($"Checking {_displayService.GetHierarchicalName(repo, rootDirectory)}...");
                     var branches = await _gitService.GetPrunableBranchesAsync(repo, merged, gone, olderThan).ConfigureAwait(false);
+
                     if (branches.Count > 0)
                         result[repo] = branches;
+
                     task.Increment(1);
                 }
 
@@ -124,10 +127,11 @@ public sealed class PruneBranchesCommand : Command
         if (repoBranches.Count == 0)
         {
             _console.MarkupLine("[yellow]No branches to prune found.[/]");
+
             return;
         }
 
-        var branchKeys = repoBranches.SelectMany(kv => kv.Value.Select(b => $"{kv.Key}|{b}")).ToList();
+        var branchKeys = repoBranches.SelectMany(kv => kv.Value.Select(b => $"{kv.Key}|{b.Name}|{b.CanBeSafelyDeleted}")).ToList();
 
         var selected = automatic ? branchKeys : await _console.PromptAsync(
             new MultiSelectionPrompt<string>()
@@ -139,15 +143,22 @@ public sealed class PruneBranchesCommand : Command
                 .AddChoiceGroup("Select all", branchKeys)
                 .UseConverter(key =>
                 {
-                    var parts = key.Split('|', 2);
+                    if (key == "Select all")
+                        return key;
+
+                    var parts = key.Split('|', 3);
                     var repo = parts[0];
                     var branch = parts[1];
-                    return $"{_displayService.GetHierarchicalName(repo, rootDirectory)} > {branch}";
+                    var canBeDeleted = parts.Length > 2 && bool.Parse(parts[2]);
+                    var canBeDeletedText = canBeDeleted ? "[green](can be safely deleted)[/]" : "[red](not fully merged)[/]";
+
+                    return $"{_displayService.GetHierarchicalName(repo, rootDirectory)} > {branch} {canBeDeletedText}";
                 }));
 
         if (selected.Count == 0)
         {
             _console.MarkupLine("[yellow]No branch selected.[/]");
+
             return;
         }
 
@@ -160,6 +171,7 @@ public sealed class PruneBranchesCommand : Command
             }
 
             _console.MarkupLine("[green]Dry run completed.[/]");
+
             return;
         }
 
@@ -182,9 +194,10 @@ public sealed class PruneBranchesCommand : Command
                 {
                     var (repo, branch) = SplitKey(key);
                     task.Description($"Deleting {_displayService.GetHierarchicalName(repo, rootDirectory)} -> {branch}...");
+
                     try
                     {
-                        await _gitService.DeleteLocalBranchAsync(repo, branch).ConfigureAwait(false);
+                        await _gitService.DeleteLocalBranchAsync(repo, branch, force: true).ConfigureAwait(false);
                         _console.MarkupLineInterpolated($"[green]✓ {_displayService.GetHierarchicalName(repo, rootDirectory)} -> {branch}[/]");
                     }
                     catch (Exception ex)
@@ -203,7 +216,10 @@ public sealed class PruneBranchesCommand : Command
 
     private static (string repo, string branch) SplitKey(string key)
     {
-        var index = key.IndexOf('|');
-        return (key[..index], key[(index + 1)..]);
+        var parts = key.Split('|');
+        var repo = parts[0];
+        var branch = parts[1];
+
+        return (repo, branch);
     }
 }

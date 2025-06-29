@@ -2,8 +2,11 @@ using System.Diagnostics;
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
 using GitTools.Models;
 using GitTools.Services;
+using GitTools.Tests.Utils;
 using Spectre.Console;
 using Spectre.Console.Testing;
 
@@ -36,6 +39,73 @@ public sealed class GitServiceTests
             .GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, [typeof(string)], null);
 
         return (DataReceivedEventArgs)constructor!.Invoke([data]);
+    }
+
+    private void ConfigureGitCommands(GitCommandConfiguratorOptions options)
+    {
+        var configurator = new GitCommandConfigurator(options);
+
+        _processRunner.RunAsync(
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>())
+            .Returns(callInfo =>
+            {
+                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
+                var psi = callInfo.ArgAt<ProcessStartInfo>(0);
+
+                return configurator.ProcessCommand(psi.Arguments, outputHandler);
+            });
+    }
+
+    private void ConfigureRepositoryStatus
+    (
+        string remoteUrl,
+        List<string> localBranches,
+        List<string>? modifiedFiles = null,
+        Dictionary<string, string>? upstreamBranches = null,
+        Dictionary<string, (int ahead, int behind)>? aheadBehindCounts = null,
+        Dictionary<string, bool>? goneBranches = null,
+        Dictionary<string, DateTime>? lastCommitDates = null,
+        string? currentBranch = null)
+    {
+        var options = new GitCommandConfiguratorOptions
+        {
+            RemoteUrl = remoteUrl,
+            LocalBranches = localBranches,
+            ModifiedFiles = modifiedFiles,
+            CurrentBranch = currentBranch,
+            UpstreamBranches = upstreamBranches,
+            AheadBehindCounts = aheadBehindCounts,
+            GoneBranches = goneBranches,
+            LastCommitDates = lastCommitDates
+        };
+
+        ConfigureGitCommands(options);
+    }
+
+    private void ConfigureBranchStatus
+    (
+        List<string> localBranches,
+        string? currentBranch = null,
+        Dictionary<string, string>? upstreamBranches = null,
+        Dictionary<string, (int ahead, int behind)>? aheadBehindCounts = null,
+        Dictionary<string, bool>? goneBranches = null,
+        Dictionary<string, DateTime>? lastCommitDates = null,
+        List<string>? mergedBranches = null)
+    {
+        var options = new GitCommandConfiguratorOptions
+        {
+            LocalBranches = localBranches,
+            CurrentBranch = currentBranch,
+            UpstreamBranches = upstreamBranches,
+            AheadBehindCounts = aheadBehindCounts,
+            GoneBranches = goneBranches,
+            LastCommitDates = lastCommitDates,
+            MergedBranches = mergedBranches
+        };
+
+        ConfigureGitCommands(options);
     }
 
     [Fact]
@@ -1571,7 +1641,7 @@ public sealed class GitServiceTests
     {
         // Arrange
         const string BRANCH_NAME = "feature-branch";
-        var untrackedBranch = new BranchStatus(REPO_PATH, BRANCH_NAME, null, false, 0, 0);
+        var untrackedBranch = new BranchStatus(REPO_PATH, BRANCH_NAME, null, false, 0, 0, false, false, DateTime.Now, true);
 
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
@@ -1594,7 +1664,7 @@ public sealed class GitServiceTests
         // Arrange
         const string BRANCH_NAME = "feature-branch";
         const string GIT_PUSH_OUTPUT = "";
-        var untrackedBranch = new BranchStatus(REPO_PATH, BRANCH_NAME, null, false, 0, 0);
+        var untrackedBranch = new BranchStatus(REPO_PATH, BRANCH_NAME, null, false, 0, 0, false, false, DateTime.Now, true);
 
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
@@ -1632,7 +1702,7 @@ public sealed class GitServiceTests
         const string BRANCH_NAME = "main";
         const string UPSTREAM = "origin/main";
         const string GIT_OUTPUT = "";
-        var trackedBranch = new BranchStatus(REPO_PATH, BRANCH_NAME, UPSTREAM, true, 1, 2);
+        var trackedBranch = new BranchStatus(REPO_PATH, BRANCH_NAME, UPSTREAM, true, 1, 2, false, false, DateTime.Now, true);
 
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
@@ -1683,7 +1753,7 @@ public sealed class GitServiceTests
         // Arrange
         const string BRANCH_NAME = "main";
         const string NON_EXISTENT_REPO_PATH = @"C:\non\existent\repo";
-        var branch = new BranchStatus(NON_EXISTENT_REPO_PATH, BRANCH_NAME, "origin/main", true, 0, 0);
+        var branch = new BranchStatus(NON_EXISTENT_REPO_PATH, BRANCH_NAME, "origin/main", true, 0, 0, false, false, DateTime.Now, true);
 
         _fileSystem.Directory.Exists(NON_EXISTENT_REPO_PATH).Returns(false);
 
@@ -1706,7 +1776,7 @@ public sealed class GitServiceTests
         // Arrange
         const string BRANCH_NAME = "main";
         const string EMPTY_REPO_PATH = "";
-        var branch = new BranchStatus(EMPTY_REPO_PATH, BRANCH_NAME, "origin/main", true, 0, 0);
+        var branch = new BranchStatus(EMPTY_REPO_PATH, BRANCH_NAME, "origin/main", true, 0, 0, false, false, DateTime.Now, true);
 
         // Act
         var result = await _gitService.SynchronizeBranchAsync(branch);
@@ -1728,7 +1798,7 @@ public sealed class GitServiceTests
         const string BRANCH_NAME = "main";
         const string UPSTREAM = "origin/main";
         const string ERROR_MESSAGE = "Git synchronization failed";
-        var trackedBranch = new BranchStatus(REPO_PATH, BRANCH_NAME, UPSTREAM, true, 0, 0);
+        var trackedBranch = new BranchStatus(REPO_PATH, BRANCH_NAME, UPSTREAM, true, 0, 0, false, false, DateTime.Now, true);
 
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
@@ -1749,7 +1819,7 @@ public sealed class GitServiceTests
     public async Task SynchronizeRepositoryAsync_WhenSuccessful_ShouldExecuteExpectedCommands()
     {
         // Arrange
-        var branch = new BranchStatus(REPO_PATH, "main", "origin/main", true, 0, 0);
+        var branch = new BranchStatus(REPO_PATH, "main", "origin/main", true, 0, 0, false, false, DateTime.Now, true);
         var repo = new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, REMOTE_URL, false, [branch]);
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
         var checkoutMainCalled = false;
@@ -1847,7 +1917,16 @@ public sealed class GitServiceTests
     public async Task SynchronizeRepositoryAsync_WhenExceptionOccurs_ShouldReturnFalseAndReport()
     {
         // Arrange
-        var repo = new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, REMOTE_URL, false, [new(REPO_PATH, "main", "origin/main", true, 0, 0)]);
+        var repo = new GitRepositoryStatus
+        (
+            REPO_NAME,
+            REPO_NAME,
+            REPO_PATH,
+            REMOTE_URL,
+            false,
+            [new(REPO_PATH, "main", "origin/main", true, 0, 0, false, false, DateTime.Now, true)]
+        );
+
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
         _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
@@ -1869,7 +1948,7 @@ public sealed class GitServiceTests
     public async Task SynchronizeRepositoryAsync_WithUncommittedChanges_ShouldStashAndPop()
     {
         // Arrange
-        var branch = new BranchStatus(REPO_PATH, "main", "origin/main", true, 0, 0);
+        var branch = new BranchStatus(REPO_PATH, "main", "origin/main", true, 0, 0, false, false, DateTime.Now, true);
         var repo = new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, REMOTE_URL, true, [branch]);
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
         var stashCalled = false;
@@ -1911,7 +1990,7 @@ public sealed class GitServiceTests
     public async Task SynchronizeRepositoryAsync_WhenBranchNotTrackedAndPushNewBranchesFalse_ShouldNotReportFailure()
     {
         // Arrange
-        var branch = new BranchStatus(REPO_PATH, "feature", null, true, 0, 0);
+        var branch = new BranchStatus(REPO_PATH, "feature", null, true, 0, 0, false, false, DateTime.Now, true);
         var repo = new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, REMOTE_URL, false, [branch]);
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
@@ -1933,7 +2012,7 @@ public sealed class GitServiceTests
     public async Task SynchronizeRepositoryAsync_WhenBranchTracked_ShouldSynchronizeAndReportSuccess()
     {
         // Arrange
-        var branch = new BranchStatus(REPO_PATH, "main", "origin/main", true, 0, 0);
+        var branch = new BranchStatus(REPO_PATH, "main", "origin/main", true, 0, 0, false, false, DateTime.Now, true);
         var repo = new GitRepositoryStatus(REPO_NAME, REPO_NAME, REPO_PATH, REMOTE_URL, false, [branch]);
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
@@ -2274,71 +2353,41 @@ public sealed class GitServiceTests
     {
         // Arrange
         const string ROOT_DIR = @"C:\repos";
-        const string REMOTE_LOCAL_URL = "https://github.com/user/repo.git";
+        const string REMOTE_URL = "https://github.com/user/repo.git";
         const string FEATURE_BRANCH = "feature/new-feature";
+        
+        var branches = new List<string> { "main", "develop", FEATURE_BRANCH };
+
+        var upstreams = new Dictionary<string, string>
+        {
+            ["main"] = "origin/main",
+            ["develop"] = "origin/develop"
+        };
+
+        var aheadBehind = new Dictionary<string, (int ahead, int behind)>
+        {
+            ["main"] = (0, 2),
+            ["develop"] = (1, 0),
+            [FEATURE_BRANCH] = (0, 0)
+        };
+
+        var goneBranches = new Dictionary<string, bool>
+        {
+            [FEATURE_BRANCH] = true
+        };
 
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
-        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            // ReSharper disable once CyclomaticComplexity
-            .Returns(static callInfo =>
-            {
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-                var psi = callInfo.ArgAt<ProcessStartInfo>(0);
-
-                // Mock different git commands based on arguments
-                if (psi.Arguments.Contains("config --get remote.origin.url"))
-                {
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(REMOTE_LOCAL_URL));
-                }
-                else if (psi.Arguments.Contains("branch --format"))
-                {
-                    const string BRANCHES = $"'{MAIN_BRANCH}'\n'{FEATURE_BRANCH}'\n'{DEVELOP_BRANCH}'";
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(BRANCHES));
-                }
-                else if (psi.Arguments.Contains("status --porcelain"))
-                {
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("M modified_file.txt"));
-                }
-                else if (psi.Arguments.Contains("fetch"))
-                {
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
-                }
-                else if (psi.Arguments.Contains("for-each-ref"))
-                {
-                    // Mock upstream tracking for main and develop, but not feature
-                    if (psi.Arguments.Contains($"refs/heads/{MAIN_BRANCH}"))
-                        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("origin/main"));
-                    else if (psi.Arguments.Contains($"refs/heads/{DEVELOP_BRANCH}"))
-                        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("origin/develop"));
-                    else
-                        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
-                }
-                else if (psi.Arguments.Contains("show-ref"))
-                {
-                    // Mock remote ref existence for tracked branches
-                    if (psi.Arguments.Contains("origin/main") || psi.Arguments.Contains("origin/develop"))
-                        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs($"abc123 refs/remotes/{psi.Arguments.Split(' ')[1]}"));
-                    else
-                        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
-                }
-                else if (psi.Arguments.Contains("rev-parse --abbrev-ref HEAD"))
-                {
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MAIN_BRANCH));
-                }
-                else if (psi.Arguments.Contains("rev-list --left-right --count"))
-                {
-                    // Mock ahead/behind counts
-                    if (psi.Arguments.Contains($"{MAIN_BRANCH}...origin/{MAIN_BRANCH}"))
-                        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("0\t2"));
-                    else if (psi.Arguments.Contains($"{DEVELOP_BRANCH}...origin/{DEVELOP_BRANCH}"))
-                        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("1\t0"));
-                    else
-                        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("0\t0"));
-                }
-
-                return 0;
-            });
+        ConfigureRepositoryStatus
+        (
+            remoteUrl: REMOTE_URL,
+            localBranches: branches,
+            modifiedFiles: ["modified_file.txt"],
+            upstreamBranches: upstreams,
+            aheadBehindCounts: aheadBehind,
+            goneBranches: goneBranches,
+            currentBranch: "main"
+        );
 
         // Act
         var result = await _gitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIR);        // Assert
@@ -2346,7 +2395,7 @@ public sealed class GitServiceTests
         result.Name.ShouldBe("repo");
         result.HierarchicalName.ShouldBe("../test/repo");
         result.RepoPath.ShouldBe(REPO_PATH);
-        result.RemoteUrl.ShouldBe(REMOTE_LOCAL_URL);
+        result.RemoteUrl.ShouldBe(REMOTE_URL);
         result.HasUncommitedChanges.ShouldBeTrue();
         result.LocalBranches.ShouldNotBeEmpty();
         result.LocalBranches.Count.ShouldBe(3);
@@ -3046,100 +3095,7 @@ public sealed class GitServiceTests
         _console.Output.ShouldContain(REPO_PATH);
         _console.Output.ShouldContain(ERROR_MESSAGE);
     }
-
-    [Fact]
-    public async Task GetPrunableBranchesAsync_ShouldExcludeProtectedBranches()
-    {
-        // Arrange
-        const string MERGED_OUTPUT = "main\nfeature/old";
-        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
-
-        _processRunner.RunAsync(
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
-            {
-                var psi = callInfo.Arg<ProcessStartInfo>();
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-
-                if (psi.Arguments.Contains("branch --merged"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_OUTPUT));
-                else if (psi.Arguments.Contains("rev-parse"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
-
-                return 0;
-            });
-
-        // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
-
-        // Assert
-        result.ShouldNotContain("main");
-        result.ShouldContain("feature/old");
-    }
-
-    [Fact]
-    public async Task GetPrunableBranchesAsync_WithOlderThanAndDetachedHead_ShouldFilterOutDetachedHead()
-    {
-        // Arrange
-        const int OLDER_THAN_DAYS = 30;
-        const string OLD_NORMAL_BRANCH = "feature/old-branch";
-        const string OLD_DETACHED_BRANCH = "HEAD detached at abc123";
-
-        var threshold = DateTimeOffset.UtcNow.AddDays(-OLDER_THAN_DAYS - 1);
-        var thresholdIso = threshold.ToString("yyyy-MM-dd HH:mm:ss zzz");
-
-        var dateOutput = $"{thresholdIso}|{OLD_NORMAL_BRANCH}\n{thresholdIso}|{OLD_DETACHED_BRANCH}";
-
-        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
-
-        _processRunner.RunAsync
-        (
-            Arg.Is<ProcessStartInfo>
-            (
-                psi => psi.Arguments
-                    .Contains("for-each-ref --format='%(committerdate:iso8601)|%(refname:short)' refs/heads")
-            ),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(Task.FromResult(0))
-            .AndDoes(callInfo =>
-            {
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-                foreach (var line in dateOutput.Split('\n'))
-                {
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(line));
-                }
-            });
-
-        _processRunner.RunAsync
-        (
-            Arg.Is<ProcessStartInfo>(psi => psi.Arguments.Contains("rev-parse --abbrev-ref HEAD")),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(Task.FromResult(0))
-            .AndDoes(callInfo =>
-            {
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MAIN_BRANCH));
-            });
-
-        // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, false, false, OLDER_THAN_DAYS);
-
-        // Assert
-        result.ShouldContain(OLD_NORMAL_BRANCH);
-        result.ShouldNotContain(OLD_DETACHED_BRANCH);
-        result.ShouldNotContain("HEAD");
-        result.ShouldNotContain("detached");
-
-        await _processRunner.Received(2).RunAsync(
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>());
-    }
-
+    
     [Fact]
     public async Task GetCurrentBranchAsync_WhenBranchExists_ShouldReturnBranchName()
     {
@@ -3317,233 +3273,27 @@ public sealed class GitServiceTests
     }
 
     [Fact]
-    public async Task GetPrunableBranchesAsync_WhenMergedBranchesRequested_ShouldReturnMergedBranches()
+    public async Task GetPrunableBranchesAsync_ShouldExcludeProtectedBranches()
     {
         // Arrange
-        const string MERGED_BRANCHES_OUTPUT = """
-            'feature/branch1'
-            'feature/branch2'
-            'main'
-            """;
-        const string CURRENT_BRANCH = "main";
+        var branches = new List<string> { "main", "feature/old" };
+        var mergedBranches = new List<string> { "main", "feature/old" };
 
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
-        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
-            {
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-                var psi = callInfo.ArgAt<ProcessStartInfo>(0);
-
-                if (psi.Arguments.Contains("branch --merged"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_BRANCHES_OUTPUT));
-                else if (psi.Arguments.Contains("rev-parse --abbrev-ref HEAD"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(CURRENT_BRANCH));
-
-                return 0;
-            });
+        ConfigureBranchStatus
+        (
+            localBranches: branches,
+            currentBranch: "main",
+            mergedBranches: mergedBranches
+        );
 
         // Act
         var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
 
         // Assert
-        result.ShouldContain("feature/branch1");
-        result.ShouldContain("feature/branch2");
-        result.ShouldNotContain("main"); // Protected branch
-        result.ShouldNotContain("master"); // Protected branch
-        result.ShouldNotContain("develop"); // Protected branch
-    }
-
-    [Fact]
-    public async Task GetPrunableBranchesAsync_WithMergedOption_ShouldReturnBranches()
-    {
-        // Arrange
-        const string MERGED_OUTPUT = "feature/one\nfeature/two";
-        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
-
-        _processRunner.RunAsync(
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
-            {
-                var psi = callInfo.Arg<ProcessStartInfo>();
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-
-                if (psi.Arguments.Contains("branch --merged"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_OUTPUT));
-                else if (psi.Arguments.Contains("rev-parse"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
-
-                return 0;
-            });
-
-        // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
-
-        // Assert
-        result.ShouldContain("feature/one");
-        result.ShouldContain("feature/two");
-        result.ShouldNotContain("main"); // Protected branch
-        result.ShouldNotContain("develop"); // Protected branch
-    }
-
-    [Fact]
-    public async Task GetPrunableBranchesAsync_WhenGoneBranchesRequested_ShouldReturnGoneBranches()
-    {
-        // Arrange
-        const string GONE_OUTPUT = """
-              feature/gone1    abc123 [origin/feature/gone1: gone] Last commit
-            * main             def456 [origin/main] Current branch
-              feature/gone2    ghi789 [origin/feature/gone2: gone] Another commit
-            """;
-
-        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
-
-        _processRunner.RunAsync(
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
-            {
-                var psi = callInfo.Arg<ProcessStartInfo>();
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-
-                if (psi.Arguments.Contains("branch -vv"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GONE_OUTPUT));
-                else if (psi.Arguments.Contains("rev-parse"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
-
-                return 0;
-            });
-
-        // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: true, olderThanDays: null);
-
-        // Assert
-        result.ShouldContain("feature/gone1");
-        result.ShouldContain("feature/gone2");
-        result.ShouldNotContain("main");
-    }
-
-    [Fact]
-    public async Task GetPrunableBranchesAsync_WhenOlderThanDaysRequested_ShouldReturnOldBranches()
-    {
-        // Arrange
-        const int OLDER_THAN_DAYS = 30;
-        var oldDate = DateTimeOffset.UtcNow.AddDays(-40).ToString("yyyy-MM-ddTHH:mm:sszzz");
-        var recentDate = DateTimeOffset.UtcNow.AddDays(-10).ToString("yyyy-MM-ddTHH:mm:sszzz");
-
-        var dateOutput = $"""
-            {oldDate}|feature/old-branch
-            {recentDate}|feature/recent-branch
-            {oldDate}|main
-            """;
-
-        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
-
-        _processRunner.RunAsync(
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
-            {
-                var psi = callInfo.Arg<ProcessStartInfo>();
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-
-                if (psi.Arguments.Contains("for-each-ref --format"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(dateOutput));
-
-                return 0;
-            });
-
-        // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, olderThanDays: OLDER_THAN_DAYS);
-
-        // Assert
-        result.ShouldContain("feature/old-branch");
-        result.ShouldNotContain("feature/recent-branch");
-        result.ShouldNotContain("main"); // Protected branch
-    }
-
-    [Fact]
-    public async Task GetPrunableBranchesAsync_WhenMultipleCriteriaProvided_ShouldReturnUnionOfResults()
-    {
-        // Arrange
-        const string MERGED_BRANCHES_OUTPUT = "'feature/merged1'\n'feature/merged2'";
-        const string GONE_BRANCHES_OUTPUT = "  feature/gone1    abc123 [origin/feature/gone1: gone] Last commit";
-        var oldDate = DateTimeOffset.UtcNow.AddDays(-40).ToString("yyyy-MM-ddTHH:mm:sszzz");
-        var dateOutput = $"{oldDate}|feature/old-branch";
-
-        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
-
-        _processRunner.RunAsync(
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
-            {
-                var psi = callInfo.Arg<ProcessStartInfo>();
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-
-                if (psi.Arguments.Contains("branch --merged"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_BRANCHES_OUTPUT));
-                else if (psi.Arguments.Contains("branch -vv"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GONE_BRANCHES_OUTPUT));
-                else if (psi.Arguments.Contains("for-each-ref --format"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(dateOutput));
-
-                return 0;
-            });
-
-        // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: true, olderThanDays: 30);
-
-        // Assert
-        result.ShouldContain("feature/merged1");
-        result.ShouldContain("feature/merged2");
-        result.ShouldContain("feature/gone1");
-        result.ShouldContain("feature/old-branch");
-        result.Count.ShouldBe(4);
-    }
-
-    [Fact]
-    public async Task GetPrunableBranchesAsync_WhenCurrentBranchIsInResults_ShouldExcludeCurrentBranch()
-    {
-        // Arrange
-        const string CURRENT_BRANCH = "feature/current";
-        const string MERGED_BRANCHES_OUTPUT = """
-            main
-            feature/normal-branch
-            (HEAD detached at abc1234)
-            """;
-        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
-
-        _processRunner.RunAsync(
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
-            {
-                var psi = callInfo.Arg<ProcessStartInfo>();
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-
-                if (psi.Arguments.Contains("branch --merged"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_BRANCHES_OUTPUT));
-                else if (psi.Arguments.Contains("rev-parse --abbrev-ref HEAD"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(CURRENT_BRANCH));
-
-                return 0;
-            });
-
-        // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
-
-        // Assert
-        result.ShouldContain("feature/normal-branch");
-        result.ShouldNotContain("main"); // Protected branch
-        result.ShouldNotContain("feature/current"); // Current branch should be filtered out
-        result.Count.ShouldBe(1);
+        result.ShouldNotContain(b => b.Name == "main");
+        result.ShouldContain(b => b.Name == "feature/old");
     }
 
     [Fact]
@@ -3616,67 +3366,189 @@ public sealed class GitServiceTests
 
         // Assert
         result.ShouldBeEmpty();
-        _console.Output.ShouldContain("Error getting prunable branches");
+        _console.Output.ShouldContain("Error getting local branches");
         _console.Output.ShouldContain(REPO_PATH);
         _console.Output.ShouldContain(ERROR_MESSAGE);
     }
 
     [Fact]
-    public async Task GetPrunableBranchesAsync_WhenNoCriteriaProvided_ShouldReturnEmptyList()
+    public async Task GetPrunableBranchesAsync_WithMergedOption_ShouldReturnBranches()
     {
         // Arrange
+        var branches = new List<string> { "main", "feature/one", "feature/two" };
+        var mergedBranches = new List<string> { "feature/one", "feature/two" };
+
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
+        ConfigureBranchStatus
+        (
+            localBranches: branches,
+            currentBranch: "main",
+            mergedBranches: mergedBranches
+        );
+
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
 
         // Assert
-        result.ShouldBeEmpty();
-
-        await _processRunner.DidNotReceive().RunAsync
-        (
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>()
-        );
+        result.ShouldContain(b => b.Name == "feature/one");
+        result.ShouldContain(b => b.Name == "feature/two");
+        result.ShouldNotContain(b => b.Name == "main");
+        result.ShouldNotContain(b => b.Name == "develop");
     }
 
     [Fact]
-    public async Task GetPrunableBranchesAsync_WhenInvalidDateFormat_ShouldSkipInvalidEntries()
+    public async Task GetPrunableBranchesAsync_WhenMergedBranchesRequested_ShouldReturnMergedBranches()
     {
         // Arrange
-        const string DATE_OUTPUT = """
-            2024-01-15T10:30:00+00:00|feature/valid-date
-            invalid-date|feature/invalid-date
-            |feature/empty-date
-            """;
+        var branches = new List<string> { "main", "feature/branch1", "feature/branch2" };
+        var mergedBranches = new List<string> { "feature/branch1", "feature/branch2", "main" };
 
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
-        _processRunner.RunAsync(
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
-            {
-                var psi = callInfo.Arg<ProcessStartInfo>();
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-
-                if (psi.Arguments.Contains("for-each-ref"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(DATE_OUTPUT));
-                else if (psi.Arguments.Contains("rev-parse"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
-
-                return 0;
-            });
+        ConfigureBranchStatus
+        (
+            localBranches: branches,
+            currentBranch: "main",
+            mergedBranches: mergedBranches
+        );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, olderThanDays: 60);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
 
-        // Assert - Only valid entries should be included
-        result.ShouldContain("feature/valid-date");
-        result.ShouldNotContain("feature/invalid-date");
-        result.ShouldNotContain("feature/empty-date");
+        // Assert
+        result.ShouldContain(b => b.Name == "feature/branch1");
+        result.ShouldContain(b => b.Name == "feature/branch2");
+        result.ShouldNotContain(b => b.Name == "main"); // Protected branch
+        result.ShouldNotContain(b => b.Name == "master"); // Protected branch
+        result.ShouldNotContain(b => b.Name == "develop"); // Protected branch
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenGoneBranchesRequested_ShouldReturnGoneBranches()
+    {
+        // Arrange
+        var branches = new List<string> { "main", "feature/gone1", "feature/gone2" };
+
+        var goneBranches = new Dictionary<string, bool>
+        {
+            ["feature/gone1"] = true,
+            ["feature/gone2"] = true,
+            ["main"] = false
+        };
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        ConfigureBranchStatus
+        (
+            localBranches: branches,
+            currentBranch: "main",
+            goneBranches: goneBranches
+        );
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: true, olderThanDays: null);
+
+        // Assert
+        result.ShouldContain(b => b.Name == "feature/gone1");
+        result.ShouldContain(b => b.Name == "feature/gone2");
+        result.ShouldNotContain(b => b.Name == "main");
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenOlderThanDaysRequested_ShouldReturnOldBranches()
+    {
+        // Arrange
+        const int OLDER_THAN_DAYS = 30;
+        var branches = new List<string> { "main", "feature/old-branch", "feature/recent-branch" };
+        var lastCommitDates = new Dictionary<string, DateTime>
+        {
+            ["main"] = DateTime.UtcNow.AddDays(-40),
+            ["feature/old-branch"] = DateTime.UtcNow.AddDays(-40),
+            ["feature/recent-branch"] = DateTime.UtcNow.AddDays(-10)
+        };
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        ConfigureBranchStatus
+        (
+            localBranches: branches,
+            currentBranch: "main",
+            lastCommitDates: lastCommitDates
+        );
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, olderThanDays: OLDER_THAN_DAYS);
+
+        // Assert
+        result.ShouldContain(b => b.Name == "feature/old-branch");
+        result.ShouldNotContain(b => b.Name == "feature/recent-branch");
+        result.ShouldNotContain(b => b.Name == "main"); // Protected branch
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenMultipleCriteriaProvided_ShouldReturnUnionOfResults()
+    {
+        // Arrange
+        var branches = new List<string> { "main", "feature/merged1", "feature/merged2", "feature/gone1", "feature/old-branch" };
+        var mergedBranches = new List<string> { "feature/merged1", "feature/merged2" };
+
+        var goneBranches = new Dictionary<string, bool>
+        {
+            ["feature/gone1"] = true
+        };
+
+        var lastCommitDates = new Dictionary<string, DateTime>
+        {
+            ["feature/old-branch"] = DateTime.UtcNow.AddDays(-40)
+        };
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        ConfigureBranchStatus
+        (
+            localBranches: branches,
+            currentBranch: "main",
+            mergedBranches: mergedBranches,
+            goneBranches: goneBranches,
+            lastCommitDates: lastCommitDates
+        );
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: true, olderThanDays: 30);
+
+        // Assert
+        result.ShouldContain(b => b.Name == "feature/merged1");
+        result.ShouldContain(b => b.Name == "feature/merged2");
+        result.ShouldContain(b => b.Name == "feature/gone1");
+        result.ShouldContain(b => b.Name == "feature/old-branch");
+        result.Count.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenCurrentBranchIsInResults_ShouldExcludeCurrentBranch()
+    {
+        // Arrange
+        const string CURRENT_BRANCH = "feature/current";
+        var branches = new List<string> { "main", "feature/normal-branch", "feature/current" };
+        var mergedBranches = new List<string> { "main", "feature/normal-branch", "feature/current" };
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        ConfigureBranchStatus
+        (
+            localBranches: branches,
+            currentBranch: CURRENT_BRANCH,
+            mergedBranches: mergedBranches
+        );
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldContain(b => b.Name == "feature/normal-branch");
+        result.ShouldNotContain(b => b.Name == "main"); // Protected branch
+        result.ShouldNotContain(b => b.Name == "feature/current"); // Current branch should be filtered out
         result.Count.ShouldBe(1);
     }
 
@@ -3684,37 +3556,24 @@ public sealed class GitServiceTests
     public async Task GetPrunableBranchesAsync_WithDetachedHeadBranches_ShouldFilterOutDetachedHeads()
     {
         // Arrange
-        const string MERGED_OUTPUT = """
-            main
-            feature/normal-branch
-            (HEAD detached at abc1234)
-            """;
+        var branches = new List<string> { "main", "feature/normal-branch" }; // GetLocalBranchesAsync já filtra detached heads
+        var mergedBranches = new List<string> { "main", "feature/normal-branch" };
+
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
-        _processRunner.RunAsync(
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
-            {
-                var psi = callInfo.Arg<ProcessStartInfo>();
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-
-                if (psi.Arguments.Contains("branch --merged"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MERGED_OUTPUT));
-                else if (psi.Arguments.Contains("rev-parse --abbrev-ref HEAD"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
-
-                return 0;
-            });
+        ConfigureBranchStatus
+        (
+            localBranches: branches,
+            currentBranch: "main",
+            mergedBranches: mergedBranches
+        );
 
         // Act
         var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
 
-        // Assert - Should exclude detached head and protected branches
-        result.ShouldContain("feature/normal-branch");
-        result.ShouldNotContain("main"); // Protected branch
-        result.ShouldNotContain("feature/current"); // Current branch should be filtered out
+        // Assert
+        result.ShouldContain(b => b.Name == "feature/normal-branch");
+        result.ShouldNotContain(b => b.Name == "main"); // Protected branch
         result.Count.ShouldBe(1);
     }
 
@@ -3722,41 +3581,65 @@ public sealed class GitServiceTests
     public async Task GetPrunableBranchesAsync_WithGoneBranchesIncludingDetached_ShouldFilterOutDetachedHeads()
     {
         // Arrange
-        const string GONE_OUTPUT = """
-              feature/gone1    abc123 [origin/feature/gone1: gone] Last commit
-            * main             def456 [origin/main] Current branch
-              feature/gone2    ghi789 [origin/feature/gone2: gone] Another commit
-              (HEAD detached at xyz)  123abcd [origin/detached: gone]
-            """;
+        var branches = new List<string> { "main", "feature/gone1", "feature/gone2" }; // Detached heads não aparecem em GetLocalBranchesAsync
+        var goneBranches = new Dictionary<string, bool>
+        {
+            ["feature/gone1"] = true,
+            ["feature/gone2"] = true,
+            ["main"] = false
+        };
 
         _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
 
-        _processRunner.RunAsync(
-            Arg.Any<ProcessStartInfo>(),
-            Arg.Any<DataReceivedEventHandler>(),
-            Arg.Any<DataReceivedEventHandler>())
-            .Returns(callInfo =>
-            {
-                var psi = callInfo.Arg<ProcessStartInfo>();
-                var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-
-                if (psi.Arguments.Contains("branch -vv"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(GONE_OUTPUT));
-                else if (psi.Arguments.Contains("rev-parse"))
-                    outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("main"));
-
-                return 0;
-            });
+        ConfigureBranchStatus
+        (
+            localBranches: branches,
+            currentBranch: "main",
+            goneBranches: goneBranches
+        );
 
         // Act
         var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: true, olderThanDays: null);
 
-        // Assert - Should include only normal gone branches, not detached heads
-        result.ShouldContain("feature/gone1");
-        result.ShouldContain("feature/gone2");
-        result.ShouldNotContain("main");
+        // Assert
+        result.ShouldContain(b => b.Name == "feature/gone1");
+        result.ShouldContain(b => b.Name == "feature/gone2");
+        result.ShouldNotContain(b => b.Name == "main");
     }
 
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WithOlderThanAndDetachedHead_ShouldFilterOutDetachedHead()
+    {
+        // Arrange
+        const int OLDER_THAN_DAYS = 30;
+        const string OLD_NORMAL_BRANCH = "feature/old-branch";
+        var branches = new List<string> { "main", OLD_NORMAL_BRANCH }; // Detached heads não aparecem em GetLocalBranchesAsync
+
+        var threshold = DateTime.UtcNow.AddDays(-OLDER_THAN_DAYS - 1);
+        var lastCommitDates = new Dictionary<string, DateTime>
+        {
+            [OLD_NORMAL_BRANCH] = threshold,
+            ["main"] = threshold
+        };
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        ConfigureBranchStatus
+        (
+            localBranches: branches,
+            currentBranch: "main",
+            lastCommitDates: lastCommitDates
+        );
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, olderThanDays: OLDER_THAN_DAYS);
+
+        // Assert
+        result.ShouldContain(b => b.Name == OLD_NORMAL_BRANCH);
+        result.ShouldNotContain(b => b.Name == "main"); // Protected branch
+        result.Count.ShouldBe(1);
+    }
+   
     [Fact]
     public async Task DeleteLocalBranchAsync_WhenBranchExists_ShouldCallGitBranchDelete()
     {

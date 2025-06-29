@@ -94,6 +94,19 @@ public sealed record GitRepositoryStatus
 /// <param name="RemoteBehindCount">
 /// The number of commits the local branch is ahead of the remote branch.
 /// </param>
+/// <param name="IsMerged">
+/// true if the branch has been merged into the current branch; otherwise, false.
+/// </param>
+/// <param name="IsGone">
+/// true if the upstream branch no longer exists; otherwise, false.
+/// </param>
+/// <param name="LastCommitDate">
+/// The date and time of the last commit on this branch.
+/// </param>
+/// <param name="IsFullyMerged">
+/// true if the branch is fully merged and can be safely deleted with 'git branch -d'; otherwise, false.
+/// When false, the branch requires 'git branch -D' to be deleted as it has commits not present in other branches.
+/// </param>
 public record BranchStatus
 (
     string RepositoryPath,
@@ -101,7 +114,11 @@ public record BranchStatus
     string? Upstream,
     bool IsCurrent,
     int RemoteAheadCount,
-    int RemoteBehindCount
+    int RemoteBehindCount,
+    bool IsMerged,
+    bool IsGone,
+    DateTime LastCommitDate,
+    bool IsFullyMerged
 )
 {
     /// <summary>
@@ -116,4 +133,19 @@ public record BranchStatus
     /// </summary>
     public bool IsTracked
         => !string.IsNullOrWhiteSpace(Upstream);
+
+    /// <summary>
+    /// Gets if the branch is detached.
+    /// A branch is considered detached if it is named "HEAD" or contains "detached
+    /// </summary>
+    public bool IsDetached
+        => Name.Contains("HEAD", StringComparison.OrdinalIgnoreCase) ||
+        Name.Contains(" detached", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gets if the branch can be safely deleted using 'git branch -d'.
+    /// Returns true if the branch is fully merged, false if it requires 'git branch -D'.
+    /// </summary>
+    public bool CanBeSafelyDeleted
+        => IsFullyMerged;
 }

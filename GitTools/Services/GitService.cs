@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
 using System.IO.Abstractions;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -19,6 +20,13 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
 
     [GeneratedRegex("""\[(?<section>remote|submodule)\s+"(?<name>[^"]+)"\]""", RegexOptions.Compiled)]
     private static partial Regex RegexConfigSection();
+
+    private static readonly string[] _protectedBranches = 
+    [
+        "master",
+        "main",
+        "develop"
+    ];
 
     /// <inheritdoc/>
     public async Task<bool> HasTagAsync(string repoPath, string tag)
@@ -61,7 +69,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         var realWorkingDirectory = GetRealGitDirectory(workingDirectory);
 
         if (options.LogAllGitCommands)
-            console.MarkupLineInterpolated($"[grey]{workingDirectory}> git {arguments}[/]");
+            console.MarkupLineInterpolated($"[grey]{realWorkingDirectory}> git {arguments}[/]");
 
         var output = new StringBuilder();
         var error = new StringBuilder();
@@ -500,29 +508,186 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             if (branches.Count == 0)
                 return new GitRepositoryStatus(IGitService.GetRepositoryName(repositoryPath), hierarchicalName, repositoryPath, remoteUrl, false, [], "No local branches found.");
 
-            List<BranchStatus> branchStatuses = [];
-
             if (fetch)
                 await FetchAsync(repositoryPath, true).ConfigureAwait(false);
+            
+            var branchStatuses = await GetBranchStatusesAsync(repositoryPath).ConfigureAwait(false);            
 
-            foreach (var branch in branches
-                .Where(static b => !b.Contains("HEAD", StringComparison.OrdinalIgnoreCase) && !b.Contains("detached", StringComparison.OrdinalIgnoreCase)))
-            {
-                var (isTracked, upstream) = await IsBranchTrackedAsync(repositoryPath, branch).ConfigureAwait(false);
-                var isCurrent = await IsCurrentBranchAsync(repositoryPath, branch).ConfigureAwait(false);
-
-                var (aheadCount, behindCount) = isTracked
-                    ? await GetRemoteAheadBehindCountAsync(repositoryPath, branch, fetch: false).ConfigureAwait(false)
-                    : (0, 0);
-
-                branchStatuses.Add(new BranchStatus(repositoryPath, branch, upstream, isCurrent, aheadCount, behindCount));
-            }
-
-            return new GitRepositoryStatus(IGitService.GetRepositoryName(repositoryPath), hierarchicalName, repositoryPath, remoteUrl, hasUncommittedChanges, branchStatuses);
+            return new GitRepositoryStatus
+            (
+                IGitService.GetRepositoryName(repositoryPath),
+                hierarchicalName,
+                repositoryPath,
+                remoteUrl,
+                hasUncommittedChanges,
+                branchStatuses
+            );
         }
         catch (Exception ex)
         {
             return new GitRepositoryStatus(IGitService.GetRepositoryName(repositoryPath), hierarchicalName, repositoryPath, null, false, [], ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Gets the list of branches that have been merged into the current branch.
+    /// This method runs the `git branch --merged` command to retrieve the merged branches.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository.
+    /// </param>
+    /// <returns>
+    /// An array of branch names that have been merged into the current branch.
+    /// If the repository path is invalid or an error occurs, an empty array is returned.
+    /// </returns>
+    private async Task<string[]> GetMergedBranchesAsync(string repositoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return [];
+
+        try
+        {
+            var output = await RunGitCommandAsync(repositoryPath, "branch --merged").ConfigureAwait(false);
+            HashSet<string> branches = [];
+            AddBranches(branches, output);
+
+            return [.. branches];
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error getting merged branches in {repositoryPath}: {ex.Message}[/]");
+
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Gets the status of all local branches in the specified repository.
+    /// This method retrieves the list of local branches, checks if they are tracked, and gathers
+    /// their upstream branches, current status, and ahead/behind counts.
+    /// It also checks if the branches have been merged into the current branch.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository for which to get branch statuses.
+    /// If the path is invalid or the repository does not exist, an empty list is returned
+    /// </param>
+    /// <returns>
+    /// A list of <see cref="BranchStatus"/> objects representing the status of each local branch.
+    /// Each <see cref="BranchStatus"/> contains information about the branch name, upstream branch,
+    /// whether it is the current branch, how many commits it is ahead or behind the remote branch,
+    /// and whether it has been merged into the current branch.
+    /// </returns>
+    private async Task<List<BranchStatus>> GetBranchStatusesAsync(string repositoryPath, bool excludeDetached = true)
+    {
+        var branches = await GetLocalBranchesAsync(repositoryPath).ConfigureAwait(false);
+        var branchStatuses = new List<BranchStatus>();
+        var mergedBranches = await GetMergedBranchesAsync(repositoryPath).ConfigureAwait(false);
+        var goneBranches = await GetGoneBranchesAsync(repositoryPath).ConfigureAwait(false);
+
+        foreach (var branch in branches)
+        {
+            if (excludeDetached && IsDetachedHead(branch))
+                continue; // Skip detached HEAD branches
+
+            var (isTracked, upstream) = IsBranchTrackedAsync(repositoryPath, branch).GetAwaiter().GetResult();
+            var isCurrent = IsCurrentBranchAsync(repositoryPath, branch).GetAwaiter().GetResult();
+            var isGone = goneBranches.Contains(branch, StringComparer.OrdinalIgnoreCase);
+            var isFullyMerged = await IsFullyMergedAsync(repositoryPath, branch).ConfigureAwait(false);
+
+
+            var (aheadCount, behindCount) = isTracked
+                ? GetRemoteAheadBehindCountAsync(repositoryPath, branch, fetch: false).GetAwaiter().GetResult()
+                : (0, 0);
+
+            var isMerged = mergedBranches.Contains(branch, StringComparer.OrdinalIgnoreCase);
+            var lastCommitDate = await GetLastCommitDateAsync(repositoryPath, branch).ConfigureAwait(false);
+
+            branchStatuses.Add
+            (
+                new BranchStatus
+                (
+                    repositoryPath,
+                    branch,
+                    upstream,
+                    isCurrent,
+                    aheadCount,
+                    behindCount,
+                    isMerged,
+                    isGone,
+                    lastCommitDate,
+                    isFullyMerged
+                )
+            );
+        }
+
+        return branchStatuses;
+    }
+
+    /// <summary>
+    /// Checks if a branch is fully merged and can be safely deleted with 'git branch -d'.
+    /// This method attempts to delete the branch with -d flag and checks if it would succeed.
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository.
+    /// </param>
+    /// <param name="branch">
+    /// The name of the branch to check.
+    /// </param>
+    /// <returns>
+    /// true if the branch is fully merged and can be safely deleted; otherwise, false.
+    /// </returns>
+    private async Task<bool> IsFullyMergedAsync(string repositoryPath, string branch)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return false;
+
+        if (_protectedBranches.Contains(branch, StringComparer.OrdinalIgnoreCase))
+            return false;
+
+        try
+        {
+            // Use --dry-run to check if branch can be deleted without actually deleting it
+            // This is safer than actually attempting the deletion
+            var result = await RunGitCommandAsync(repositoryPath, $"branch -d --dry-run {branch}").ConfigureAwait(false);
+            
+            return true; // If no exception was thrown, the branch can be safely deleted
+        }
+        catch
+        {
+            // If the command fails, the branch is not fully merged
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gets the last commit date for a specific branch in the given repository.
+    /// This method runs the `git log -1 --format=%cd` command to retrieve
+    /// </summary>
+    /// <param name="repositoryPath">
+    /// The path to the git repository.
+    /// </param>
+    /// <param name="branch">
+    /// The name of the branch for which to get the last commit date.
+    /// </param>
+    /// <returns>
+    /// A <see cref="DateTime"/> representing the last commit date of the specified branch.
+    /// </returns>
+    private async Task<DateTime> GetLastCommitDateAsync(string repositoryPath, string branch)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return DateTime.MinValue;
+
+        try
+        {
+            var output = await RunGitCommandAsync(repositoryPath, $"log -1 --format=%cd --date=format:\"%Y-%m-%d %H:%M:%S\" {branch} --").ConfigureAwait(false);
+
+            return DateTime.ParseExact(output, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error getting last commit date for branch {branch} in {repositoryPath}: {ex.Message}[/]");
+
+            return DateTime.MinValue;
         }
     }
 
@@ -567,9 +732,9 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     }
 
     /// <inheritdoc/>
-    public async Task<List<string>> GetPrunableBranchesAsync(string repositoryPath, bool merged, bool gone, int? olderThanDays)
+    public async Task<List<BranchStatus>> GetPrunableBranchesAsync(string repositoryPath, bool merged, bool gone, int? olderThanDays)
     {
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<BranchStatus>();
 
         if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
             return [];
@@ -578,67 +743,36 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         if (!merged && !gone && !olderThanDays.HasValue)
             return [];
 
-        var protectedBranches = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "master",
-            "main",
-            "develop"
-        };
-
-        var current = await GetCurrentBranchAsync(repositoryPath).ConfigureAwait(false);
-        if (!string.IsNullOrWhiteSpace(current))
-            protectedBranches.Add(current);
-
         try
         {
+            var branches = (await GetBranchStatusesAsync(repositoryPath).ConfigureAwait(false))
+                .Where(static b => !b.IsDetached && !b.IsCurrent && !_protectedBranches.Contains(b.Name, StringComparer.OrdinalIgnoreCase))
+                .ToList(); 
+
             if (merged)
             {
-                var mergedOutput = await RunGitCommandAsync(repositoryPath, "branch --merged").ConfigureAwait(false);
-                AddBranches(result, mergedOutput);
+                branches.Where(static b => b.IsMerged)
+                    .ToList()
+                    .ForEach(result.Add);
             }
 
             if (gone)
             {
-                var goneOutput = await RunGitCommandAsync(repositoryPath, "branch -vv").ConfigureAwait(false);
-                foreach (var line in goneOutput.SplitLines())
-                {
-                    if (!line.Contains(": gone]", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var branch = line.TrimStart('*', ' ').SplitRemoveEmpty(' ')[0];
-
-                    if (IsDetachedHead(branch))
-                        continue;
-
-                    result.Add(branch);
-                }
+                branches.Where(static b => b.IsGone)
+                    .ToList()
+                    .ForEach(n => result.Add(n));
             }
 
             if (olderThanDays.HasValue)
             {
                 var threshold = DateTimeOffset.UtcNow.AddDays(-olderThanDays.Value);
-                var dateOutput = await RunGitCommandAsync(repositoryPath, "for-each-ref --format='%(committerdate:iso8601)|%(refname:short)' refs/heads").ConfigureAwait(false);
 
-                foreach (var line in dateOutput.SplitLines())
-                {
-                    var parts = line.SplitAndTrim('|', 2);
-
-                    if (parts.Length != 2)
-                        continue;
-
-                    var branch = parts[1];
-
-                    if (IsDetachedHead(branch))
-                        continue;
-
-                    if (DateTimeOffset.TryParse(parts[0], out var commitDate) && commitDate < threshold)
-                        result.Add(branch);
-                }
+                branches.Where(b => b.LastCommitDate < threshold)
+                    .ToList()
+                    .ForEach(n => result.Add(n));
             }
 
-            result.ExceptWith(protectedBranches);
-
-            return [.. result];
+            return [.. result.DistinctBy(static b => b.Name.ToLowerInvariant())];
         }
         catch (Exception ex)
         {
@@ -648,6 +782,39 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         }
     }
 
+    private async Task<List<string>> GetGoneBranchesAsync(string repositoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
+            return [];
+
+        try
+        {
+            var output = await RunGitCommandAsync(repositoryPath, "branch -vv").ConfigureAwait(false);
+
+            List<string> goneBranches = [];
+
+            foreach (var line in output.Split('\n'))
+            {
+                if (line.Contains(": gone]", StringComparison.OrdinalIgnoreCase))
+                {
+                    var tokens = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    var branchName = tokens[0] == "*" ? tokens[1] : tokens[0];
+
+                    goneBranches.Add(branchName);
+                }
+            }
+
+            return goneBranches;
+        }
+        catch (Exception ex)
+        {
+            console.MarkupInterpolated($"[red]Error getting gone branches in {repositoryPath}: {ex.Message}[/]");
+
+            return [];
+        }
+    }
+
+
     private static bool IsDetachedHead(string branch)
         => branch.Contains("HEAD", StringComparison.OrdinalIgnoreCase) ||
         branch.Contains("detached", StringComparison.OrdinalIgnoreCase);
@@ -656,13 +823,13 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     public Task DeleteLocalBranchAsync(string repositoryPath, string branch, bool force = false)
         => RunGitCommandAsync(repositoryPath, $"branch {(force ? "-D" : "-d")} {branch}");
 
-    private static void AddBranches(HashSet<string> target, string output)
+    private static void AddBranches(HashSet<string> target, string output, bool ignoreDetached = true)
     {
         foreach (var line in output.SplitLines())
         {
             var branch = line.Replace("'", string.Empty).Trim('*', ' ');
 
-            if (IsDetachedHead(branch))
+            if (!ignoreDetached && IsDetachedHead(branch))
                 continue;
 
             target.Add(branch);

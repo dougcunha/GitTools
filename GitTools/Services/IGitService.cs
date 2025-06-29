@@ -293,7 +293,7 @@ public interface IGitService
     /// <param name="gone">Include branches whose upstream was removed.</param>
     /// <param name="olderThanDays">Include branches older than the specified number of days.</param>
     /// <returns>A list of branch names that can be safely pruned.</returns>
-    Task<List<string>> GetPrunableBranchesAsync(string repositoryPath, bool merged, bool gone, int? olderThanDays);
+    Task<List<BranchStatus>> GetPrunableBranchesAsync(string repositoryPath, bool merged, bool gone, int? olderThanDays);
 
     /// <summary>
     /// Deletes a local branch from the specified repository.

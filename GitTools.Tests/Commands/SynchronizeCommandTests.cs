@@ -13,8 +13,8 @@ public sealed class SynchronizeCommandTests
     private static readonly string _rootDirectory = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/repos");
     private static readonly string _repoPath = FileSystemUtils.GetNormalizedPathForCurrentPlatform("C:/repos/repo1");
     private const string REPO_NAME = "repo1";
-    private static readonly List<BranchStatus> _syncedBranches = [new(_repoPath, "main", "origin/main", true, 0, 0)];
-    private static readonly List<BranchStatus> _outdatedBranches = [new(_repoPath, "main", "origin/main", true, 1, 0)];
+    private static readonly List<BranchStatus> _syncedBranches = [new(_repoPath, "main", "origin/main", true, 0, 0, false, false, DateTime.Now, true)];
+    private static readonly List<BranchStatus> _outdatedBranches = [new(_repoPath, "main", "origin/main", true, 1, 0, false, false, DateTime.Now, true)];
     private readonly IGitRepositoryScanner _mockScanner = Substitute.For<IGitRepositoryScanner>();
     private readonly IGitService _mockGitService = Substitute.For<IGitService>();
     private readonly TestConsole _testConsole = new();

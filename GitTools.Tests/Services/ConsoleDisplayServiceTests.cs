@@ -266,7 +266,7 @@ public sealed class ConsoleDisplayServiceTests
                 HasUncommitedChanges: false,
                 LocalBranches: 
                 [
-                    new BranchStatus(@"C:\repos\TestRepo", "main", "origin/main", true, 2, 1)
+                    new BranchStatus(@"C:\repos\TestRepo", "main", "origin/main", true, 2, 1, false, false, DateTime.Now, true)
                 ]
             )
         };
@@ -300,8 +300,8 @@ public sealed class ConsoleDisplayServiceTests
                 HasUncommitedChanges: false,
                 LocalBranches: 
                 [
-                    new BranchStatus(@"C:\repos\org\Repo1", "main", "origin/main", true, 0, 3),
-                    new BranchStatus(@"C:\repos\org\Repo1", "feature", null, false, 0, 0)
+                    new BranchStatus(@"C:\repos\org\Repo1", "main", "origin/main", true, 0, 3, false, false, DateTime.Now, true),
+                    new BranchStatus(@"C:\repos\org\Repo1", "feature", null, false, 0, 0, false, false, DateTime.Now, true)
                 ]
             ),
             new(
@@ -312,7 +312,7 @@ public sealed class ConsoleDisplayServiceTests
                 HasUncommitedChanges: true,
                 LocalBranches: 
                 [
-                    new BranchStatus(@"C:\repos\Repo2", "develop", "origin/develop", true, 1, 0)
+                    new BranchStatus(@"C:\repos\Repo2", "develop", "origin/develop", true, 1, 0, false, false, DateTime.Now, true)
                 ]
             )
         };
@@ -370,7 +370,7 @@ public sealed class ConsoleDisplayServiceTests
                 HasUncommitedChanges: false,
                 LocalBranches: 
                 [
-                    new BranchStatus(@"C:\repos\GoodRepo", "main", "origin/main", true, 0, 0)
+                    new BranchStatus(@"C:\repos\GoodRepo", "main", "origin/main", true, 0, 0, false, false, DateTime.Now, true)
                 ]
             )
         };
@@ -404,9 +404,9 @@ public sealed class ConsoleDisplayServiceTests
                 HasUncommitedChanges: false,
                 LocalBranches: 
                 [
-                    new BranchStatus(@"C:\repos\MultiBranchRepo", "main", "origin/main", true, 2, 1),     // 1 ahead, 2 behind
-                    new BranchStatus(@"C:\repos\MultiBranchRepo", "feature1", "origin/feature1", false, 1, 3), // 3 ahead, 1 behind
-                    new BranchStatus(@"C:\repos\MultiBranchRepo", "feature2", null, false, 0, 0)         // untracked
+                    new BranchStatus(@"C:\repos\MultiBranchRepo", "main", "origin/main", true, 2, 1, false, false, DateTime.Now, true),     // 1 ahead, 2 behind
+                    new BranchStatus(@"C:\repos\MultiBranchRepo", "feature1", "origin/feature1", false, 1, 3, false, false, DateTime.Now, true), // 3 ahead, 1 behind
+                    new BranchStatus(@"C:\repos\MultiBranchRepo", "feature2", null, false, 0, 0, false, false, DateTime.Now, true)         // untracked
                 ]
             )
         };
@@ -438,7 +438,7 @@ public sealed class ConsoleDisplayServiceTests
                 HasUncommitedChanges: false,
                 LocalBranches: 
                 [
-                    new BranchStatus(@"C:\repos\LocalRepo", "main", null, true, 0, 0)
+                    new BranchStatus(@"C:\repos\LocalRepo", "main", null, true, 0, 0, false, false, DateTime.Now, true)
                 ]
             )
         };
@@ -467,7 +467,7 @@ public sealed class ConsoleDisplayServiceTests
                 HasUncommitedChanges: false,
                 LocalBranches: 
                 [
-                    new BranchStatus(@"C:\repos\TestRepo", "main", "origin/main", true, 0, 0)
+                    new BranchStatus(@"C:\repos\TestRepo", "main", "origin/main", true, 0, 0, false, false, DateTime.Now, true)
                 ]
             )
         };
@@ -501,7 +501,7 @@ public sealed class ConsoleDisplayServiceTests
                 HasUncommitedChanges: false,
                 LocalBranches: 
                 [
-                    new BranchStatus(@"C:\repos\TestRepo", "main", "origin/main", true, 0, 0)
+                    new BranchStatus(@"C:\repos\TestRepo", "main", "origin/main", true, 0, 0, false, false, DateTime.Now, true)
                 ]
             )
         };
