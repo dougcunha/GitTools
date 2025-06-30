@@ -1,11 +1,9 @@
 using System.Diagnostics;
 using System.IO.Abstractions;
-using System.IO.Abstractions.TestingHelpers;
 using System.Reflection;
 using GitTools.Models;
 using GitTools.Services;
 using GitTools.Tests.Utils;
-using Spectre.Console;
 using Spectre.Console.Testing;
 
 namespace GitTools.Tests.Services;
@@ -65,7 +63,9 @@ public sealed partial class GitServiceTests
         Dictionary<string, (int ahead, int behind)>? aheadBehindCounts = null,
         Dictionary<string, bool>? goneBranches = null,
         Dictionary<string, DateTime>? lastCommitDates = null,
-        string? currentBranch = null)
+        string? currentBranch = null,
+        List<string>? mergedBranches = null,
+        List<string>? fullyMergedBranches = null)
     {
         var options = new GitCommandConfiguratorOptions
         {
@@ -76,7 +76,9 @@ public sealed partial class GitServiceTests
             UpstreamBranches = upstreamBranches,
             AheadBehindCounts = aheadBehindCounts,
             GoneBranches = goneBranches,
-            LastCommitDates = lastCommitDates
+            LastCommitDates = lastCommitDates,
+            MergedBranches = mergedBranches,
+            FullyMergedBranches = fullyMergedBranches
         };
 
         ConfigureGitCommands(options);
@@ -90,7 +92,8 @@ public sealed partial class GitServiceTests
         Dictionary<string, (int ahead, int behind)>? aheadBehindCounts = null,
         Dictionary<string, bool>? goneBranches = null,
         Dictionary<string, DateTime>? lastCommitDates = null,
-        List<string>? mergedBranches = null)
+        List<string>? mergedBranches = null,
+        List<string>? fullyMergedBranches = null)
     {
         var options = new GitCommandConfiguratorOptions
         {
@@ -100,11 +103,13 @@ public sealed partial class GitServiceTests
             AheadBehindCounts = aheadBehindCounts,
             GoneBranches = goneBranches,
             LastCommitDates = lastCommitDates,
-            MergedBranches = mergedBranches
+            MergedBranches = mergedBranches,
+            FullyMergedBranches = fullyMergedBranches
         };
 
         ConfigureGitCommands(options);
     }
+
     private static async IAsyncEnumerable<string> MockReadLinesAsync(string content)
     {
         foreach (var line in content.Split(["\r\n", "\n"], StringSplitOptions.None))
@@ -114,5 +119,4 @@ public sealed partial class GitServiceTests
             yield return line;
         }
     }
-
 }

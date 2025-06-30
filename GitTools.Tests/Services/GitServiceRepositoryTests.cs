@@ -1,10 +1,7 @@
 using System.Diagnostics;
-using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
-using System.Reflection;
 using GitTools.Models;
 using GitTools.Services;
-using GitTools.Tests.Utils;
 using Spectre.Console;
 using Spectre.Console.Testing;
 
@@ -12,6 +9,7 @@ namespace GitTools.Tests.Services;
 
 public sealed partial class GitServiceTests
 {
+    [Fact]
     public async Task GetGitRepositoryAsync_WhenValidRepository_ShouldReturnValidGitRepository()
     {
         // Arrange
@@ -130,7 +128,6 @@ public sealed partial class GitServiceTests
         result.RemoteUrl.ShouldBeNull();
         result.IsValid.ShouldBeFalse();
     }
-
 
     [Fact]
     public async Task GetGitRepositoryAsync_WhenGitCommandFailsButConfigFileExists_ShouldReturnRepositoryWithUrlFromConfig()

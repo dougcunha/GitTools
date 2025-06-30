@@ -191,7 +191,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     /// <summary>
     /// Asynchronously retrieves the URL from a specified section in a Git configuration file.
     /// </summary>
-    /// <remarks>This method reads the configuration file line by line and searches for the specified section.
+    /// <remarks>This method reads the configuration file branch by branch and searches for the specified section.
     /// If the section is found, it attempts to extract the URL from the section's content. The method returns the first
     /// URL found in the specified section or <see langword="null"/> if no URL is present.</remarks>
     /// <param name="configPath">The path to the Git configuration file to read.</param>
@@ -511,7 +511,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             if (fetch)
                 await FetchAsync(repositoryPath, true).ConfigureAwait(false);
 
-            var branchStatuses = await GetBranchStatusesAsync(repositoryPath).ConfigureAwait(false);
+            var branchStatuses = await GetBranchStatusesAsync(repositoryPath, includeNotFullyMerged: true).ConfigureAwait(false);
 
             return new GitRepositoryStatus
             (
@@ -542,9 +542,6 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     /// </returns>
     private async Task<string[]> GetMergedBranchesAsync(string repositoryPath)
     {
-        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
-            return [];
-
         try
         {
             var output = await RunGitCommandAsync(repositoryPath, "branch --merged").ConfigureAwait(false);
@@ -574,13 +571,16 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     /// <param name="excludeDetached">
     /// true to exclude detached HEAD branches from the results; otherwise, false.
     /// </param>
+    /// <param name="includeNotFullyMerged">
+    /// true to include branches that are not fully merged into the current branch;
+    /// </param>
     /// <returns>
     /// A list of <see cref="BranchStatus"/> objects representing the status of each local branch.
     /// Each <see cref="BranchStatus"/> contains information about the branch name, upstream branch,
     /// whether it is the current branch, how many commits it is ahead or behind the remote branch,
     /// and whether it has been merged into the current branch.
     /// </returns>
-    private async Task<List<BranchStatus>> GetBranchStatusesAsync(string repositoryPath, bool excludeDetached = true)
+    internal async Task<List<BranchStatus>> GetBranchStatusesAsync(string repositoryPath, bool excludeDetached = true, bool includeNotFullyMerged = false)
     {
         var branches = await GetLocalBranchesAsync(repositoryPath).ConfigureAwait(false);
         var branchStatuses = new List<BranchStatus>();
@@ -593,6 +593,9 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             var isCurrent = IsCurrentBranchAsync(repositoryPath, branch).GetAwaiter().GetResult();
             var isGone = goneBranches.Contains(branch, StringComparer.OrdinalIgnoreCase);
             var isFullyMerged = await IsFullyMergedAsync(repositoryPath, branch).ConfigureAwait(false);
+
+            if (!includeNotFullyMerged && !isFullyMerged)
+                continue;
 
             (int aheadCount, int behindCount) = isTracked
                 ? GetRemoteAheadBehindCountAsync(repositoryPath, branch, fetch: false).GetAwaiter().GetResult()
@@ -637,9 +640,6 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     /// </returns>
     private async Task<bool> IsFullyMergedAsync(string repositoryPath, string branch)
     {
-        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
-            return false;
-
         if (_protectedBranches.Contains(branch, StringComparer.OrdinalIgnoreCase))
             return false;
 
@@ -673,9 +673,6 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     /// </returns>
     private async Task<DateTime> GetLastCommitDateAsync(string repositoryPath, string branch)
     {
-        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
-            return DateTime.MinValue;
-
         try
         {
             var output = await RunGitCommandAsync(repositoryPath, $"log -1 --format=%cd --date=format:\"%Y-%m-%d %H:%M:%S\" {branch} --").ConfigureAwait(false);
@@ -731,7 +728,14 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     }
 
     /// <inheritdoc/>
-    public async Task<List<BranchStatus>> GetPrunableBranchesAsync(string repositoryPath, bool merged, bool gone, int? olderThanDays)
+    public async Task<List<BranchStatus>> GetPrunableBranchesAsync
+    (
+        string repositoryPath,
+        bool merged,
+        bool gone,
+        bool includeNotFullyMerged,
+        int? olderThanDays
+    )
     {
         var result = new List<BranchStatus>();
 
@@ -742,65 +746,51 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         if (!merged && !gone && !olderThanDays.HasValue)
             return [];
 
-        try
+        var branches = (await GetBranchStatusesAsync(repositoryPath, includeNotFullyMerged: includeNotFullyMerged).ConfigureAwait(false))
+            .Where(static b => b is { IsDetached: false, IsCurrent: false } && !_protectedBranches.Contains(b.Name, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        if (merged)
         {
-            var branches = (await GetBranchStatusesAsync(repositoryPath).ConfigureAwait(false))
-                .Where(static b => !b.IsDetached && !b.IsCurrent && !_protectedBranches.Contains(b.Name, StringComparer.OrdinalIgnoreCase))
-                .ToList();
+            branches.Where(static b => b.IsMerged)
+                .ToList()
+                .ForEach(result.Add);
+        }
 
-            if (merged)
-            {
-                branches.Where(static b => b.IsMerged)
-                    .ToList()
-                    .ForEach(result.Add);
-            }
+        if (gone)
+        {
+            branches.Where(static b => b.IsGone)
+                .ToList()
+                .ForEach(n => result.Add(n));
+        }
 
-            if (gone)
-            {
-                branches.Where(static b => b.IsGone)
-                    .ToList()
-                    .ForEach(n => result.Add(n));
-            }
-
-            if (olderThanDays.HasValue)
-            {
-                var threshold = DateTimeOffset.UtcNow.AddDays(-olderThanDays.Value);
-
-                branches.Where(b => b.LastCommitDate < threshold)
-                    .ToList()
-                    .ForEach(n => result.Add(n));
-            }
-
+        if (!olderThanDays.HasValue)
             return [.. result.DistinctBy(static b => b.Name.ToLowerInvariant())];
-        }
-        catch (Exception ex)
-        {
-            console.MarkupInterpolated($"[red]Error getting prunable branches in {repositoryPath}: {ex.Message}[/]");
 
-            return [];
-        }
+        var threshold = DateTimeOffset.UtcNow.AddDays(-olderThanDays.Value);
+
+        branches.Where(b => b.LastCommitDate < threshold)
+            .ToList()
+            .ForEach(n => result.Add(n));
+
+        return [.. result.DistinctBy(static b => b.Name.ToLowerInvariant())];
     }
 
     private async Task<List<string>> GetGoneBranchesAsync(string repositoryPath)
     {
-        if (string.IsNullOrWhiteSpace(repositoryPath) || !fileSystem.Directory.Exists(repositoryPath))
-            return [];
-
         try
         {
             var output = await RunGitCommandAsync(repositoryPath, "branch -vv").ConfigureAwait(false);
 
             List<string> goneBranches = [];
 
-            foreach (var line in output.Split('\n'))
+            foreach (var line in output.Split('\n')
+                .Where(static l => l.Contains(": gone]", StringComparison.OrdinalIgnoreCase)))
             {
-                if (line.Contains(": gone]", StringComparison.OrdinalIgnoreCase))
-                {
-                    var tokens = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    var branchName = tokens[0] == "*" ? tokens[1] : tokens[0];
+                var tokens = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var branchName = tokens[0] == "*" ? tokens[1] : tokens[0];
 
-                    goneBranches.Add(branchName);
-                }
+                goneBranches.Add(branchName);
             }
 
             return goneBranches;
@@ -821,15 +811,12 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     public Task DeleteLocalBranchAsync(string repositoryPath, string branch, bool force = false)
         => RunGitCommandAsync(repositoryPath, $"branch {(force ? "-D" : "-d")} {branch}");
 
-    private static void AddBranches(HashSet<string> target, string output, bool ignoreDetached = true)
+    private static void AddBranches(HashSet<string> target, string output)
     {
-        foreach (var line in output.SplitLines())
+        foreach (var branch in output.SplitLines()
+            .Select(static l => l.Replace("'", string.Empty).Trim('*', ' '))
+            .Where(static b => !IsDetachedHead(b)))
         {
-            var branch = line.Replace("'", string.Empty).Trim('*', ' ');
-
-            if (!ignoreDetached && IsDetachedHead(branch))
-                continue;
-
             target.Add(branch);
         }
     }

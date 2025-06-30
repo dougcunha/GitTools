@@ -1,17 +1,11 @@
 using System.Diagnostics;
-using System.IO.Abstractions;
-using System.IO.Abstractions.TestingHelpers;
-using System.Reflection;
-using GitTools.Models;
-using GitTools.Services;
 using GitTools.Tests.Utils;
-using Spectre.Console;
-using Spectre.Console.Testing;
 
 namespace GitTools.Tests.Services;
 
 public sealed partial class GitServiceTests
 {
+    [Fact]
     public async Task IsCurrentBranchAsync_WhenBranchIsCurrent_ShouldReturnTrue()
     {
         // Arrange
@@ -861,22 +855,23 @@ public sealed partial class GitServiceTests
         (
             localBranches: branches,
             currentBranch: "main",
-            mergedBranches: mergedBranches
+            mergedBranches: mergedBranches,
+            fullyMergedBranches: mergedBranches
         );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
-        result.ShouldNotContain(b => b.Name == "main");
-        result.ShouldContain(b => b.Name == "feature/old");
+        result.ShouldNotContain(static b => b.Name == "main");
+        result.ShouldContain(static b => b.Name == "feature/old");
     }
 
     [Fact]
     public async Task GetPrunableBranchesAsync_WhenRepositoryPathIsNull_ShouldReturnEmptyList()
     {
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(null!, merged: true, gone: false, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(null!, merged: true, gone: false, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
         result.ShouldBeEmpty();
@@ -893,7 +888,24 @@ public sealed partial class GitServiceTests
     public async Task GetPrunableBranchesAsync_WhenRepositoryPathIsEmpty_ShouldReturnEmptyList()
     {
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(string.Empty, merged: true, gone: false, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(string.Empty, merged: true, gone: false, includeNotFullyMerged: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldBeEmpty();
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenRepositoryPathIsWhitespace_ShouldReturnEmptyList()
+    {
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync("   ", merged: true, gone: false, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
         result.ShouldBeEmpty();
@@ -914,7 +926,7 @@ public sealed partial class GitServiceTests
         _fileSystem.Directory.Exists(NON_EXISTENT_REPO_PATH).Returns(false);
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(NON_EXISTENT_REPO_PATH, merged: true, gone: false, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(NON_EXISTENT_REPO_PATH, merged: true, gone: false, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
         result.ShouldBeEmpty();
@@ -938,7 +950,7 @@ public sealed partial class GitServiceTests
             .Returns<int>(static _ => throw new InvalidOperationException(ERROR_MESSAGE));
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
         result.ShouldBeEmpty();
@@ -960,17 +972,18 @@ public sealed partial class GitServiceTests
         (
             localBranches: branches,
             currentBranch: "main",
-            mergedBranches: mergedBranches
+            mergedBranches: mergedBranches,
+            fullyMergedBranches: mergedBranches
         );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
-        result.ShouldContain(b => b.Name == "feature/one");
-        result.ShouldContain(b => b.Name == "feature/two");
-        result.ShouldNotContain(b => b.Name == "main");
-        result.ShouldNotContain(b => b.Name == "develop");
+        result.ShouldContain(static b => b.Name == "feature/one");
+        result.ShouldContain(static b => b.Name == "feature/two");
+        result.ShouldNotContain(static b => b.Name == "main");
+        result.ShouldNotContain(static b => b.Name == "develop");
     }
 
     [Fact]
@@ -986,18 +999,19 @@ public sealed partial class GitServiceTests
         (
             localBranches: branches,
             currentBranch: "main",
-            mergedBranches: mergedBranches
+            mergedBranches: mergedBranches,
+            fullyMergedBranches: mergedBranches
         );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
-        result.ShouldContain(b => b.Name == "feature/branch1");
-        result.ShouldContain(b => b.Name == "feature/branch2");
-        result.ShouldNotContain(b => b.Name == "main"); // Protected branch
-        result.ShouldNotContain(b => b.Name == "master"); // Protected branch
-        result.ShouldNotContain(b => b.Name == "develop"); // Protected branch
+        result.ShouldContain(static b => b.Name == "feature/branch1");
+        result.ShouldContain(static b => b.Name == "feature/branch2");
+        result.ShouldNotContain(static b => b.Name == "main"); // Protected branch
+        result.ShouldNotContain(static b => b.Name == "master"); // Protected branch
+        result.ShouldNotContain(static b => b.Name == "develop"); // Protected branch
     }
 
     [Fact]
@@ -1019,16 +1033,17 @@ public sealed partial class GitServiceTests
         (
             localBranches: branches,
             currentBranch: "main",
-            goneBranches: goneBranches
+            goneBranches: goneBranches,
+            fullyMergedBranches: [..goneBranches.Keys]
         );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: true, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: true, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
-        result.ShouldContain(b => b.Name == "feature/gone1");
-        result.ShouldContain(b => b.Name == "feature/gone2");
-        result.ShouldNotContain(b => b.Name == "main");
+        result.ShouldContain(static b => b.Name == "feature/gone1");
+        result.ShouldContain(static b => b.Name == "feature/gone2");
+        result.ShouldNotContain(static b => b.Name == "main");
     }
 
     [Fact]
@@ -1036,7 +1051,7 @@ public sealed partial class GitServiceTests
     {
         // Arrange
         const int OLDER_THAN_DAYS = 30;
-        var branches = new List<string> { "main", "feature/old-branch", "feature/recent-branch" };
+        List<string> branches = ["main", "feature/old-branch", "feature/recent-branch"];
 
         var lastCommitDates = new Dictionary<string, DateTime>
         {
@@ -1051,16 +1066,17 @@ public sealed partial class GitServiceTests
         (
             localBranches: branches,
             currentBranch: "main",
-            lastCommitDates: lastCommitDates
+            lastCommitDates: lastCommitDates,
+            fullyMergedBranches: branches
         );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, olderThanDays: OLDER_THAN_DAYS);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, includeNotFullyMerged: false, olderThanDays: OLDER_THAN_DAYS);
 
         // Assert
-        result.ShouldContain(b => b.Name == "feature/old-branch");
-        result.ShouldNotContain(b => b.Name == "feature/recent-branch");
-        result.ShouldNotContain(b => b.Name == "main"); // Protected branch
+        result.ShouldContain(static b => b.Name == "feature/old-branch");
+        result.ShouldNotContain(static b => b.Name == "feature/recent-branch");
+        result.ShouldNotContain(static b => b.Name == "main"); // Protected branch
     }
 
     [Fact]
@@ -1088,17 +1104,18 @@ public sealed partial class GitServiceTests
             currentBranch: "main",
             goneBranches: goneBranches,
             lastCommitDates: lastCommitDates,
-            mergedBranches: mergedBranches
+            mergedBranches: mergedBranches,
+            fullyMergedBranches: branches
         );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: true, olderThanDays: 30);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: true, includeNotFullyMerged: false, olderThanDays: 30);
 
         // Assert
-        result.ShouldContain(b => b.Name == "feature/merged1");
-        result.ShouldContain(b => b.Name == "feature/merged2");
-        result.ShouldContain(b => b.Name == "feature/gone1");
-        result.ShouldContain(b => b.Name == "feature/old-branch");
+        result.ShouldContain(static b => b.Name == "feature/merged1");
+        result.ShouldContain(static b => b.Name == "feature/merged2");
+        result.ShouldContain(static b => b.Name == "feature/gone1");
+        result.ShouldContain(static b => b.Name == "feature/old-branch");
         result.Count.ShouldBe(4);
     }
 
@@ -1116,16 +1133,17 @@ public sealed partial class GitServiceTests
         (
             localBranches: branches,
             currentBranch: CURRENT_BRANCH,
-            mergedBranches: mergedBranches
+            mergedBranches: mergedBranches,
+            fullyMergedBranches: mergedBranches
         );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
-        result.ShouldContain(b => b.Name == "feature/normal-branch");
-        result.ShouldNotContain(b => b.Name == "main"); // Protected branch
-        result.ShouldNotContain(b => b.Name == "feature/current"); // Current branch should be filtered out
+        result.ShouldContain(static b => b.Name == "feature/normal-branch");
+        result.ShouldNotContain(static b => b.Name == "main"); // Protected branch
+        result.ShouldNotContain(static b => b.Name == "feature/current"); // Current branch should be filtered out
         result.Count.ShouldBe(1);
     }
 
@@ -1142,15 +1160,16 @@ public sealed partial class GitServiceTests
         (
             localBranches: branches,
             currentBranch: "main",
-            mergedBranches: mergedBranches
+            mergedBranches: mergedBranches,
+            fullyMergedBranches: mergedBranches
         );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: true, gone: false, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
-        result.ShouldContain(b => b.Name == "feature/normal-branch");
-        result.ShouldNotContain(b => b.Name == "main"); // Protected branch
+        result.ShouldContain(static b => b.Name == "feature/normal-branch");
+        result.ShouldNotContain(static b => b.Name == "main"); // Protected branch
         result.Count.ShouldBe(1);
     }
 
@@ -1173,16 +1192,17 @@ public sealed partial class GitServiceTests
         (
             localBranches: branches,
             currentBranch: "main",
-            goneBranches: goneBranches
+            goneBranches: goneBranches,
+            fullyMergedBranches: branches
         );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: true, olderThanDays: null);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: true, includeNotFullyMerged: false, olderThanDays: null);
 
         // Assert
-        result.ShouldContain(b => b.Name == "feature/gone1");
-        result.ShouldContain(b => b.Name == "feature/gone2");
-        result.ShouldNotContain(b => b.Name == "main");
+        result.ShouldContain(static b => b.Name == "feature/gone1");
+        result.ShouldContain(static b => b.Name == "feature/gone2");
+        result.ShouldNotContain(static b => b.Name == "main");
     }
 
     [Fact]
@@ -1207,15 +1227,16 @@ public sealed partial class GitServiceTests
         (
             localBranches: branches,
             currentBranch: "main",
-            lastCommitDates: lastCommitDates
+            lastCommitDates: lastCommitDates,
+            fullyMergedBranches: branches
         );
 
         // Act
-        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, olderThanDays: OLDER_THAN_DAYS);
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, includeNotFullyMerged: false, olderThanDays: OLDER_THAN_DAYS);
 
         // Assert
-        result.ShouldContain(b => b.Name == OLD_NORMAL_BRANCH);
-        result.ShouldNotContain(b => b.Name == "main"); // Protected branch
+        result.ShouldContain(static b => b.Name == OLD_NORMAL_BRANCH);
+        result.ShouldNotContain(static b => b.Name == "main"); // Protected branch
         result.Count.ShouldBe(1);
     }
 
@@ -1235,7 +1256,7 @@ public sealed partial class GitServiceTests
         // Assert
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == $"branch -d {BRANCH_NAME}" &&
                 psi.WorkingDirectory == REPO_PATH),
@@ -1260,7 +1281,7 @@ public sealed partial class GitServiceTests
         // Assert
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == $"branch -D {BRANCH_NAME}" &&
                 psi.WorkingDirectory == REPO_PATH),
@@ -1356,12 +1377,64 @@ public sealed partial class GitServiceTests
         // Assert
         await _processRunner.Received(1).RunAsync
         (
-            Arg.Is<ProcessStartInfo>(psi =>
+            Arg.Is<ProcessStartInfo>(static psi =>
                 psi.FileName == "git" &&
                 psi.Arguments == $"branch -d {BRANCH_NAME}" &&
                 psi.WorkingDirectory == REPO_PATH),
             Arg.Any<DataReceivedEventHandler>(),
             Arg.Any<DataReceivedEventHandler>()
         );
+    }
+
+    [Fact]
+    public async Task GetPrunableBranchesAsync_WhenNoCriteriaProvided_ShouldReturnEmptyList()
+    {
+        // Arrange
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        // Act
+        var result = await _gitService.GetPrunableBranchesAsync(REPO_PATH, merged: false, gone: false, includeNotFullyMerged: false, olderThanDays: null);
+
+        // Assert
+        result.ShouldBeEmpty();
+
+        await _processRunner.DidNotReceive().RunAsync
+        (
+            Arg.Any<ProcessStartInfo>(),
+            Arg.Any<DataReceivedEventHandler>(),
+            Arg.Any<DataReceivedEventHandler>()
+        );
+    }
+
+    [Fact]
+    public async Task GetBranchStatusesAsync_WhenGetLastCommitDateAsyncFails_ShouldSetDateTimeMinValue()
+    {
+        // Arrange
+        const string FEATURE_BRANCH = "feature-branch";
+        const string ERROR_BRANCH = "error-branch";
+
+        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
+
+        ConfigureGitCommands(new GitCommandConfiguratorOptions
+        {
+            LocalBranches = [FEATURE_BRANCH, ERROR_BRANCH],
+            MergedBranches = [],
+            GoneBranches = [],
+            FullyMergedBranches = [FEATURE_BRANCH, ERROR_BRANCH],
+            BranchCommitDateErrors = [ERROR_BRANCH]
+        });
+
+        // Act
+        var result = await _gitService.GetBranchStatusesAsync(REPO_PATH);
+
+        // Assert
+        result.ShouldNotBeNull();
+        result.Count.ShouldBe(2);
+
+        var errorBranchStatus = result.First(static b => b.Name == ERROR_BRANCH);
+        var normalBranchStatus = result.First(static b => b.Name == FEATURE_BRANCH);
+
+        errorBranchStatus.LastCommitDate.ShouldBe(DateTime.MinValue);
+        normalBranchStatus.LastCommitDate.ShouldNotBe(DateTime.MinValue);
     }
 }

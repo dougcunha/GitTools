@@ -41,6 +41,11 @@ public sealed class PruneBranchesCommand : Command
             Description = "Include branches whose upstream no longer exists"
         };
 
+        var notFullyMergedOtion = new Option<bool>("--not-fully-merged", "-nfm")
+        {
+            Description = "Include branches that are not fully merged (use with caution)"
+        };
+
         var olderThanOption = new Option<int?>("--older-than")
         {
             Description = "Include branches with last commit older than specified days",
@@ -60,6 +65,7 @@ public sealed class PruneBranchesCommand : Command
         Arguments.Add(rootArg);
         Options.Add(mergedOption);
         Options.Add(goneOption);
+        Options.Add(notFullyMergedOtion);
         Options.Add(olderThanOption);
         Options.Add(automaticOption);
         Options.Add(dryRunOption);
@@ -71,6 +77,7 @@ public sealed class PruneBranchesCommand : Command
                 parseResult.GetValue(rootArg)!,
                 parseResult.GetValue(mergedOption),
                 parseResult.GetValue(goneOption),
+                parseResult.GetValue(notFullyMergedOtion),
                 parseResult.GetValue(olderThanOption),
                 parseResult.GetValue(automaticOption),
                 parseResult.GetValue(dryRunOption)
@@ -78,7 +85,16 @@ public sealed class PruneBranchesCommand : Command
         );
     }
 
-    private async Task ExecuteAsync(string rootDirectory, bool merged, bool gone, int? olderThan, bool automatic, bool dryRun)
+    private async Task ExecuteAsync
+    (
+        string rootDirectory,
+        bool merged,
+        bool gone,
+        bool includeNotFullyMerged,
+        int? olderThan,
+        bool automatic,
+        bool dryRun
+    )
     {
         if (!merged && !gone && olderThan is null)
             merged = true;
@@ -93,7 +109,7 @@ public sealed class PruneBranchesCommand : Command
             return;
         }
 
-        var repoBranches = await GetPrunableBranchesByRepositoryAsync(rootDirectory, merged, gone, olderThan, repoPaths).ConfigureAwait(false);
+        var repoBranches = await GetPrunableBranchesByRepositoryAsync(rootDirectory, merged, gone, includeNotFullyMerged, olderThan, repoPaths).ConfigureAwait(false);
 
         if (repoBranches.Count == 0)
         {
@@ -200,7 +216,15 @@ public sealed class PruneBranchesCommand : Command
                 )
         ).ConfigureAwait(false);
 
-    private Task<Dictionary<string, List<BranchStatus>>> GetPrunableBranchesByRepositoryAsync(string rootDirectory, bool merged, bool gone, int? olderThan, List<string> repoPaths)
+    private Task<Dictionary<string, List<BranchStatus>>> GetPrunableBranchesByRepositoryAsync
+    (
+        string rootDirectory,
+        bool merged,
+        bool gone,
+        bool includeNotFullyMerged,
+        int? olderThan,
+        List<string> repoPaths
+    )
     {
         return _console.Progress()
             .Columns(new ProgressBarColumn
@@ -221,7 +245,7 @@ public sealed class PruneBranchesCommand : Command
                 foreach (var repo in repoPaths)
                 {
                     task.Description($"Checking {_displayService.GetHierarchicalName(repo, rootDirectory)}...");
-                    var branches = await _gitService.GetPrunableBranchesAsync(repo, merged, gone, olderThan).ConfigureAwait(false);
+                    var branches = await _gitService.GetPrunableBranchesAsync(repo, merged, gone, includeNotFullyMerged, olderThan).ConfigureAwait(false);
 
                     if (branches.Count > 0)
                         result[repo] = branches;

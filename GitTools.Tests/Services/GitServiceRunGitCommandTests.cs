@@ -1,12 +1,8 @@
 using System.Diagnostics;
-using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
-using System.Reflection;
 using GitTools.Models;
 using GitTools.Services;
-using GitTools.Tests.Utils;
 using Spectre.Console;
-using Spectre.Console.Testing;
 
 namespace GitTools.Tests.Services;
 

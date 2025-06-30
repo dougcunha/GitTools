@@ -1,17 +1,12 @@
 using System.Diagnostics;
-using System.IO.Abstractions;
-using System.IO.Abstractions.TestingHelpers;
-using System.Reflection;
 using GitTools.Models;
-using GitTools.Services;
-using GitTools.Tests.Utils;
 using Spectre.Console;
-using Spectre.Console.Testing;
 
 namespace GitTools.Tests.Services;
 
 public sealed partial class GitServiceTests
 {
+    [Fact]
     public async Task FetchAsync_WithoutPrune_ShouldExecuteBasicFetchCommand()
     {
         // Arrange
@@ -695,7 +690,7 @@ public sealed partial class GitServiceTests
         // Act
         var result = await _gitService.StashAsync(REPO_PATH);
         // Assert
-        
+
         result.ShouldBeFalse();
         _console.Output.ShouldContain("Error stashing changes");
         _console.Output.ShouldContain(REPO_PATH);
