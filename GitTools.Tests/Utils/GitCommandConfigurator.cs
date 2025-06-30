@@ -20,6 +20,8 @@ public sealed record GitCommandConfiguratorOptions
     public Dictionary<string, bool>? GoneBranches { get; init; }
     public Dictionary<string, DateTime>? LastCommitDates { get; init; }
     public List<string>? MergedBranches { get; init; }
+    public List<string>? FullyMergedBranches { get; init; }
+    public List<string>? BranchCommitDateErrors { get; init; }
 }
 
 /// <summary>
@@ -58,25 +60,34 @@ public sealed partial class GitCommandConfigurator(GitCommandConfiguratorOptions
     /// <returns>The exit code for the command.</returns>
     public int ProcessCommand(string args, DataReceivedEventHandler? outputHandler)
     {
-        var response = args switch
+        try
         {
-            var cmd when cmd.Contains(GitCommands.CONFIG_GET_REMOTE_URL) => HandleRemoteUrl(),
-            var cmd when cmd.Contains(GitCommands.BRANCH_FORMAT) => HandleLocalBranches(),
-            var cmd when cmd.Contains(GitCommands.STATUS_PORCELAIN) => HandleModifiedFiles(),
-            var cmd when cmd.Contains(GitCommands.REV_PARSE_HEAD) => HandleCurrentBranch(),
-            var cmd when cmd.Contains(GitCommands.BRANCH_MERGED) => HandleMergedBranches(),
-            var cmd when cmd.Contains(GitCommands.FOR_EACH_REF_UPSTREAM) && GitCommands.Upstream_Patterns.Any(cmd.Contains) => HandleUpstreamTracking(args),
-            var cmd when cmd.Contains(GitCommands.SHOW_REF_ORIGIN) => HandleRemoteRefExistence(args),
-            var cmd when cmd.Contains(GitCommands.REV_LIST_COUNT) => HandleAheadBehindCounts(args),
-            var cmd when cmd.Contains(GitCommands.BRANCH_VV) => HandleGoneBranches(),
-            var cmd when cmd.Contains(GitCommands.LOG_FORMAT_DATE) => HandleLastCommitDate(args),
-            var cmd when cmd.Contains(GitCommands.FETCH) => HandleFetch(),
-            _ => ""
-        };
+            var response = args switch
+            {
+                var cmd when cmd.Contains(GitCommands.CONFIG_GET_REMOTE_URL) => HandleRemoteUrl(),
+                var cmd when cmd.Contains(GitCommands.BRANCH_FORMAT) => HandleLocalBranches(),
+                var cmd when cmd.Contains(GitCommands.STATUS_PORCELAIN) => HandleModifiedFiles(),
+                var cmd when cmd.Contains(GitCommands.REV_PARSE_HEAD) => HandleCurrentBranch(),
+                var cmd when cmd.Contains(GitCommands.BRANCH_MERGED) => HandleMergedBranches(),
+                var cmd when cmd.Contains("branch -d --dry-run") => HandleFullyMergedBranch(args),
+                var cmd when cmd.Contains(GitCommands.FOR_EACH_REF_UPSTREAM) && GitCommands.Upstream_Patterns.Any(cmd.Contains) => HandleUpstreamTracking(args),
+                var cmd when cmd.Contains(GitCommands.SHOW_REF_ORIGIN) => HandleRemoteRefExistence(args),
+                var cmd when cmd.Contains(GitCommands.REV_LIST_COUNT) => HandleAheadBehindCounts(args),
+                var cmd when cmd.Contains(GitCommands.BRANCH_VV) => HandleGoneBranches(),
+                var cmd when cmd.Contains(GitCommands.LOG_FORMAT_DATE) => HandleLastCommitDate(args),
+                var cmd when cmd.Contains(GitCommands.FETCH) => HandleFetch(),
+                _ => ""
+            };
 
-        outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(response));
+            outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(response));
 
-        return 0;
+            return 0;
+        }
+        catch (Exception) when (args.Contains(GitCommands.LOG_FORMAT_DATE))
+        {
+            // Only return error code for log date commands to simulate GetLastCommitDateAsync failure
+            return 1;
+        }
     }
 
     private static DataReceivedEventArgs CreateDataReceivedEventArgs(string data)
@@ -162,10 +173,34 @@ public sealed partial class GitCommandConfigurator(GitCommandConfiguratorOptions
     {
         var branchName = ExtractBranchNameFromLog(args);
 
+        if (!string.IsNullOrEmpty(branchName) && options.BranchCommitDateErrors?.Contains(branchName) == true)
+        {
+            throw new InvalidOperationException($"Error getting last commit date for branch {branchName}");
+        }
+
         return !string.IsNullOrEmpty(branchName)
             && options.LastCommitDates?.TryGetValue(branchName, out var date) == true
                 ? date.ToString("yyyy-MM-dd HH:mm:ss")
                 : DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+    }
+
+    private string HandleFullyMergedBranch(string args)
+    {
+        var branchName = ExtractBranchNameFromBranchDelete(args);
+
+        if (string.IsNullOrEmpty(branchName))
+            return "";
+
+        // Check if the branch is in the fully merged list
+        var isFullyMerged = options.FullyMergedBranches?.Contains(branchName) == true;
+
+        if (!isFullyMerged)
+        {
+            // Simulate git error for branches that are not fully merged
+            throw new InvalidOperationException($"error: The branch '{branchName}' is not fully merged.");
+        }
+
+        return ""; // Success - branch can be deleted
     }
 
     private static string HandleFetch()
@@ -199,6 +234,13 @@ public sealed partial class GitCommandConfigurator(GitCommandConfiguratorOptions
         return parts.Length > 0 ? parts[^2] : null;
     }
 
+    private static string? ExtractBranchNameFromBranchDelete(string args)
+    {
+        var match = BranchNameFromBranchDeleteRegex().Match(args);
+
+        return match.Success ? match.Groups[1].Value : null;
+    }
+
     [GeneratedRegex(@"refs/heads/(\S+)")]
     private static partial Regex BranchNameFromForEachRefRegex();
 
@@ -207,4 +249,7 @@ public sealed partial class GitCommandConfigurator(GitCommandConfiguratorOptions
 
     [GeneratedRegex(@"(\w+)\.\.\.origin/\w+")]
     private static partial Regex BranchNameFromRevListRegex();
+
+    [GeneratedRegex(@"branch -d --dry-run (\S+)")]
+    private static partial Regex BranchNameFromBranchDeleteRegex();
 }
