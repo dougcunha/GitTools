@@ -247,7 +247,6 @@ public sealed class StartupTests
         parseResult.Errors.ShouldNotBeEmpty();
     }
 
-
     [Fact]
     public void BuildRootCommand_ShouldAddTagRemoveCommand()
     {

@@ -106,7 +106,7 @@ public sealed class PruneBranchesCommandTests
         await _command.Parse([ROOT_DIR, "--merged", "--automatic"]).InvokeAsync();
 
         // Assert
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH, Arg.Any<bool>());
         _console.Output.ShouldContain("✓ repo1 -> feature/merged");
         _console.Output.ShouldContain("Branch pruning completed.");
     }
@@ -124,7 +124,7 @@ public sealed class PruneBranchesCommandTests
 
         // Assert
         await _gitService.Received(1).GetPrunableBranchesAsync(REPO1_PATH, false, true, null);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, GONE_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, GONE_BRANCH, Arg.Any<bool>());
         _console.Output.ShouldContain("✓ repo1 -> feature/gone");
     }
 
@@ -144,7 +144,7 @@ public sealed class PruneBranchesCommandTests
 
         // Assert
         await _gitService.Received(1).GetPrunableBranchesAsync(REPO1_PATH, false, false, OLDER_THAN_DAYS);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, OLD_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, OLD_BRANCH, Arg.Any<bool>());
         _console.Output.ShouldContain("✓ repo1 -> feature/old-branch");
     }
 
@@ -162,8 +162,8 @@ public sealed class PruneBranchesCommandTests
 
         // Assert
         await _gitService.Received(1).GetPrunableBranchesAsync(REPO1_PATH, true, true, OLDER_THAN_DAYS);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, GONE_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH, Arg.Any<bool>());
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, GONE_BRANCH, Arg.Any<bool>());
     }
 
     [Fact]
@@ -182,8 +182,8 @@ public sealed class PruneBranchesCommandTests
         // Assert
         await _gitService.Received(1).GetPrunableBranchesAsync(REPO1_PATH, true, false, null);
         await _gitService.Received(1).GetPrunableBranchesAsync(REPO2_PATH, true, false, null);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO2_PATH, GONE_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH, Arg.Any<bool>());
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO2_PATH, GONE_BRANCH, Arg.Any<bool>());
         _console.Output.ShouldContain("✓ repo1 -> feature/merged");
         _console.Output.ShouldContain("✓ repo2 -> feature/gone");
     }
@@ -201,7 +201,7 @@ public sealed class PruneBranchesCommandTests
 
         // Assert
         await _gitService.Received(1).GetPrunableBranchesAsync(REPO1_PATH, true, false, null);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH, Arg.Any<bool>());
     }
 
     [Fact]
@@ -212,16 +212,34 @@ public sealed class PruneBranchesCommandTests
         const string BRANCH2 = "feature/deletable";
 
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
-        _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(MERGED_BRANCH), CreateBranchStatus(BRANCH2)]);
-        _gitService.DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH).Returns(Task.FromException(new InvalidOperationException(ERROR_MESSAGE)));
+
+        _gitService
+            .GetPrunableBranchesAsync
+            (
+                REPO1_PATH,
+                true,
+                false,
+                null
+            )
+            .Returns
+            (
+                [
+                    CreateBranchStatus(MERGED_BRANCH),
+                    CreateBranchStatus(BRANCH2)
+                ]
+            );
+
+        _gitService.DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH, true)
+            .Returns(Task.FromException(new InvalidOperationException(ERROR_MESSAGE)));
+
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
         await _command.Parse([ROOT_DIR, "--merged", "--automatic"]).InvokeAsync();
 
         // Assert
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, BRANCH2);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH, true);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, BRANCH2, true);
         _console.Output.ShouldContain($"✗ repo1 -> feature/merged: {ERROR_MESSAGE}");
         _console.Output.ShouldContain("✓ repo1 -> feature/deletable");
         _console.Output.ShouldContain("Branch pruning completed.");
@@ -239,7 +257,7 @@ public sealed class PruneBranchesCommandTests
         await _command.Parse([ROOT_DIR, "-a"]).InvokeAsync();
 
         // Assert
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH, Arg.Any<bool>());
         _console.Output.ShouldContain("✓ repo1 -> feature/merged");
     }
 
@@ -258,7 +276,7 @@ public sealed class PruneBranchesCommandTests
         await _command.Parse([ROOT_DIR, "--merged", "--automatic"]).InvokeAsync();
 
         // Assert
-        await _gitService.Received(1).DeleteLocalBranchAsync(NESTED_REPO, MERGED_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(NESTED_REPO, MERGED_BRANCH, Arg.Any<bool>());
         _console.Output.ShouldContain($"✓ {HIERARCHICAL_NAME} -> feature/merged");
     }
 
@@ -282,9 +300,9 @@ public sealed class PruneBranchesCommandTests
         await _gitService.Received(1).GetPrunableBranchesAsync(REPO1_PATH, true, false, null);
         await _gitService.Received(1).GetPrunableBranchesAsync(REPO2_PATH, true, false, null);
         await _gitService.Received(1).GetPrunableBranchesAsync(REPO3_PATH, true, false, null);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH);
-        await _gitService.DidNotReceive().DeleteLocalBranchAsync(REPO2_PATH, Arg.Any<string>());
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO3_PATH, GONE_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH, Arg.Any<bool>());
+        await _gitService.DidNotReceive().DeleteLocalBranchAsync(REPO2_PATH, Arg.Any<string>(), Arg.Any<bool>());
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO3_PATH, GONE_BRANCH, Arg.Any<bool>());
     }
 
     [Fact]
@@ -316,7 +334,7 @@ public sealed class PruneBranchesCommandTests
 
         // Assert
         await _gitService.Received(1).GetPrunableBranchesAsync(REPO1_PATH, false, false, LARGE_DAYS);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH, Arg.Any<bool>());
     }
 
     [Theory]
@@ -375,9 +393,9 @@ public sealed class PruneBranchesCommandTests
         await _command.Parse([ROOT_DIR, "--merged", "--automatic"]).InvokeAsync();
 
         // Assert
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, COMPLEX_BRANCH1);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, COMPLEX_BRANCH2);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, COMPLEX_BRANCH3);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, COMPLEX_BRANCH1, Arg.Any<bool>());
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, COMPLEX_BRANCH2, Arg.Any<bool>());
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, COMPLEX_BRANCH3, Arg.Any<bool>());
         _console.Output.ShouldContain("✓ repo1 -> feature/JIRA-123_implement-new-feature");
         _console.Output.ShouldContain("✓ repo1 -> bugfix/fix-issue#456");
         _console.Output.ShouldContain("✓ repo1 -> release/v1.2.3-beta");
@@ -394,16 +412,16 @@ public sealed class PruneBranchesCommandTests
 
         _scanner.Scan(ROOT_DIR).Returns([REPO1_PATH]);
         _gitService.GetPrunableBranchesAsync(REPO1_PATH, true, false, null).Returns([CreateBranchStatus(SUCCESS_BRANCH), CreateBranchStatus(FAIL_BRANCH), CreateBranchStatus(SUCCESS_BRANCH2)]);
-        _gitService.DeleteLocalBranchAsync(REPO1_PATH, FAIL_BRANCH).Returns(Task.FromException(new InvalidOperationException(ERROR_MESSAGE)));
+        _gitService.DeleteLocalBranchAsync(REPO1_PATH, FAIL_BRANCH, Arg.Any<bool>()).Returns(Task.FromException(new InvalidOperationException(ERROR_MESSAGE)));
         _display.GetHierarchicalName(REPO1_PATH, ROOT_DIR).Returns("repo1");
 
         // Act
         await _command.Parse([ROOT_DIR, "--merged", "--automatic"]).InvokeAsync();
 
         // Assert
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, SUCCESS_BRANCH);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, FAIL_BRANCH);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, SUCCESS_BRANCH2);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, SUCCESS_BRANCH, Arg.Any<bool>());
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, FAIL_BRANCH, Arg.Any<bool>());
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, SUCCESS_BRANCH2, Arg.Any<bool>());
 
         _console.Output.ShouldContain("✓ repo1 -> feature/success");
         _console.Output.ShouldContain($"✗ repo1 -> feature/fail: {ERROR_MESSAGE}");
@@ -445,7 +463,7 @@ public sealed class PruneBranchesCommandTests
         // Assert - The UseConverter lambda should be called when displaying options
         // This verifies that GetHierarchicalName is called from within the converter
         _display.Received().GetHierarchicalName(REPO1_PATH, ROOT_DIR);
-        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH);
+        await _gitService.Received(1).DeleteLocalBranchAsync(REPO1_PATH, MERGED_BRANCH, Arg.Any<bool>());
     }
 
     [Fact]
@@ -468,15 +486,15 @@ public sealed class PruneBranchesCommandTests
         await _command.Parse([ROOT_DIR, "--merged", "--automatic"]).InvokeAsync();
 
         // Assert - Only normal branches should be deleted, not detached heads
-        await _gitService.Received(1).DeleteLocalBranchAsync(MAIN_REPO, NORMAL_BRANCH);
-        await _gitService.DidNotReceive().DeleteLocalBranchAsync(SUBMODULE_REPO, Arg.Any<string>());
+        await _gitService.Received(1).DeleteLocalBranchAsync(MAIN_REPO, NORMAL_BRANCH, Arg.Any<bool>());
+        await _gitService.DidNotReceive().DeleteLocalBranchAsync(SUBMODULE_REPO, Arg.Any<string>(), Arg.Any<bool>());
         _console.Output.ShouldContain("✓ sourcegit -> custom");
         _console.Output.ShouldNotContain("detached");
         _console.Output.ShouldContain("Branch pruning completed.");
     }
 
     private static BranchStatus CreateBranchStatus(string name)
-        => new BranchStatus("/repo/path", name, "xxx", false, 0, 0, true, false, DateTime.Now, true);
+        => new("/repo/path", name, "xxx", false, 0, 0, true, false, DateTime.Now, true);
 
     [Fact]
     public async Task ExecuteAsync_WithComplexBranchNamesInInteractiveMode_ShouldFormatCorrectly()
@@ -560,11 +578,11 @@ public sealed class PruneBranchesCommandTests
         await _command.Parse([ROOT_DIR, "--merged", "--automatic"]).InvokeAsync();
 
         // Assert - Only the normal branch should be processed, detached heads filtered out
-        await _gitService.Received(1).DeleteLocalBranchAsync(SOURCEGIT_REPO, CUSTOM_BRANCH);
-        await _gitService.DidNotReceive().DeleteLocalBranchAsync(COLIBRI_REPO, Arg.Any<string>());
-        await _gitService.DidNotReceive().DeleteLocalBranchAsync(AGILE_REPO, Arg.Any<string>());
-        await _gitService.DidNotReceive().DeleteLocalBranchAsync(KIOSK_REPO, Arg.Any<string>());
-        await _gitService.DidNotReceive().DeleteLocalBranchAsync(DCONNECT_REPO, Arg.Any<string>());
+        await _gitService.Received(1).DeleteLocalBranchAsync(SOURCEGIT_REPO, CUSTOM_BRANCH, Arg.Any<bool>());
+        await _gitService.DidNotReceive().DeleteLocalBranchAsync(COLIBRI_REPO, Arg.Any<string>(), Arg.Any<bool>());
+        await _gitService.DidNotReceive().DeleteLocalBranchAsync(AGILE_REPO, Arg.Any<string>(), Arg.Any<bool>());
+        await _gitService.DidNotReceive().DeleteLocalBranchAsync(KIOSK_REPO, Arg.Any<string>(), Arg.Any<bool>());
+        await _gitService.DidNotReceive().DeleteLocalBranchAsync(DCONNECT_REPO, Arg.Any<string>(), Arg.Any<bool>());
 
         // Verify only the normal branch appears in output
         _console.Output.ShouldContain("✓ sourcegit -> custom");

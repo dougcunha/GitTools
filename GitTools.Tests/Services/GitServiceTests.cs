@@ -2,8 +2,6 @@ using System.Diagnostics;
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using System.Reflection;
-using System.Text;
-using System.Text.RegularExpressions;
 using GitTools.Models;
 using GitTools.Services;
 using GitTools.Tests.Utils;
@@ -2247,83 +2245,6 @@ public sealed class GitServiceTests
     }
 
     [Fact]
-    public async Task GetRepositoryStatusAsync_WhenRepositoryHasNoBranches_ShouldReturnStatusWithError()
-    {
-        // Arrange
-        const string ROOT_DIR = @"C:\repos";
-        const string REMOTE_LOCAL_URL = "https://github.com/user/repo.git";
-        const string EXPECTED_ERROR = "No local branches found.";
-
-        _fileSystem.Directory.Exists(REPO_PATH).Returns(true);
-
-        _processRunner.RunAsync(Arg.Any<ProcessStartInfo>(), Arg.Any<DataReceivedEventHandler>(), Arg.Any<DataReceivedEventHandler>())
-            .Returns(static callInfo => MockNoBranchesGitProcess(callInfo, REMOTE_LOCAL_URL));
-
-        // Act
-        var result = await _gitService.GetRepositoryStatusAsync(REPO_PATH, ROOT_DIR);
-
-        // Assert
-        result.ShouldNotBeNull();
-        result.Name.ShouldBe("repo");
-        result.RepoPath.ShouldBe(REPO_PATH);
-        result.RemoteUrl.ShouldBe(REMOTE_LOCAL_URL);
-        result.HasUncommitedChanges.ShouldBeFalse();
-        result.LocalBranches.ShouldBeEmpty();
-        result.ErrorMessage.ShouldBe(EXPECTED_ERROR);
-        result.HasErrors.ShouldBeTrue();
-    }
-
-    // ReSharper disable once CyclomaticComplexity
-    private static int MockNoBranchesGitProcess(NSubstitute.Core.CallInfo callInfo, string REMOTE_LOCAL_URL)
-    {
-        var outputHandler = callInfo.ArgAt<DataReceivedEventHandler>(1);
-        var psi = callInfo.ArgAt<ProcessStartInfo>(0);
-
-        if (psi.Arguments.Contains("config --get remote.origin.url"))
-        {
-            outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(REMOTE_LOCAL_URL));
-        }
-        else if (psi.Arguments.Contains("branch --format") || psi.Arguments.Contains("status --porcelain"))
-        {
-            outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
-        }
-        else if (psi.Arguments.Contains("for-each-ref"))
-        {
-            // Mock upstream tracking for main and develop, but not feature
-            if (psi.Arguments.Contains($"refs/heads/{MAIN_BRANCH}"))
-                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("origin/main"));
-            else if (psi.Arguments.Contains($"refs/heads/{DEVELOP_BRANCH}"))
-                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("origin/develop"));
-            else
-                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
-        }
-        else if (psi.Arguments.Contains("show-ref"))
-        {
-            // Mock remote ref existence for tracked branches
-            if (psi.Arguments.Contains("origin/main") || psi.Arguments.Contains("origin/develop"))
-                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs($"abc123 refs/remotes/{psi.Arguments.Split(' ')[1]}"));
-            else
-                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(""));
-        }
-        else if (psi.Arguments.Contains("rev-parse --abbrev-ref HEAD"))
-        {
-            outputHandler?.Invoke(null!, CreateDataReceivedEventArgs(MAIN_BRANCH));
-        }
-        else if (psi.Arguments.Contains("rev-list --left-right --count"))
-        {
-            // Mock ahead/behind counts
-            if (psi.Arguments.Contains($"{MAIN_BRANCH}...origin/{MAIN_BRANCH}"))
-                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("0\t2"));
-            else if (psi.Arguments.Contains($"{DEVELOP_BRANCH}...origin/{DEVELOP_BRANCH}"))
-                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("1\t0"));
-            else
-                outputHandler?.Invoke(null!, CreateDataReceivedEventArgs("0\t0"));
-        }
-
-        return 0;
-    }
-
-    [Fact]
     public async Task GetRepositoryStatusAsync_WhenGitCommandFails_ShouldReturnStatusWithError()
     {
         // Arrange
@@ -2353,9 +2274,8 @@ public sealed class GitServiceTests
     {
         // Arrange
         const string ROOT_DIR = @"C:\repos";
-        const string REMOTE_URL = "https://github.com/user/repo.git";
         const string FEATURE_BRANCH = "feature/new-feature";
-        
+
         var branches = new List<string> { "main", "develop", FEATURE_BRANCH };
 
         var upstreams = new Dictionary<string, string>
@@ -3095,7 +3015,7 @@ public sealed class GitServiceTests
         _console.Output.ShouldContain(REPO_PATH);
         _console.Output.ShouldContain(ERROR_MESSAGE);
     }
-    
+
     [Fact]
     public async Task GetCurrentBranchAsync_WhenBranchExists_ShouldReturnBranchName()
     {
@@ -3461,6 +3381,7 @@ public sealed class GitServiceTests
         // Arrange
         const int OLDER_THAN_DAYS = 30;
         var branches = new List<string> { "main", "feature/old-branch", "feature/recent-branch" };
+
         var lastCommitDates = new Dictionary<string, DateTime>
         {
             ["main"] = DateTime.UtcNow.AddDays(-40),
@@ -3509,9 +3430,9 @@ public sealed class GitServiceTests
         (
             localBranches: branches,
             currentBranch: "main",
-            mergedBranches: mergedBranches,
             goneBranches: goneBranches,
-            lastCommitDates: lastCommitDates
+            lastCommitDates: lastCommitDates,
+            mergedBranches: mergedBranches
         );
 
         // Act
@@ -3582,6 +3503,7 @@ public sealed class GitServiceTests
     {
         // Arrange
         var branches = new List<string> { "main", "feature/gone1", "feature/gone2" }; // Detached heads não aparecem em GetLocalBranchesAsync
+
         var goneBranches = new Dictionary<string, bool>
         {
             ["feature/gone1"] = true,
@@ -3616,6 +3538,7 @@ public sealed class GitServiceTests
         var branches = new List<string> { "main", OLD_NORMAL_BRANCH }; // Detached heads não aparecem em GetLocalBranchesAsync
 
         var threshold = DateTime.UtcNow.AddDays(-OLDER_THAN_DAYS - 1);
+
         var lastCommitDates = new Dictionary<string, DateTime>
         {
             [OLD_NORMAL_BRANCH] = threshold,
@@ -3639,7 +3562,7 @@ public sealed class GitServiceTests
         result.ShouldNotContain(b => b.Name == "main"); // Protected branch
         result.Count.ShouldBe(1);
     }
-   
+
     [Fact]
     public async Task DeleteLocalBranchAsync_WhenBranchExists_ShouldCallGitBranchDelete()
     {

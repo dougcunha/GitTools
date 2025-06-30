@@ -40,23 +40,16 @@ public static class GitCommands
     public const string LOG_FORMAT_DATE = "log -1 --format=%cd";
     public const string FETCH = "fetch";
 
-    public static readonly string[] UPSTREAM_PATTERNS = ["%(upstream:short)"];
-    public static readonly string[] DATE_PATTERNS = ["--date=format:'%Y-%m-%d %H:%M:%S'"];
+    public static readonly string[] Upstream_Patterns = ["%(upstream:short)"];
+    public static readonly string[] Date_Patterns = ["--date=format:'%Y-%m-%d %H:%M:%S'"];
 }
 
 /// <summary>
 /// Configures Git command responses for testing purposes.
 /// </summary>
 [ExcludeFromCodeCoverage]
-public sealed class GitCommandConfigurator
+public sealed partial class GitCommandConfigurator(GitCommandConfiguratorOptions options)
 {
-    private readonly GitCommandConfiguratorOptions _options;
-
-    public GitCommandConfigurator(GitCommandConfiguratorOptions options)
-    {
-        _options = options;
-    }
-
     /// <summary>
     /// Processes a Git command and returns the appropriate response.
     /// </summary>
@@ -72,7 +65,7 @@ public sealed class GitCommandConfigurator
             var cmd when cmd.Contains(GitCommands.STATUS_PORCELAIN) => HandleModifiedFiles(),
             var cmd when cmd.Contains(GitCommands.REV_PARSE_HEAD) => HandleCurrentBranch(),
             var cmd when cmd.Contains(GitCommands.BRANCH_MERGED) => HandleMergedBranches(),
-            var cmd when cmd.Contains(GitCommands.FOR_EACH_REF_UPSTREAM) && GitCommands.UPSTREAM_PATTERNS.Any(cmd.Contains) => HandleUpstreamTracking(args),
+            var cmd when cmd.Contains(GitCommands.FOR_EACH_REF_UPSTREAM) && GitCommands.Upstream_Patterns.Any(cmd.Contains) => HandleUpstreamTracking(args),
             var cmd when cmd.Contains(GitCommands.SHOW_REF_ORIGIN) => HandleRemoteRefExistence(args),
             var cmd when cmd.Contains(GitCommands.REV_LIST_COUNT) => HandleAheadBehindCounts(args),
             var cmd when cmd.Contains(GitCommands.BRANCH_VV) => HandleGoneBranches(),
@@ -95,89 +88,68 @@ public sealed class GitCommandConfigurator
     }
 
     private string HandleRemoteUrl()
-        => _options.RemoteUrl ?? "";
+        => options.RemoteUrl ?? "";
 
     private string HandleLocalBranches()
-    {
-        if (_options.LocalBranches.Count == 0)
-        {
-            return "";
-        }
-
-        return string.Join("\n", _options.LocalBranches.Select(static b => $"'{b}'"));
-    }
+        => options.LocalBranches.Count == 0
+            ? ""
+            : string.Join("\n", options.LocalBranches.Select(static b => $"'{b}'"));
 
     private string HandleModifiedFiles()
     {
-        if (_options.ModifiedFiles == null || _options.ModifiedFiles.Count == 0)
-        {
-            return "";
-        }
-
-        return string.Join("\n", _options.ModifiedFiles.Select(static f => $"M {f}"));
+        return options.ModifiedFiles == null || options.ModifiedFiles.Count == 0
+            ? ""
+            : string.Join("\n", options.ModifiedFiles.Select(static f => $"M {f}"));
     }
 
     private string HandleCurrentBranch()
-        => _options.CurrentBranch ?? "main";
+        => options.CurrentBranch ?? "main";
 
     private string HandleMergedBranches()
     {
-        var branches = _options.MergedBranches ?? _options.LocalBranches;
+        var branches = options.MergedBranches ?? options.LocalBranches;
 
-        if (branches.Count == 0)
-        {
-            return "";
-        }
-
-        return string.Join("\n", branches.Select(static b => $"'{b}'"));
+        return branches.Count == 0
+            ? ""
+            : string.Join("\n", branches.Select(static b => $"'{b}'"));
     }
 
     private string HandleUpstreamTracking(string args)
     {
         var branchName = ExtractBranchNameFromForEachRef(args);
 
-        if (!string.IsNullOrEmpty(branchName) &&
-            _options.UpstreamBranches?.TryGetValue(branchName, out var upstream) == true)
-        {
-            return upstream;
-        }
-
-        return "";
+        return !string.IsNullOrEmpty(branchName)
+            && options.UpstreamBranches?.TryGetValue(branchName, out var upstream) == true
+                ? upstream
+                : "";
     }
 
     private string HandleRemoteRefExistence(string args)
     {
         var branchName = ExtractBranchNameFromShowRef(args);
 
-        if (!string.IsNullOrEmpty(branchName) &&
-            _options.UpstreamBranches?.ContainsKey(branchName) == true)
-        {
-            return $"abc123 refs/remotes/origin/{branchName}";
-        }
-
-        return "";
+        return !string.IsNullOrEmpty(branchName) && options.UpstreamBranches?.ContainsKey(branchName) == true
+            ? $"abc123 refs/remotes/origin/{branchName}"
+            : "";
     }
 
     private string HandleAheadBehindCounts(string args)
     {
         var branchName = ExtractBranchNameFromRevList(args);
 
-        if (!string.IsNullOrEmpty(branchName) &&
-            _options.AheadBehindCounts?.TryGetValue(branchName, out var counts) == true)
-        {
-            return $"{counts.ahead}\t{counts.behind}";
-        }
-
-        return "0\t0";
+        return !string.IsNullOrEmpty(branchName)
+            && options.AheadBehindCounts?.TryGetValue(branchName, out var counts) == true
+                ? $"{counts.ahead}\t{counts.behind}"
+                : "0\t0";
     }
 
     private string HandleGoneBranches()
     {
         var output = new StringBuilder();
 
-        foreach (var branch in _options.LocalBranches)
+        foreach (var branch in options.LocalBranches)
         {
-            var isGone = _options.GoneBranches?.TryGetValue(branch, out var gone) == true && gone;
+            var isGone = options.GoneBranches?.TryGetValue(branch, out var gone) == true && gone;
             var status = isGone ? "[origin/branch: gone]" : "[origin/branch]";
 
             output.AppendLine($"  {branch}    abc123 {status} Last commit");
@@ -190,13 +162,10 @@ public sealed class GitCommandConfigurator
     {
         var branchName = ExtractBranchNameFromLog(args);
 
-        if (!string.IsNullOrEmpty(branchName) &&
-            _options.LastCommitDates?.TryGetValue(branchName, out var date) == true)
-        {
-            return date.ToString("yyyy-MM-dd HH:mm:ss");
-        }
-
-        return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        return !string.IsNullOrEmpty(branchName)
+            && options.LastCommitDates?.TryGetValue(branchName, out var date) == true
+                ? date.ToString("yyyy-MM-dd HH:mm:ss")
+                : DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
     }
 
     private static string HandleFetch()
@@ -204,21 +173,21 @@ public sealed class GitCommandConfigurator
 
     private static string? ExtractBranchNameFromForEachRef(string args)
     {
-        var match = Regex.Match(args, @"refs/heads/(\S+)");
+        var match = BranchNameFromForEachRefRegex().Match(args);
 
         return match.Success ? match.Groups[1].Value : null;
     }
 
     private static string? ExtractBranchNameFromShowRef(string args)
     {
-        var match = Regex.Match(args, @"show-ref origin/(\S+)");
+        var match = BranchNameFromShowRefRegex().Match(args);
 
         return match.Success ? match.Groups[1].Value : null;
     }
 
     private static string? ExtractBranchNameFromRevList(string args)
     {
-        var match = Regex.Match(args, @"(\w+)\.\.\.origin/\w+");
+        var match = BranchNameFromRevListRegex().Match(args);
 
         return match.Success ? match.Groups[1].Value : null;
     }
@@ -229,4 +198,13 @@ public sealed class GitCommandConfigurator
 
         return parts.Length > 0 ? parts[^2] : null;
     }
+
+    [GeneratedRegex(@"refs/heads/(\S+)")]
+    private static partial Regex BranchNameFromForEachRefRegex();
+
+    [GeneratedRegex(@"show-ref origin/(\S+)")]
+    private static partial Regex BranchNameFromShowRefRegex();
+
+    [GeneratedRegex(@"(\w+)\.\.\.origin/\w+")]
+    private static partial Regex BranchNameFromRevListRegex();
 }

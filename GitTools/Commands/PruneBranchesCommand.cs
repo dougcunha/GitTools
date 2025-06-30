@@ -89,10 +89,120 @@ public sealed class PruneBranchesCommand : Command
         if (repoPaths.Count == 0)
         {
             _console.MarkupLine("[yellow]No Git repositories found.[/]");
+
             return;
         }
 
-        var repoBranches = await _console.Progress()
+        var repoBranches = await GetPrunableBranchesByRepositoryAsync(rootDirectory, merged, gone, olderThan, repoPaths).ConfigureAwait(false);
+
+        if (repoBranches.Count == 0)
+        {
+            _console.MarkupLine("[yellow]No branches to prune found.[/]");
+
+            return;
+        }
+
+        var branchKeys = repoBranches.SelectMany(static kv => kv.Value.Select(b => $"{kv.Key}|{b.Name}|{b.CanBeSafelyDeleted}")).ToList();
+        var selected = await PromptForBranchSelectionAsync(rootDirectory, automatic, branchKeys).ConfigureAwait(false);
+
+        if (selected.Count == 0)
+        {
+            _console.MarkupLine("[yellow]No branch selected.[/]");
+
+            return;
+        }
+
+        if (dryRun)
+        {
+            ShowDryRunResults(rootDirectory, selected);
+
+            return;
+        }
+
+        await PruneSelectedBranchesAsync(rootDirectory, selected).ConfigureAwait(false);
+
+        _console.MarkupLine("[green]Branch pruning completed.[/]");
+    }
+
+    private Task PruneSelectedBranchesAsync(string rootDirectory, List<string> selected)
+        => _console.Progress()
+        .Columns(new ProgressBarColumn
+            {
+                CompletedStyle = new Style(foreground: Color.Green1, decoration: Decoration.Conceal | Decoration.Bold | Decoration.Invert),
+                RemainingStyle = new Style(decoration: Decoration.Conceal),
+                FinishedStyle = new Style(foreground: Color.Green1, decoration: Decoration.Conceal | Decoration.Bold | Decoration.Invert)
+            },
+            new PercentageColumn(),
+            new SpinnerColumn(),
+            new TaskDescriptionColumn())
+        .StartAsync(async ctx =>
+        {
+            var task = ctx.AddTask("Deleting branches...");
+            task.MaxValue = selected.Count;
+
+            foreach (var key in selected)
+            {
+                (string repo, string branch) = SplitKey(key);
+                task.Description($"Deleting {_displayService.GetHierarchicalName(repo, rootDirectory)} -> {branch}...");
+
+                try
+                {
+                    await _gitService.DeleteLocalBranchAsync(repo, branch, force: true).ConfigureAwait(false);
+                    _console.MarkupLineInterpolated($"[green]✓ {_displayService.GetHierarchicalName(repo, rootDirectory)} -> {branch}[/]");
+                }
+                catch (Exception ex)
+                {
+                    _console.MarkupLineInterpolated($"[red]✗ {_displayService.GetHierarchicalName(repo, rootDirectory)} -> {branch}: {ex.Message}[/]");
+                }
+
+                task.Increment(1);
+            }
+
+            task.StopTask();
+        });
+
+    private void ShowDryRunResults(string rootDirectory, List<string> selected)
+    {
+        foreach (var key in selected)
+        {
+            (string repo, string branch) = SplitKey(key);
+            _console.MarkupLineInterpolated($"[blue]{_displayService.GetHierarchicalName(repo, rootDirectory)} -> {branch}[/]");
+        }
+
+        _console.MarkupLine("[green]Dry run completed.[/]");
+    }
+
+    private async Task<List<string>> PromptForBranchSelectionAsync(string rootDirectory, bool automatic, List<string> branchKeys)
+        => automatic ? branchKeys : await _console.PromptAsync
+        (
+            new MultiSelectionPrompt<string>()
+                .Title("[green]Select branches to delete[/]")
+                .NotRequired()
+                .PageSize(20)
+                .MoreChoicesText("[grey](Use space to select, enter to confirm)[/]")
+                .InstructionsText("[grey](Press [blue]<space>[/] to select, [green]<enter>[/] to confirm)[/]")
+                .AddChoiceGroup("Select all", branchKeys)
+                .UseConverter
+                (
+                    key =>
+                    {
+                        if (key == "Select all")
+                            return key;
+
+                        var parts = key.Split('|', 3);
+                        var repo = parts[0];
+                        var branch = parts[1];
+                        var canBeDeleted = parts.Length > 2 && bool.Parse(parts[2]);
+                        var canBeDeletedText = canBeDeleted ? "[green](can be safely deleted)[/]" : "[red](not fully merged)[/]";
+
+                        return $"{_displayService.GetHierarchicalName(repo, rootDirectory)} > {branch} {canBeDeletedText}";
+                    }
+                )
+        ).ConfigureAwait(false);
+
+    private Task<Dictionary<string, List<BranchStatus>>> GetPrunableBranchesByRepositoryAsync(string rootDirectory, bool merged, bool gone, int? olderThan, List<string> repoPaths)
+    {
+        return _console.Progress()
             .Columns(new ProgressBarColumn
                 {
                     CompletedStyle = new Style(foreground: Color.Green1, decoration: Decoration.Conceal | Decoration.Bold | Decoration.Invert),
@@ -122,96 +232,7 @@ public sealed class PruneBranchesCommand : Command
                 task.StopTask();
 
                 return result;
-            }).ConfigureAwait(false);
-
-        if (repoBranches.Count == 0)
-        {
-            _console.MarkupLine("[yellow]No branches to prune found.[/]");
-
-            return;
-        }
-
-        var branchKeys = repoBranches.SelectMany(kv => kv.Value.Select(b => $"{kv.Key}|{b.Name}|{b.CanBeSafelyDeleted}")).ToList();
-
-        var selected = automatic ? branchKeys : await _console.PromptAsync(
-            new MultiSelectionPrompt<string>()
-                .Title("[green]Select branches to delete[/]")
-                .NotRequired()
-                .PageSize(20)
-                .MoreChoicesText("[grey](Use space to select, enter to confirm)[/]")
-                .InstructionsText("[grey](Press [blue]<space>[/] to select, [green]<enter>[/] to confirm)[/]")
-                .AddChoiceGroup("Select all", branchKeys)
-                .UseConverter(key =>
-                {
-                    if (key == "Select all")
-                        return key;
-
-                    var parts = key.Split('|', 3);
-                    var repo = parts[0];
-                    var branch = parts[1];
-                    var canBeDeleted = parts.Length > 2 && bool.Parse(parts[2]);
-                    var canBeDeletedText = canBeDeleted ? "[green](can be safely deleted)[/]" : "[red](not fully merged)[/]";
-
-                    return $"{_displayService.GetHierarchicalName(repo, rootDirectory)} > {branch} {canBeDeletedText}";
-                }));
-
-        if (selected.Count == 0)
-        {
-            _console.MarkupLine("[yellow]No branch selected.[/]");
-
-            return;
-        }
-
-        if (dryRun)
-        {
-            foreach (var key in selected)
-            {
-                var (repo, branch) = SplitKey(key);
-                _console.MarkupLineInterpolated($"[blue]{_displayService.GetHierarchicalName(repo, rootDirectory)} -> {branch}[/]");
-            }
-
-            _console.MarkupLine("[green]Dry run completed.[/]");
-
-            return;
-        }
-
-        await _console.Progress()
-            .Columns(new ProgressBarColumn
-                {
-                    CompletedStyle = new Style(foreground: Color.Green1, decoration: Decoration.Conceal | Decoration.Bold | Decoration.Invert),
-                    RemainingStyle = new Style(decoration: Decoration.Conceal),
-                    FinishedStyle = new Style(foreground: Color.Green1, decoration: Decoration.Conceal | Decoration.Bold | Decoration.Invert)
-                },
-                new PercentageColumn(),
-                new SpinnerColumn(),
-                new TaskDescriptionColumn())
-            .StartAsync(async ctx =>
-            {
-                var task = ctx.AddTask("Deleting branches...");
-                task.MaxValue = selected.Count;
-
-                foreach (var key in selected)
-                {
-                    var (repo, branch) = SplitKey(key);
-                    task.Description($"Deleting {_displayService.GetHierarchicalName(repo, rootDirectory)} -> {branch}...");
-
-                    try
-                    {
-                        await _gitService.DeleteLocalBranchAsync(repo, branch, force: true).ConfigureAwait(false);
-                        _console.MarkupLineInterpolated($"[green]✓ {_displayService.GetHierarchicalName(repo, rootDirectory)} -> {branch}[/]");
-                    }
-                    catch (Exception ex)
-                    {
-                        _console.MarkupLineInterpolated($"[red]✗ {_displayService.GetHierarchicalName(repo, rootDirectory)} -> {branch}: {ex.Message}[/]");
-                    }
-
-                    task.Increment(1);
-                }
-
-                task.StopTask();
-            }).ConfigureAwait(false);
-
-        _console.MarkupLine("[green]Branch pruning completed.[/]");
+            });
     }
 
     private static (string repo, string branch) SplitKey(string key)

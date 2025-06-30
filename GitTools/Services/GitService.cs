@@ -21,7 +21,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     [GeneratedRegex("""\[(?<section>remote|submodule)\s+"(?<name>[^"]+)"\]""", RegexOptions.Compiled)]
     private static partial Regex RegexConfigSection();
 
-    private static readonly string[] _protectedBranches = 
+    private static readonly string[] _protectedBranches =
     [
         "master",
         "main",
@@ -510,8 +510,8 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
 
             if (fetch)
                 await FetchAsync(repositoryPath, true).ConfigureAwait(false);
-            
-            var branchStatuses = await GetBranchStatusesAsync(repositoryPath).ConfigureAwait(false);            
+
+            var branchStatuses = await GetBranchStatusesAsync(repositoryPath).ConfigureAwait(false);
 
             return new GitRepositoryStatus
             (
@@ -571,6 +571,9 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
     /// The path to the git repository for which to get branch statuses.
     /// If the path is invalid or the repository does not exist, an empty list is returned
     /// </param>
+    /// <param name="excludeDetached">
+    /// true to exclude detached HEAD branches from the results; otherwise, false.
+    /// </param>
     /// <returns>
     /// A list of <see cref="BranchStatus"/> objects representing the status of each local branch.
     /// Each <see cref="BranchStatus"/> contains information about the branch name, upstream branch,
@@ -584,18 +587,14 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         var mergedBranches = await GetMergedBranchesAsync(repositoryPath).ConfigureAwait(false);
         var goneBranches = await GetGoneBranchesAsync(repositoryPath).ConfigureAwait(false);
 
-        foreach (var branch in branches)
+        foreach (string branch in branches.Where(branch => !excludeDetached || !IsDetachedHead(branch)))
         {
-            if (excludeDetached && IsDetachedHead(branch))
-                continue; // Skip detached HEAD branches
-
-            var (isTracked, upstream) = IsBranchTrackedAsync(repositoryPath, branch).GetAwaiter().GetResult();
+            (bool isTracked, string? upstream) = IsBranchTrackedAsync(repositoryPath, branch).GetAwaiter().GetResult();
             var isCurrent = IsCurrentBranchAsync(repositoryPath, branch).GetAwaiter().GetResult();
             var isGone = goneBranches.Contains(branch, StringComparer.OrdinalIgnoreCase);
             var isFullyMerged = await IsFullyMergedAsync(repositoryPath, branch).ConfigureAwait(false);
 
-
-            var (aheadCount, behindCount) = isTracked
+            (int aheadCount, int behindCount) = isTracked
                 ? GetRemoteAheadBehindCountAsync(repositoryPath, branch, fetch: false).GetAwaiter().GetResult()
                 : (0, 0);
 
@@ -648,8 +647,8 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         {
             // Use --dry-run to check if branch can be deleted without actually deleting it
             // This is safer than actually attempting the deletion
-            var result = await RunGitCommandAsync(repositoryPath, $"branch -d --dry-run {branch}").ConfigureAwait(false);
-            
+            await RunGitCommandAsync(repositoryPath, $"branch -d --dry-run {branch}").ConfigureAwait(false);
+
             return true; // If no exception was thrown, the branch can be safely deleted
         }
         catch
@@ -747,7 +746,7 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
         {
             var branches = (await GetBranchStatusesAsync(repositoryPath).ConfigureAwait(false))
                 .Where(static b => !b.IsDetached && !b.IsCurrent && !_protectedBranches.Contains(b.Name, StringComparer.OrdinalIgnoreCase))
-                .ToList(); 
+                .ToList();
 
             if (merged)
             {
@@ -813,7 +812,6 @@ public sealed partial class GitService(IFileSystem fileSystem, IProcessRunner pr
             return [];
         }
     }
-
 
     private static bool IsDetachedHead(string branch)
         => branch.Contains("HEAD", StringComparison.OrdinalIgnoreCase) ||
